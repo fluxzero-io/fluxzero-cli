@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "host.flux.cli"
-version = "1.0-SNAPSHOT"
+version = (project.properties["appVersion"] ?: "1.0.0") as String
 
 repositories {
     mavenCentral()
