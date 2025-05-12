@@ -1,6 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.1.20"
     application
+    kotlin("jvm") version "2.1.20"
+    id("com.gradleup.shadow") version "8.3.6"
 }
 
 group = "host.flux.cli"
@@ -23,4 +24,12 @@ tasks.test {
 }
 kotlin {
     jvmToolchain(21)
+}
+
+application {
+    mainClass = "host.flux.cli.MainKt"
+}
+
+tasks.shadowJar {
+    mergeServiceFiles()
 }
