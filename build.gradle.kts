@@ -1,3 +1,5 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     application
     kotlin("jvm") version "2.1.20"
@@ -32,4 +34,22 @@ application {
 
 tasks.shadowJar {
     mergeServiceFiles()
+}
+
+tasks.register<Copy>("generateScripts") {
+    val scriptsOutputDir = layout.buildDirectory.dir("release-scripts")
+    from("scripts") {
+        include("install.sh.template")
+        filter<ReplaceTokens>(
+            "tokens" to mapOf(
+                "VERSION" to version,
+            )
+        )
+    }
+    rename("install.sh.template", "install.sh")
+    into(scriptsOutputDir)
+
+    doLast {
+        file(layout.buildDirectory.file("release-scripts/install.sh")).setExecutable(true)
+    }
 }

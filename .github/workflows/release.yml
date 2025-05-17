@@ -34,13 +34,18 @@ jobs:
           tag_prefix: ""
 
       - name: Build distribution
-        run: ./gradlew build shadowJar -PappVersion=${{ steps.tag_version.outputs.new_tag }}
+        run: ./gradlew build shadowJar generateScripts -PappVersion=${{ steps.tag_version.outputs.new_tag }}
+
+      - name: Rename files
+        run: mv build/libs/flux-cli-${{ steps.tag_version.outputs.new_tag }}-all.jar build/libs/flux-cli.jar
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
-          files: build/libs/flux-cli-${{ steps.tag_version.outputs.new_tag }}-all.jar
+          files: |
+            build/libs/flux-cli.jar
+            build/release-scripts/install.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

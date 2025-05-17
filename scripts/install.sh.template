@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+##
+## This script checks prerequisites and installs the flux-cli
+##
+
+VERSION=@VERSION@
+
+echo "Creating installation directory..."
+if ! mkdir -p ~/.flux; then
+  echo "Error: Failed to create directory ~/.flux. Please check permissions and try again."
+  exit 1
+fi
+echo "Downloading flux-cli.jar..."
+if ! curl -o ~/.flux/flux-cli.jar https://github.com/sdegroot/flux-cli/releases/${VERSION}/download/flux-cli.jar; then
+  echo "Error: Failed to download flux-cli.jar. Please check your internet connection and try again."
+  exit 1
+fi
+echo "Download successful."
+
+echo "Creating cli script..."
+if ! cat > ~/.flux/cli << EOF
+#!/usr/bin/env sh
+java -jar ~/.flux/flux-cli.jar \$@
+EOF
+then
+  echo "Error: Failed to create cli script. Please check permissions and try again."
+  exit 1
+fi
+
+echo "Setting executable permissions..."
+if ! chmod +x ~/.flux/cli; then
+  echo "Error: Failed to set executable permissions. Please check permissions and try again."
+  exit 1
+fi
+
+echo "Installation completed successfully. You can now use the flux-cli by running ~/.flux/cli"
