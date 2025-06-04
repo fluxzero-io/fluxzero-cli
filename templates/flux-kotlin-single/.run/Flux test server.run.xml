@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Flux test server" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="io.fluxcapacitor.testserver.TestServer" />
+    <module name="flux-kotlin-single.test" />
+    <option name="VM_PARAMETERS" value="-Xms6g -Xmx6g -Dport=8888" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

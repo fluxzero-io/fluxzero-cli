@@ -36,6 +36,60 @@ tasks.shadowJar {
     mergeServiceFiles()
 }
 
+sourceSets {
+    main {
+        resources {
+            srcDir("build/generated/resources")
+        }
+    }
+}
+
+val zipTemplates by tasks.registering {
+    group = "build"
+    description = "Archives each subfolder inside templates as a zip and moves them to build/"
+
+    val templatesDir = file("templates")
+    val outputDir = file("build/generated/resources/templates")
+
+
+    inputs.dir(templatesDir)
+    outputs.dir(outputDir)
+
+    doLast {
+        if (!templatesDir.exists() || !templatesDir.isDirectory) {
+            throw GradleException("templates directory does not exist")
+        }
+        // Get all subdirectories in templates
+        val templateFolders = templatesDir.listFiles { file -> file.isDirectory } ?: arrayOf()
+
+        templateFolders.forEach { folder ->
+            val folderName = folder.name
+            val zipFileName = "$folderName.zip"
+            val outputFile = File(outputDir, zipFileName)
+
+            println("Archiving template folder: $folderName")
+
+            // Run git archive command
+            val command = listOf("git", "archive", "--format=zip", "HEAD:templates/$folderName")
+
+            val processBuilder = ProcessBuilder(command)
+                .redirectOutput(outputFile)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+            val process = processBuilder.start()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw GradleException("git archive failed for folder: $folderName")
+            }
+
+            println("Created zip: ${outputFile.absolutePath}")
+        }
+    }
+}
+
+tasks.named("processResources") {
+    dependsOn(zipTemplates)
+}
+
 tasks.register<Copy>("generateScripts") {
     val scriptsOutputDir = layout.buildDirectory.dir("release-scripts")
     from("scripts") {

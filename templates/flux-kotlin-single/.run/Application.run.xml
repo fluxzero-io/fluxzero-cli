@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Application" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="21 (2)" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <envs>
+      <env name="FLUX_BASE_URL" value="ws://localhost:8888" />
+    </envs>
+    <option name="MAIN_CLASS_NAME" value="com.example.flux.FluxApplicationKt" />
+    <module name="flux-kotlin-single.main" />
+    <option name="VM_PARAMETERS" value="-Xms1g -Xmx2g" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
