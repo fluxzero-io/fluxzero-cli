@@ -3,6 +3,7 @@ package host.flux.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.validate
 import com.github.ajalt.clikt.parameters.types.path
@@ -35,6 +36,11 @@ class Init(
         }
     }
 
+    val initGit by option(
+        "--git",
+        help = "Initialize a Git repository in the generated project directory"
+    ).flag(default = false)
+
 //
 //    val anonymousMetrics by option(help = "Allow collection of anonymous usage data by Flux").switch(
 //        "--enable-usage" to "enable",
@@ -46,6 +52,18 @@ class Init(
 
         val outputDir = dir.resolve(name ?: promptForName())
         templateExtractor.extract(finalTemplate, outputDir)
+
+        if (initGit) {
+            try {
+                ProcessBuilder("git", "init")
+                    .directory(outputDir.toFile())
+                    .start()
+                    .waitFor()
+                echo("Initialized Git repository in $outputDir/.git/")
+            } catch (e: RuntimeException) {
+                echo("Failed to initialize Git: ${e.message}")
+            }
+        }
 
         echo(
             """

@@ -1,8 +1,9 @@
-package host.flux.cli
+package host.flux.cli.commands
 
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
+import host.flux.cli.Init
 import host.flux.cli.prompt.Prompt
 import host.flux.cli.template.TemplateExtractor
 import io.mockk.Runs
@@ -10,8 +11,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
-import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import java.nio.file.Paths
 import kotlin.test.Test
@@ -47,7 +47,7 @@ class InitTest {
         )
 
         verify(exactly = 1) { mockExtractor.extract("webapp", any()) }
-        assertTrue(result.stdout.contains("Successfully generated"))
+        Assertions.assertTrue(result.stdout.contains("Successfully generated"))
     }
 
     @Test
@@ -63,7 +63,7 @@ class InitTest {
 
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter name") }) }
         verify { mockExtractor.extract("cli", match { it.fileName.toString() == "prompted-name" }) }
-        assertTrue(result.stdout.contains("Successfully generated"))
+        Assertions.assertTrue(result.stdout.contains("Successfully generated"))
     }
 
     @Test
@@ -79,7 +79,7 @@ class InitTest {
 
         verify { mockPrompt.readLine(match { it.contains("Enter choice") }) }
         verify { mockExtractor.extract("basic", any()) }
-        assertTrue(result.stdout.contains("Template 'invalid-template' does not exist."))
+        Assertions.assertTrue(result.stdout.contains("Template 'invalid-template' does not exist."))
     }
 
     @Test
@@ -89,9 +89,9 @@ class InitTest {
             prompt = mockPrompt
         )
 
-        val exception = assertThrows(BadParameterValue::class.java) {
+        val exception = Assertions.assertThrows(BadParameterValue::class.java) {
             initCommand.parse(listOf("--name", "INVALID!"))
         }
-        assertTrue(exception.message!!.contains("Invalid name format"))
+        Assertions.assertTrue(exception.message!!.contains("Invalid name format"))
     }
 }
