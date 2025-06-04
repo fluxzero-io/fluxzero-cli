@@ -11,7 +11,7 @@ if ! mkdir -p ~/.flux; then
   exit 1
 fi
 echo "Downloading flux-cli.jar..."
-if ! curl -o -L ~/.flux/flux-cli.jar https://github.com/flux-capacitor-io/flux-cli/releases/${VERSION}/download/flux-cli.jar; then
+if ! curl -L -o ~/.flux/flux-cli.jar https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/flux-cli.jar; then
   echo "Error: Failed to download flux-cli.jar. Please check your internet connection and try again."
   exit 1
 fi
