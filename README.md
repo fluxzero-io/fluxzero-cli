@@ -27,3 +27,13 @@ curl https://flux-capacitor/install.sh | sh
 See the `--help` for more information.
 
 
+
+## Templates
+
+Are all located in this repository
+All templates are fully working examples and are modified by the cli to customize to your preferences
+
+Features 
+- replace package names ""
+- remove files 
+- remove certain lines 

@@ -19,6 +19,7 @@ dependencies {
     implementation("org.jline:jline:3.30.0")
 
     testImplementation(kotlin("test"))
+    testImplementation("io.mockk:mockk:1.14.2")
 }
 
 tasks.test {
@@ -62,6 +63,9 @@ val zipTemplates by tasks.registering {
         // Get all subdirectories in templates
         val templateFolders = templatesDir.listFiles { file -> file.isDirectory } ?: arrayOf()
 
+        val indexFile = outputDir.resolve("templates.csv")
+        val indexEntries = mutableListOf<String>()
+
         templateFolders.forEach { folder ->
             val folderName = folder.name
             val zipFileName = "$folderName.zip"
@@ -81,8 +85,11 @@ val zipTemplates by tasks.registering {
                 throw GradleException("git archive failed for folder: $folderName")
             }
 
+            indexEntries.add(folderName)
+
             println("Created zip: ${outputFile.absolutePath}")
         }
+        indexFile.writeText(indexEntries.joinToString("\n"))
     }
 }
 
