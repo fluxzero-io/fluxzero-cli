@@ -21,5 +21,8 @@ class FluxCli : CliktCommand() {
 
 
 fun main(args: Array<String>) = FluxCli()
-    .subcommands(Init())
+    .subcommands(
+        Init(),
+        Version(),
+    )
     .main(args)

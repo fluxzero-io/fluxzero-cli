@@ -1,4 +1,5 @@
 import org.apache.tools.ant.filters.ReplaceTokens
+import org.gradle.jvm.tasks.Jar
 
 plugins {
     application
@@ -35,6 +36,14 @@ application {
 
 tasks.shadowJar {
     mergeServiceFiles()
+}
+
+tasks.withType<Jar>().configureEach {
+    manifest {
+        attributes(
+            "Implementation-Version" to project.version,
+        )
+    }
 }
 
 sourceSets {
