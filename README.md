@@ -21,8 +21,9 @@ curl https://flux-capacitor/install.sh | sh
 ```
 
 ## Commands
- 
- - project create 
+
+ - project create
+ - version
 
 See the `--help` for more information.
 

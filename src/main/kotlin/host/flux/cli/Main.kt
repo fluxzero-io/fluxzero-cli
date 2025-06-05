@@ -5,6 +5,8 @@ import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.sources.PropertiesValueSource
+import host.flux.cli.commands.Init
+import host.flux.cli.commands.Version
 
 class FluxCli : CliktCommand() {
     init {
@@ -21,5 +23,8 @@ class FluxCli : CliktCommand() {
 
 
 fun main(args: Array<String>) = FluxCli()
-    .subcommands(Init())
+    .subcommands(
+        Init(),
+        Version(),
+    )
     .main(args)
