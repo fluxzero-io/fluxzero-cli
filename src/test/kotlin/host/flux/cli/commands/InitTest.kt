@@ -3,7 +3,7 @@ package host.flux.cli.commands
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
-import host.flux.cli.Init
+import host.flux.cli.commands.Init
 import host.flux.cli.prompt.Prompt
 import host.flux.cli.template.TemplateExtractor
 import io.mockk.Runs

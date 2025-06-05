@@ -1,8 +1,14 @@
-package host.flux.cli
+package host.flux.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 
-class Version(private val versionProvider: () -> String = { defaultVersion() }) : CliktCommand(help = "Print the release version of the flux-cli") {
+class Version(
+    private val versionProvider: () -> String = { defaultVersion() }
+) : CliktCommand() {
+
+    override fun help(context: Context): String = "Print the release version of the flux-cli"
+
     override fun run() {
         echo(versionProvider())
     }

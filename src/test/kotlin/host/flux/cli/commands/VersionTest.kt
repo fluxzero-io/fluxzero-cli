@@ -1,7 +1,7 @@
 package host.flux.cli.commands
 
 import com.github.ajalt.clikt.testing.test
-import host.flux.cli.Version
+import host.flux.cli.commands.Version
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

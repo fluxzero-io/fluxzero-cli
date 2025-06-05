@@ -1,4 +1,4 @@
-package host.flux.cli
+package host.flux.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
