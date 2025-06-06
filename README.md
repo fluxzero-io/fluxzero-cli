@@ -24,6 +24,7 @@ curl https://flux-capacitor/install.sh | sh
 
  - project create
  - version
+ - upgrade
 
 See the `--help` for more information.
 
