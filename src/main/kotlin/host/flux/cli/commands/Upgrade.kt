@@ -11,6 +11,12 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
+private const val LATEST_API_URL =
+    "https://api.github.com/repos/flux-capacitor-io/flux-cli/releases/latest"
+private const val JAR_URL_TEMPLATE =
+    "https://github.com/flux-capacitor-io/flux-cli/releases/download/%s/flux-cli.jar"
+private const val SCRIPT_TEMPLATE = "#!/usr/bin/env sh\njava -jar ~/.flux/flux-cli.jar \"\$@\"\n"
+
 class Upgrade(
     private val installer: Installer = DefaultInstaller(),
 ) : CliktCommand() {
@@ -35,14 +41,14 @@ internal class DefaultInstaller(
 ) : Installer {
 
     override fun installLatest(): String {
-        val latest = fetchLatestTag() ?: throw RuntimeException("Could not determine latest release")
+        val latest = fetchLatestTag() ?: throw IllegalStateException("Could not determine latest release")
         install(latest)
         return latest
     }
 
     private fun fetchLatestTag(): String? {
         val request = HttpRequest.newBuilder()
-            .uri(URI.create("https://api.github.com/repos/flux-capacitor-io/flux-cli/releases/latest"))
+            .uri(URI.create(LATEST_API_URL))
             .header("Accept", "application/json")
             .build()
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
@@ -55,13 +61,13 @@ internal class DefaultInstaller(
         val installDir = homeDir.resolve(".flux")
         Files.createDirectories(installDir)
 
-        val jarUrl = "https://github.com/flux-capacitor-io/flux-cli/releases/download/$tag/flux-cli.jar"
+        val jarUrl = JAR_URL_TEMPLATE.format(tag)
         val jarRequest = HttpRequest.newBuilder()
             .uri(URI.create(jarUrl))
             .build()
         val jarResponse = httpClient.send(jarRequest, HttpResponse.BodyHandlers.ofInputStream())
         if (jarResponse.statusCode() != 200) {
-            throw RuntimeException("Failed to download flux-cli.jar")
+            throw IllegalStateException("Failed to download flux-cli.jar")
         }
         val jarPath = installDir.resolve("flux-cli.jar")
         jarResponse.body().use { input ->
@@ -70,8 +76,7 @@ internal class DefaultInstaller(
 
         val cliScriptPath = installDir.resolve("cli")
         if (Files.notExists(cliScriptPath)) {
-            val scriptContent = "#!/usr/bin/env sh\njava -jar ~/.flux/flux-cli.jar \$@\n"
-            Files.writeString(cliScriptPath, scriptContent)
+            Files.writeString(cliScriptPath, SCRIPT_TEMPLATE)
         }
         cliScriptPath.toFile().setExecutable(true)
     }
