@@ -28,7 +28,9 @@ interface Installer {
 }
 
 internal class DefaultInstaller(
-    private val httpClient: HttpClient = HttpClient.newHttpClient(),
+    private val httpClient: HttpClient = HttpClient.newBuilder()
+        .followRedirects(HttpClient.Redirect.ALWAYS)
+        .build(),
     private val homeDir: Path = Paths.get(System.getProperty("user.home")),
 ) : Installer {
 
