@@ -38,3 +38,10 @@ Features
 - replace package names ""
 - remove files 
 - remove certain lines 
+
+## Building the CLI
+
+```shell
+./gradlew build shadowJar
+java -jar build/libs/flux-cli-1.0.0-all.jar version
+```
