@@ -7,6 +7,11 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.sources.PropertiesValueSource
 import host.flux.cli.commands.Init
 import host.flux.cli.commands.Version
+import host.flux.cli.UpdateChecker
+
+/**
+ * Checks for updates on startup and then launches the CLI.
+ */
 
 class FluxCli : CliktCommand() {
     init {
@@ -22,9 +27,13 @@ class FluxCli : CliktCommand() {
 }
 
 
-fun main(args: Array<String>) = FluxCli()
-    .subcommands(
-        Init(),
-        Version(),
-    )
-    .main(args)
+fun main(args: Array<String>) {
+    val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
+    UpdateChecker.notifyIfNewVersion(currentVersion) { println(it) }
+    FluxCli()
+        .subcommands(
+            Init(),
+            Version(),
+        )
+        .main(args)
+}
