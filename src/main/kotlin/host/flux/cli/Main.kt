@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.sources.PropertiesValueSource
 import host.flux.cli.commands.Init
 import host.flux.cli.commands.Version
+import host.flux.cli.commands.Upgrade
 import host.flux.cli.UpdateChecker
 
 /**
@@ -34,6 +35,7 @@ fun main(args: Array<String>) {
         .subcommands(
             Init(),
             Version(),
+            Upgrade(),
         )
         .main(args)
 }
