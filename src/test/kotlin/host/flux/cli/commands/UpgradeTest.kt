@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.testing.test
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import host.flux.cli.install.Installer
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
