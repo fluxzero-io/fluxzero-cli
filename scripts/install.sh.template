@@ -4,23 +4,46 @@
 ##
 
 VERSION=@VERSION@
+FLUX_DIR="$HOME/.flux"
+FLUX_JAR="$FLUX_DIR/flux-cli.jar"
+CLI_SCRIPT="$FLUX_DIR/cli"
+TARGET_SCRIPT="/usr/local/bin/fz"
+JAR_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/flux-cli.jar"
 
 echo "Creating installation directory..."
-if ! mkdir -p ~/.flux; then
-  echo "Error: Failed to create directory ~/.flux. Please check permissions and try again."
+if ! mkdir -p "$FLUX_DIR"; then
+  echo "Error: Failed to create directory $FLUX_DIR. Please check permissions and try again."
   exit 1
 fi
-echo "Downloading flux-cli.jar..."
-if ! curl -L -o ~/.flux/flux-cli.jar https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/flux-cli.jar; then
-  echo "Error: Failed to download flux-cli.jar. Please check your internet connection and try again."
-  exit 1
+
+if [ -s "$FLUX_JAR" ]; then
+  echo "$FLUX_JAR already exists. Skipping installation. Run 'fz upgrade' to upgrade your Flux version."
+else
+  echo "Checking if flux-cli.jar is available at remote URL..."
+  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$JAR_URL")
+  if [ "$HTTP_STATUS" -ne 200 ]; then
+    echo "Error: Remote file not available (HTTP status $HTTP_STATUS). Aborting download."
+    exit 1
+  fi
+
+  echo "Downloading flux-cli.jar..."
+  if ! curl -s -L -o "$FLUX_JAR" "$JAR_URL"; then
+    echo "Error: Failed to download flux-cli.jar. Please check your internet connection and try again."
+    exit 1
+  fi
+
+  if [ ! -s "$FLUX_JAR" ]; then
+    echo "Error: flux-cli.jar was downloaded but is empty. Please try again."
+    exit 1
+  fi
+
+  echo "Download successful."
 fi
-echo "Download successful."
 
 echo "Creating cli script..."
-if ! cat > ~/.flux/cli << EOF
+if ! cat > "$CLI_SCRIPT" << EOF
 #!/usr/bin/env sh
-java -jar ~/.flux/flux-cli.jar \$@
+java -jar $FLUX_JAR \$@
 EOF
 then
   echo "Error: Failed to create cli script. Please check permissions and try again."
@@ -28,9 +51,39 @@ then
 fi
 
 echo "Setting executable permissions..."
-if ! chmod +x ~/.flux/cli; then
+if ! chmod +x "$CLI_SCRIPT"; then
   echo "Error: Failed to set executable permissions. Please check permissions and try again."
   exit 1
 fi
 
-echo "Installation completed successfully. You can now use the flux-cli by running ~/.flux/cli"
+## Installation on PATH
+
+echo "Would you like to make flux-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
+read -r INSTALL_PATH
+case "${INSTALL_PATH}" in
+  [Yy]*)
+    echo "Creating ${TARGET_SCRIPT}..."
+    if command -v sudo >/dev/null 2>&1; then
+      SUDO="sudo"
+    else
+      SUDO=""
+    fi
+
+    if ! echo '#!/usr/bin/env sh
+exec ~/.flux/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
+      echo "Error: Failed to create ${TARGET_SCRIPT}. Please check permissions and try again."
+      exit 1
+    fi
+
+    if ! $SUDO chmod +x "${TARGET_SCRIPT}"; then
+      echo "Error: Failed to set executable permissions for ${TARGET_SCRIPT}. Please check permissions and try again."
+      exit 1
+    fi
+
+    echo "Installation completed successfully. You can now use the flux-cli by running fz from anywhere."
+    ;;
+  *)
+    echo "Skipping PATH installation. You can run the CLI using ~/.flux/cli"
+    echo "Installation completed successfully."
+    ;;
+esac
