@@ -33,4 +33,25 @@ if ! chmod +x ~/.flux/cli; then
   exit 1
 fi
 
-echo "Installation completed successfully. You can now use the flux-cli by running ~/.flux/cli"
+TARGET_SCRIPT="/usr/bin/flux-cli"
+echo "Creating ${TARGET_SCRIPT} to add flux-cli to your PATH..."
+if command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+else
+  SUDO=""
+fi
+
+if ! $SUDO sh -c 'cat > '"${TARGET_SCRIPT}"' << EOF
+#!/usr/bin/env sh
+exec ~/.flux/cli "$@"
+EOF'; then
+  echo "Error: Failed to create ${TARGET_SCRIPT}. Please check permissions and try again."
+  exit 1
+fi
+
+if ! $SUDO chmod +x "${TARGET_SCRIPT}"; then
+  echo "Error: Failed to set executable permissions for ${TARGET_SCRIPT}. Please check permissions and try again."
+  exit 1
+fi
+
+echo "Installation completed successfully. You can now use the flux-cli by running flux-cli from anywhere."
