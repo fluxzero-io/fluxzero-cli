@@ -17,8 +17,10 @@ Instead, each project determines which version of the cli it uses in the `.flux/
 You can scaffold a new project using the following command:
 
 ```shell
-curl https://flux-capacitor/install.sh | sh 
+curl https://flux-capacitor/install.sh | sh
 ```
+
+During installation you will be prompted to create `/usr/bin/fz` so the CLI is available on your `PATH`.
 
 ## Commands
 
