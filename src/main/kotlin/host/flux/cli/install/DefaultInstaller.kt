@@ -10,9 +10,9 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
 internal const val LATEST_API_URL =
-    "https://api.github.com/repos/flux-capacitor-io/fluxzero-cli/releases/latest"
+    "https://api.github.com/repos/flux-capacitor-io/flux-cli/releases/latest"
 internal const val JAR_URL_TEMPLATE =
-    "https://github.com/flux-capacitor-io/fluxzero-cli/releases/download/%s/fluxzero-cli.jar"
+    "https://github.com/flux-capacitor-io/flux-cli/releases/download/%s/fluxzero-cli.jar"
 internal const val SCRIPT_TEMPLATE = "#!/usr/bin/env sh\njava -jar ~/.flux/fluxzero-cli.jar \"\$@\"\n"
 
 internal class DefaultInstaller(
