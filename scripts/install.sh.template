@@ -59,7 +59,7 @@ fi
 ## Installation on PATH
 
 echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
-read -r INSTALL_PATH
+read -r INSTALL_PATH < /dev/tty
 case "${INSTALL_PATH}" in ([Yy]*)
     echo "Creating ${TARGET_SCRIPT}..."
     if command -v sudo >/dev/null 2>&1; then
