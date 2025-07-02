@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="App" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+    <envs>
+      <env name="ENVIRONMENT" value="local" />
+      <env name="FLUX_APPLICATION_NAME" value="Rebound" />
+      <env name="FLUX_BASE_URL" value="ws://localhost:8888" />
+    </envs>
+    <module name="gamerental" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.app.App" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

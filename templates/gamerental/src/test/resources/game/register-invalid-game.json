@@ -1,0 +1,6 @@
+{
+  "@extends": "register-game.json",
+  "details": {
+    "title":  ""
+  }
+}

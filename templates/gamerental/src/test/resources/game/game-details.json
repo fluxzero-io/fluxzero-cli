@@ -1,0 +1,7 @@
+{
+  "@class": "GameDetails",
+  "title":  "My first game",
+  "releaseDate": "2025-05-15T00:00:00Z",
+  "description":  "Game for testing game registration",
+  "tags": ["singleplayer", "strategy"]
+}

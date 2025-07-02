@@ -1,0 +1,10 @@
+{
+  "@class": "RegisterGame",
+  "gameId": "other",
+  "details": {
+    "title": "Skyward Legends",
+    "releaseDate": "2023-11-15T00:00:00Z",
+    "description": "An epic singleplayer adventure where you ascend floating isles to uncover the secrets of a forgotten civilization.",
+    "tags": ["singleplayer", "adventure"]
+  }
+}

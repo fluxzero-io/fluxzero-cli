@@ -1,0 +1,9 @@
+GET {{baseUrl}}/static/index.html
+
+###
+
+GET {{baseUrl}}/static/unknown-path
+
+###
+
+GET {{baseUrl}}/static/assets/logo.png

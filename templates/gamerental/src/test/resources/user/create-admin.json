@@ -1,0 +1,8 @@
+{
+  "@class" : "CreateUser",
+  "userId": "admin",
+  "details": {
+    "name": "An admin"
+  },
+  "role": "admin"
+}

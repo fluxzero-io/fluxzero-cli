@@ -1,0 +1,185 @@
+{
+  "@class": "RegisterGames",
+  "games": [
+    {
+      "gameId": "skyward_legends",
+      "details": {
+        "title": "Skyward Legends",
+        "releaseDate": "2023-11-15T00:00:00Z",
+        "description": "An epic singleplayer adventure where you ascend floating isles to uncover the secrets of a forgotten civilization.",
+        "tags": ["singleplayer", "adventure"]
+      }
+    },
+    {
+      "gameId": "rift_racers",
+      "details": {
+        "title": "Rift Racers",
+        "releaseDate": "2025-08-01T00:00:00Z",
+        "description": "A high-speed multiplayer racing game set across interdimensional tracks that shift and collapse as you race.",
+        "tags": ["multiplayer", "racing"]
+      }
+    },
+    {
+      "gameId": "puzzle_protocol",
+      "details": {
+        "title": "Puzzle Protocol",
+        "releaseDate": "2024-02-28T00:00:00Z",
+        "description": "Solve cryptographic mysteries and outsmart a rogue AI in this cerebral singleplayer puzzle adventure.",
+        "tags": ["singleplayer", "puzzle"]
+      }
+    },
+    {
+      "gameId": "battleborn_2049",
+      "details": {
+        "title": "Battleborn 2049",
+        "releaseDate": "2023-07-04T00:00:00Z",
+        "description": "Join elite squads in futuristic urban combat where tactics, reflexes, and teamwork decide the fate of megacities.",
+        "tags": ["multiplayer", "shooter", "action"]
+      }
+    },
+    {
+      "gameId": "chrono_chess",
+      "details": {
+        "title": "Chrono Chess",
+        "releaseDate": "2022-09-19T00:00:00Z",
+        "description": "Classic strategy meets time travel in this mind-bending turn-based chess variant set across multiple timelines.",
+        "tags": ["singleplayer", "strategy"]
+      }
+    },
+    {
+      "gameId": "stormline_soccer",
+      "details": {
+        "title": "Stormline Soccer",
+        "releaseDate": "2024-05-01T00:00:00Z",
+        "description": "Fast-paced multiplayer soccer in dynamic stadiums with real-time weather effects and mid-match power-ups.",
+        "tags": ["multiplayer", "sports"]
+      }
+    },
+    {
+      "gameId": "pixelward",
+      "details": {
+        "title": "Pixelward",
+        "releaseDate": "2023-03-12T00:00:00Z",
+        "description": "A charming singleplayer retro-style RPG where you build pixel-sized armies and conquer colorful kingdoms.",
+        "tags": ["singleplayer", "strategy"]
+      }
+    },
+    {
+      "gameId": "echoes_of_ember",
+      "details": {
+        "title": "Echoes of Ember",
+        "releaseDate": "2025-10-30T00:00:00Z",
+        "description": "Traverse enchanted lands in a mystical action-adventure to restore the eternal flame stolen by shadow beasts.",
+        "tags": ["singleplayer", "action", "adventure"]
+      }
+    },
+    {
+      "gameId": "moto_mech_arena",
+      "details": {
+        "title": "Moto Mech Arena",
+        "releaseDate": "2024-07-14T00:00:00Z",
+        "description": "Mount your custom mech bikes and fight in turbo-charged duels across wasteland arenas.",
+        "tags": ["multiplayer", "racing", "action"]
+      }
+    },
+    {
+      "gameId": "nebula_clash",
+      "details": {
+        "title": "Nebula Clash",
+        "releaseDate": "2023-12-05T00:00:00Z",
+        "description": "Engage in massive MMO space battles where factions fight for control over the last habitable systems.",
+        "tags": ["multiplayer", "mmo", "shooter"]
+      }
+    },
+    {
+      "gameId": "silent_signal",
+      "details": {
+        "title": "Silent Signal",
+        "releaseDate": "2023-10-01T00:00:00Z",
+        "description": "Hack into secure networks and decipher encrypted messages in this stealthy solo puzzle thriller.",
+        "tags": ["singleplayer", "puzzle"]
+      }
+    },
+    {
+      "gameId": "island_inferno",
+      "details": {
+        "title": "Island Inferno",
+        "releaseDate": "2024-03-20T00:00:00Z",
+        "description": "Battle mutated wildlife and unstable volcanoes in this fast-paced jungle shooter survival game.",
+        "tags": ["singleplayer", "action", "shooter"]
+      }
+    },
+    {
+      "gameId": "tactical_frontline",
+      "details": {
+        "title": "Tactical Frontline",
+        "releaseDate": "2022-12-08T00:00:00Z",
+        "description": "Command your platoon in real-time tactical scenarios based on historical and speculative conflicts.",
+        "tags": ["strategy", "multiplayer"]
+      }
+    },
+    {
+      "gameId": "velocity_veins",
+      "details": {
+        "title": "Velocity Veins",
+        "releaseDate": "2024-09-17T00:00:00Z",
+        "description": "Drift through gravity-defying urban tracks in a futuristic bloodsport where speed is survival.",
+        "tags": ["racing", "action"]
+      }
+    },
+    {
+      "gameId": "quantum_loop",
+      "details": {
+        "title": "Quantum Loop",
+        "releaseDate": "2025-01-11T00:00:00Z",
+        "description": "A singleplayer puzzle-platformer where manipulating quantum states alters the flow of time and space.",
+        "tags": ["singleplayer", "puzzle"]
+      }
+    },
+    {
+      "gameId": "galactic_guilds",
+      "details": {
+        "title": "Galactic Guilds",
+        "releaseDate": "2023-08-22T00:00:00Z",
+        "description": "Form guilds and build empires in a persistent online universe teeming with politics, trade, and space warfare.",
+        "tags": ["mmo", "strategy"]
+      }
+    },
+    {
+      "gameId": "street_arts_showdown",
+      "details": {
+        "title": "Street Arts Showdown",
+        "releaseDate": "2022-11-05T00:00:00Z",
+        "description": "Team up in urban crews to compete in stylized graffiti duels and dance-offs in this rhythm-action hybrid.",
+        "tags": ["multiplayer", "action"]
+      }
+    },
+    {
+      "gameId": "mindmaze",
+      "details": {
+        "title": "Mindmaze",
+        "releaseDate": "2024-01-30T00:00:00Z",
+        "description": "Navigate a labyrinth of logic and illusion as you challenge yourself with increasingly devious mental puzzles.",
+        "tags": ["puzzle", "singleplayer"]
+      }
+    },
+    {
+      "gameId": "strikezone_omega",
+      "details": {
+        "title": "Strikezone Omega",
+        "releaseDate": "2023-05-10T00:00:00Z",
+        "description": "Drop into war-torn exoplanets as elite operatives in this gritty tactical multiplayer shooter.",
+        "tags": ["multiplayer", "shooter"]
+      }
+    },
+    {
+      "gameId": "hypergrid_hoops",
+      "details": {
+        "title": "Hypergrid Hoops",
+        "releaseDate": "2025-06-25T00:00:00Z",
+        "description": "Experience gravity-bending basketball on dynamic arenas that reshape after every dunk.",
+        "tags": ["sports", "multiplayer"]
+      }
+    }
+  ]
+}
