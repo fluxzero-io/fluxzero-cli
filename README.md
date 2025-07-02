@@ -1,15 +1,15 @@
-# flux-cli 
+# fluxzero-cli 
 
-The idea behind the flux-cli is an easy way to interact with flux (and flux-cloud). 
+The idea behind the fluxzero-cli is an easy way to interact with flux (and flux-cloud). 
 It can scaffold new projects, perform dependency upgrades, generate example code and manage flux cloud resources.
 
 ## Compatibility
 
-The `flux-cli` is built using Kotlin and distributed as a jar.
+The `fluxzero-cli` is built using Kotlin and distributed as a jar.
 
 ## Installation
 
-The flux-cli is not installed globally. 
+The fluxzero-cli is not installed globally. 
 Instead, each project determines which version of the cli it uses in the `.flux/config.yaml` file.
 
 ## Getting started
@@ -46,5 +46,11 @@ Features
 
 ```shell
 ./gradlew build shadowJar
-java -jar build/libs/flux-cli-1.0.0-all.jar version
+java -jar build/libs/fluxzero-cli-1.0.0-all.jar version
 ```
+
+
+TODO
+
+- GitHub action
+- Dockerfile 

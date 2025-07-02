@@ -6,7 +6,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 object UpdateChecker {
-    private const val LATEST_RELEASE_URL = "https://api.github.com/repos/flux-capacitor-io/flux-cli/releases/latest"
+    private const val LATEST_RELEASE_URL = "https://api.github.com/repos/flux-capacitor-io/fluxzero-cli/releases/latest"
 
     internal fun isNewer(current: String, latest: String): Boolean {
         val curParts = parseVersion(current)
@@ -35,7 +35,7 @@ object UpdateChecker {
                 val tagRegex = "\"tag_name\"\\s*:\\s*\"([^\"]+)\"".toRegex()
                 val latest = tagRegex.find(response.body())?.groupValues?.get(1)
                 if (latest != null && isNewer(currentVersion, latest)) {
-                    notify("A new version of flux-cli is available: $latest (current: $currentVersion)")
+                    notify("A new version of fluxzero-cli is available: $latest (current: $currentVersion)")
                 }
             }
         } catch (_: Exception) {

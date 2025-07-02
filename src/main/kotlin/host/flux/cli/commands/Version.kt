@@ -7,7 +7,7 @@ class Version(
     private val versionProvider: () -> String = { defaultVersion() }
 ) : CliktCommand() {
 
-    override fun help(context: Context): String = "Print the release version of the flux-cli"
+    override fun help(context: Context): String = "Print the release version of the fluxzero-cli"
 
     override fun run() {
         echo(versionProvider())

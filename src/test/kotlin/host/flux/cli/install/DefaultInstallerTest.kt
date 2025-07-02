@@ -29,13 +29,13 @@ class DefaultInstallerTest {
         val jarStream = ByteArrayInputStream("dummy".toByteArray())
         every { jarResponse.statusCode() } returns 200
         every { jarResponse.body() } returns jarStream
-        every { httpClient.send(match { it.uri().toString().contains("v2.0.0/flux-cli.jar") }, any<HttpResponse.BodyHandler<InputStream>>()) } returns jarResponse
+        every { httpClient.send(match { it.uri().toString().contains("v2.0.0/fluxzero-cli.jar") }, any<HttpResponse.BodyHandler<InputStream>>()) } returns jarResponse
 
         val installer = DefaultInstaller(httpClient, tempHome)
         val version = installer.installLatest()
 
         assertEquals("v2.0.0", version)
-        assertTrue(Files.exists(tempHome.resolve(".flux/flux-cli.jar")))
+        assertTrue(Files.exists(tempHome.resolve(".flux/fluxzero-cli.jar")))
         assertTrue(Files.exists(tempHome.resolve(".flux/cli")))
     }
 }

@@ -9,10 +9,10 @@ class Upgrade(
     private val installer: Installer = DefaultInstaller(),
 ) : CliktCommand() {
 
-    override fun help(context: Context): String = "Download and install the latest flux-cli release"
+    override fun help(context: Context): String = "Download and install the latest fluxzero-cli release"
 
     override fun run() {
         val version = installer.installLatest()
-        echo("flux-cli upgraded to $version")
+        echo("fluxzero-cli upgraded to $version")
     }
 }

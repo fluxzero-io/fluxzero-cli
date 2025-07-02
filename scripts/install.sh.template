@@ -1,14 +1,14 @@
 #!/usr/bin/env sh
 ##
-## This script checks prerequisites and installs the flux-cli
+## This script checks prerequisites and installs the fluxzero-cli
 ##
 
 VERSION=@VERSION@
-FLUX_DIR="$HOME/.flux"
-FLUX_JAR="$FLUX_DIR/flux-cli.jar"
+FLUX_DIR="$HOME/.fluxzero"
+FLUX_JAR="$FLUX_DIR/fluxzero-cli.jar"
 CLI_SCRIPT="$FLUX_DIR/cli"
 TARGET_SCRIPT="/usr/local/bin/fz"
-JAR_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/flux-cli.jar"
+JAR_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/fluxzero-cli.jar"
 
 echo "Creating installation directory..."
 if ! mkdir -p "$FLUX_DIR"; then
@@ -19,21 +19,21 @@ fi
 if [ -s "$FLUX_JAR" ]; then
   echo "$FLUX_JAR already exists. Skipping installation. Run 'fz upgrade' to upgrade your Flux version."
 else
-  echo "Checking if flux-cli.jar is available at remote URL..."
+  echo "Checking if fluxzero-cli.jar is available at remote URL..."
   HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$JAR_URL")
   if [ "$HTTP_STATUS" -ne 200 ]; then
     echo "Error: Remote file not available (HTTP status $HTTP_STATUS). Aborting download."
     exit 1
   fi
 
-  echo "Downloading flux-cli.jar..."
+  echo "Downloading fluxzero-cli.jar..."
   if ! curl -s -L -o "$FLUX_JAR" "$JAR_URL"; then
-    echo "Error: Failed to download flux-cli.jar. Please check your internet connection and try again."
+    echo "Error: Failed to download fluxzero-cli.jar. Please check your internet connection and try again."
     exit 1
   fi
 
   if [ ! -s "$FLUX_JAR" ]; then
-    echo "Error: flux-cli.jar was downloaded but is empty. Please try again."
+    echo "Error: fluxzero-cli.jar was downloaded but is empty. Please try again."
     exit 1
   fi
 
@@ -58,10 +58,9 @@ fi
 
 ## Installation on PATH
 
-echo "Would you like to make flux-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
+echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
 read -r INSTALL_PATH
-case "${INSTALL_PATH}" in
-  [Yy]*)
+case "${INSTALL_PATH}" in ([Yy]*)
     echo "Creating ${TARGET_SCRIPT}..."
     if command -v sudo >/dev/null 2>&1; then
       SUDO="sudo"
@@ -69,8 +68,7 @@ case "${INSTALL_PATH}" in
       SUDO=""
     fi
 
-    if ! echo '#!/usr/bin/env sh
-exec ~/.flux/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
+    if ! echo '#!/usr/bin/env sh exec ~/.fluxzero/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
       echo "Error: Failed to create ${TARGET_SCRIPT}. Please check permissions and try again."
       exit 1
     fi
@@ -80,10 +78,10 @@ exec ~/.flux/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
       exit 1
     fi
 
-    echo "Installation completed successfully. You can now use the flux-cli by running fz from anywhere."
+    echo "Installation completed successfully. You can now use the fluxzero-cli by running fz from anywhere."
     ;;
   *)
-    echo "Skipping PATH installation. You can run the CLI using ~/.flux/cli"
+    echo "Skipping PATH installation. You can run the CLI using ~/.fluxzero/cli"
     echo "Installation completed successfully."
     ;;
 esac

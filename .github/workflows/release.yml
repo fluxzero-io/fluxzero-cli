@@ -37,7 +37,7 @@ jobs:
         run: ./gradlew build shadowJar generateScripts -PappVersion=${{ steps.tag_version.outputs.new_tag }}
 
       - name: Rename files
-        run: mv build/libs/flux-cli-${{ steps.tag_version.outputs.new_tag }}-all.jar build/libs/flux-cli.jar
+        run: mv build/libs/fluxzero-cli-${{ steps.tag_version.outputs.new_tag }}-all.jar build/libs/fluxzero-cli.jar
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -45,7 +45,7 @@ jobs:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           files: |
-            build/libs/flux-cli.jar
+            build/libs/fluxzero-cli.jar
             build/release-scripts/install.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,10 +10,10 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
 internal const val LATEST_API_URL =
-    "https://api.github.com/repos/flux-capacitor-io/flux-cli/releases/latest"
+    "https://api.github.com/repos/flux-capacitor-io/fluxzero-cli/releases/latest"
 internal const val JAR_URL_TEMPLATE =
-    "https://github.com/flux-capacitor-io/flux-cli/releases/download/%s/flux-cli.jar"
-internal const val SCRIPT_TEMPLATE = "#!/usr/bin/env sh\njava -jar ~/.flux/flux-cli.jar \"\$@\"\n"
+    "https://github.com/flux-capacitor-io/fluxzero-cli/releases/download/%s/fluxzero-cli.jar"
+internal const val SCRIPT_TEMPLATE = "#!/usr/bin/env sh\njava -jar ~/.flux/fluxzero-cli.jar \"\$@\"\n"
 
 internal class DefaultInstaller(
     private val httpClient: HttpClient = HttpClient.newBuilder()
@@ -49,9 +49,9 @@ internal class DefaultInstaller(
             .build()
         val jarResponse = httpClient.send(jarRequest, HttpResponse.BodyHandlers.ofInputStream())
         if (jarResponse.statusCode() != 200) {
-            throw IllegalStateException("Failed to download flux-cli.jar")
+            throw IllegalStateException("Failed to download fluxzero-cli.jar")
         }
-        val jarPath = installDir.resolve("flux-cli.jar")
+        val jarPath = installDir.resolve("fluxzero-cli.jar")
         jarResponse.body().use { input ->
             Files.copy(input, jarPath, StandardCopyOption.REPLACE_EXISTING)
         }
