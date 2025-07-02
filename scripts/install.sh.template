@@ -3,6 +3,22 @@
 ## This script checks prerequisites and installs the fluxzero-cli
 ##
 
+# Parse command line arguments
+INSTALL_PATH=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --install-path)
+            INSTALL_PATH="y"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--install-path]"
+            exit 1
+            ;;
+    esac
+done
+
 VERSION=@VERSION@
 FLUX_DIR="$HOME/.fluxzero"
 FLUX_JAR="$FLUX_DIR/fluxzero-cli.jar"
@@ -58,8 +74,12 @@ fi
 
 ## Installation on PATH
 
-echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
-read -r INSTALL_PATH < /dev/tty
+# Skip prompt if --install-path was provided
+if [ -z "$INSTALL_PATH" ]; then
+    echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
+    read -r INSTALL_PATH < /dev/tty
+fi
+
 case "${INSTALL_PATH}" in ([Yy]*)
     echo "Creating ${TARGET_SCRIPT}..."
     if command -v sudo >/dev/null 2>&1; then
