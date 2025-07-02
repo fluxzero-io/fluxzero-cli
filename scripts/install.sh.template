@@ -3,6 +3,32 @@
 ## This script checks prerequisites and installs the fluxzero-cli
 ##
 
+# Parse command line arguments
+INSTALL_PATH=""
+CUSTOM_JAR=""
+FORCE_INSTALL=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --install-path)
+            INSTALL_PATH="y"
+            shift
+            ;;
+        --jar=*)
+            CUSTOM_JAR="${1#*=}"
+            shift
+            ;;
+        --force)
+            FORCE_INSTALL="y"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--install-path] [--jar=PATH_OR_URL] [--force]"
+            exit 1
+            ;;
+    esac
+done
+
 VERSION=@VERSION@
 FLUX_DIR="$HOME/.fluxzero"
 FLUX_JAR="$FLUX_DIR/fluxzero-cli.jar"
@@ -16,9 +42,37 @@ if ! mkdir -p "$FLUX_DIR"; then
   exit 1
 fi
 
-if [ -s "$FLUX_JAR" ]; then
-  echo "$FLUX_JAR already exists. Skipping installation. Run 'fz upgrade' to upgrade your Flux version."
+if [ -n "$CUSTOM_JAR" ]; then
+  echo "Using custom JAR: $CUSTOM_JAR"
+  
+  # Check if it's a local file or URL
+  if [ -f "$CUSTOM_JAR" ]; then
+    echo "Copying local JAR file..."
+    if ! cp "$CUSTOM_JAR" "$FLUX_JAR"; then
+      echo "Error: Failed to copy JAR file from $CUSTOM_JAR"
+      exit 1
+    fi
+  else
+    echo "Downloading JAR from custom URL..."
+    if ! curl -s -L -o "$FLUX_JAR" "$CUSTOM_JAR"; then
+      echo "Error: Failed to download JAR from $CUSTOM_JAR"
+      exit 1
+    fi
+  fi
+  
+  if [ ! -s "$FLUX_JAR" ]; then
+    echo "Error: JAR file is empty after copy/download."
+    exit 1
+  fi
+  
+  echo "Custom JAR installation successful."
+elif [ -s "$FLUX_JAR" ] && [ -z "$FORCE_INSTALL" ]; then
+  echo "$FLUX_JAR already exists. Skipping installation. Run 'fz upgrade' or use --force to reinstall."
 else
+  if [ -s "$FLUX_JAR" ] && [ -n "$FORCE_INSTALL" ]; then
+    echo "Forcing reinstallation of $FLUX_JAR..."
+  fi
+  
   echo "Checking if fluxzero-cli.jar is available at remote URL..."
   HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$JAR_URL")
   if [ "$HTTP_STATUS" -ne 200 ]; then
@@ -58,8 +112,12 @@ fi
 
 ## Installation on PATH
 
-echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
-read -r INSTALL_PATH < /dev/tty
+# Skip prompt if --install-path was provided
+if [ -z "$INSTALL_PATH" ]; then
+    echo "Would you like to make fluxzero-cli available on your PATH by creating ${TARGET_SCRIPT}? [y/N]"
+    read -r INSTALL_PATH < /dev/tty
+fi
+
 case "${INSTALL_PATH}" in ([Yy]*)
     echo "Creating ${TARGET_SCRIPT}..."
     if command -v sudo >/dev/null 2>&1; then
