@@ -39,6 +39,65 @@ jobs:
       - name: Rename files
         run: mv build/libs/fluxzero-cli-${{ steps.tag_version.outputs.new_tag }}-all.jar build/libs/fluxzero-cli.jar
 
+      - name: Verify JAR functionality
+        run: |
+          echo "Testing JAR with 'templates list' command..."
+          java -jar build/libs/fluxzero-cli.jar templates list
+          if [ $? -ne 0 ]; then
+            echo "JAR verification failed!"
+            exit 1
+          fi
+          echo "JAR verification successful!"
+
+      - name: Verify install script
+        run: |
+          echo "Testing install script..."
+          # Create a test environment
+          export TEST_HOME=$(mktemp -d)
+          export HOME=$TEST_HOME
+          
+          # Run install script with --install-path flag and local JAR
+          bash build/release-scripts/install.sh --install-path --jar="$(pwd)/build/libs/fluxzero-cli.jar"
+          
+          # Check if the CLI script was created
+          if [ ! -x "$TEST_HOME/.fluxzero/cli" ]; then
+            echo "Install script failed to create CLI script!"
+            exit 1
+          fi
+          
+          # Test the installed CLI
+          $TEST_HOME/.fluxzero/cli version
+          if [ $? -ne 0 ]; then
+            echo "Installed CLI verification failed!"
+            exit 1
+          fi
+          
+          # Check if fz was created in /usr/local/bin
+          if [ ! -x "/usr/local/bin/fz" ]; then
+            echo "Install script failed to create /usr/local/bin/fz!"
+            exit 1
+          fi
+          
+          # Test the fz command directly
+          fz version
+          if [ $? -ne 0 ]; then
+            echo "fz command verification failed!"
+            exit 1
+          fi
+          
+          # Also test templates list command via fz
+          fz templates list
+          if [ $? -ne 0 ]; then
+            echo "fz templates list command failed!"
+            exit 1
+          fi
+          
+          echo "Install script verification successful!"
+          
+          # Cleanup
+          sudo rm -f /usr/local/bin/fz
+          rm -rf $TEST_HOME
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
