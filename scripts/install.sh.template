@@ -68,7 +68,7 @@ case "${INSTALL_PATH}" in ([Yy]*)
       SUDO=""
     fi
 
-    if ! echo '#!/usr/bin/env sh exec ~/.fluxzero/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
+    if ! printf '#!/usr/bin/env sh\nexec ~/.fluxzero/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
       echo "Error: Failed to create ${TARGET_SCRIPT}. Please check permissions and try again."
       exit 1
     fi
