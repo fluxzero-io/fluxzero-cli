@@ -19,8 +19,8 @@ class FluxCli : CliktCommand() {
         context {
             // Load default configuration options
             valueSources(
-                PropertiesValueSource.from("~/.flux/cli.properties"),
-                PropertiesValueSource.from(".flux/cli.properties"),
+                PropertiesValueSource.from("~/.fluxzero/cli.properties"),
+                PropertiesValueSource.from(".fluxzero/cli.properties"),
             )
         }
     }
