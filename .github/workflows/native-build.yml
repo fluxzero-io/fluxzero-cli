@@ -1,6 +1,9 @@
 name: Native Image Build
 
 on:
+  push:
+    branches:
+      - feature/graalvm
   workflow_call:
   workflow_dispatch:
 
