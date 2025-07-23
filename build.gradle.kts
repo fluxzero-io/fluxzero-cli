@@ -49,14 +49,6 @@ graalvmNative {
                 "--initialize-at-build-time=kotlin",
                 "--initialize-at-run-time=org.jline"
             )
-            
-            // Add memory optimization for ARM64 builds
-            if (System.getProperty("os.arch") == "aarch64") {
-                buildArgs.addAll(
-                    "-J-Xmx2g",
-                    "--gc=serial"
-                )
-            }
         }
     }
     binaries.all {

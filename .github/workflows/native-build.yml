@@ -16,83 +16,44 @@ jobs:
         include:
           - os: linux-amd64
             runner: ubuntu-latest
-            platform: linux/amd64
             artifact-name: flux-linux-amd64
-            use-docker: true
-          - os: linux-arm64
-            runner: macos-14
-            platform: linux/arm64
-            artifact-name: flux-linux-arm64
-            use-docker: true
           - os: macos-amd64
             runner: macos-13
             artifact-name: flux-macos-amd64
-            use-docker: false
           - os: macos-arm64
             runner: macos-14
             artifact-name: flux-macos-arm64
-            use-docker: false
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Linux native image in Docker
-        if: matrix.use-docker
-        timeout-minutes: 20
-        run: |
-          echo "Building ${{ matrix.os }} native image using Docker"
-          echo "Host: $(uname -m), Target platform: ${{ matrix.platform }}"
-          
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            ghcr.io/graalvm/graalvm-community:21 \
-            bash -c "
-              echo 'Container info:'
-              echo 'Architecture: \$(uname -m)'
-              echo 'Memory: \$(free -h | head -2)'
-              echo 'CPU cores: \$(nproc)'
-              echo 'Starting native image build...'
-              ./gradlew nativeCompile --info --no-daemon
-            "
-
-      - name: Set up GraalVM for macOS
-        if: '!matrix.use-docker'
+      - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
           java-version: '21'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Gradle for macOS
-        if: '!matrix.use-docker'
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build macOS native image
-        if: '!matrix.use-docker'
+      - name: Build native image
         timeout-minutes: 15
         run: |
-          echo "Building ${{ matrix.os }} native image natively on macOS"
-          echo "Host: $(uname -m), CPU cores: $(sysctl -n hw.ncpu)"
+          echo "Building ${{ matrix.os }} native image"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "Host: $(uname -m), CPU cores: $(sysctl -n hw.ncpu)"
+          else
+            echo "Host: $(uname -m), CPU cores: $(nproc), Memory: $(free -h | head -2)"
+          fi
           ./gradlew nativeCompile --info
 
       - name: Verify native image
         run: |
           echo "Testing native executable..."
-          
-          if [ "${{ matrix.use-docker }}" = "true" ]; then
-            # Test Linux binary in container
-            docker run --rm --platform ${{ matrix.platform }} \
-              -v "$PWD:/workspace" \
-              -w /workspace \
-              ubuntu:22.04 \
-              bash -c "./build/native/nativeCompile/flux version && ./build/native/nativeCompile/flux templates list"
-          else
-            # Test macOS binary directly
-            ./build/native/nativeCompile/flux version
-            ./build/native/nativeCompile/flux templates list
-          fi
+          ./build/native/nativeCompile/flux version
+          ./build/native/nativeCompile/flux templates list
           echo "Native image verification successful!"
 
       - name: Upload native executable
