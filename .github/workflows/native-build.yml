@@ -39,7 +39,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build native image
-        run: ./gradlew nativeCompile
+        run: |
+          echo "Starting native image build on $(uname -m) with $(nproc) CPU cores and $(free -h | awk '/^Mem:/ {print $2}') memory"
+          timeout 15m ./gradlew nativeCompile --info
+        timeout-minutes: 20
 
       - name: Verify native image
         run: |
