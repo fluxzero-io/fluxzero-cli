@@ -6,12 +6,38 @@ on:
       - main
 
 jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Test JAR functionality
+        run: |
+          echo "Testing JAR with basic commands..."
+          java -jar build/libs/fluxzero-cli-dev-all.jar version
+          java -jar build/libs/fluxzero-cli-dev-all.jar templates list
+          echo "JAR functionality test successful!"
+
   native-build:
+    needs: build-and-test
     uses: ./.github/workflows/native-build.yml
 
   release:
     runs-on: ubuntu-latest
-    needs: native-build
+    needs: [build-and-test, native-build]
     permissions:
       contents: write
 

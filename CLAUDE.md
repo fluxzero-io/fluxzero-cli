@@ -74,11 +74,12 @@ Uses Gradle with Kotlin DSL:
 - Triggered on pushes to main/feature branches and PRs
 
 **Release Workflow** (`.github/workflows/release.yml`):
-- Integrates native build artifacts with JAR releases
+- Sequential pipeline: build-and-test → native-build → release
+- Prevents expensive native builds from running on failing code
 - Auto-versioning with git tags
 - Distributes multiple artifacts:
   - `fluxzero-cli.jar` (cross-platform JAR)
-  - `flux-linux-amd64`, `flux-linux-arm64` (Linux native executables)
+  - `flux-linux-amd64` (Linux native executable)
   - `flux-macos-amd64`, `flux-macos-arm64` (macOS native executables)
   - `install.sh` (installation script)
 
@@ -115,6 +116,7 @@ config/detekt/              - Code quality configuration
 - Update checking happens automatically on startup
 - Interactive prompts handle template selection and project naming
 - Package structure follows reverse domain naming: `host.flux.cli`
+- **Commit messages should not mention Claude or AI assistance**
 
 ### GraalVM Configuration
 

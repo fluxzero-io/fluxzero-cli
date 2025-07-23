@@ -44,7 +44,7 @@ jobs:
           else
             echo "Host: $(uname -m), CPU cores: $(nproc), Memory: $(free -h | head -2)"
           fi
-          ./gradlew nativeCompile --info
+          ./gradlew nativeCompile -x test --info
 
       - name: Verify native image
         run: |
