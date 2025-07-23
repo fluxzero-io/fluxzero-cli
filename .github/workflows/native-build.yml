@@ -1,0 +1,58 @@
+name: Native Image Build
+
+on:
+  push:
+    branches: [ main, feature/graalvm ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  native-build:
+    name: Build Native Image - ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux-amd64
+            runner: ubuntu-latest
+            artifact-name: flux-linux-amd64
+          - os: linux-arm64
+            runner: ubuntu-24.04-arm64
+            artifact-name: flux-linux-arm64
+          - os: macos-intel
+            runner: macos-13
+            artifact-name: flux-macos-amd64
+          - os: macos-silicon
+            runner: macos-14
+            artifact-name: flux-macos-arm64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build native image
+        run: ./gradlew nativeCompile
+
+      - name: Verify native image
+        run: |
+          echo "Testing native executable..."
+          ./build/native/nativeCompile/flux version
+          ./build/native/nativeCompile/flux templates list
+          echo "Native image verification successful!"
+
+      - name: Upload native executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ./build/native/nativeCompile/flux
+          retention-days: 30

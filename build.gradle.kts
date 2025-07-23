@@ -5,6 +5,7 @@ plugins {
     application
     kotlin("jvm") version "2.1.20"
     id("com.gradleup.shadow") version "8.3.6"
+    id("org.graalvm.buildtools.native") version "0.10.6"
 }
 
 group = "host.flux.cli"
@@ -17,7 +18,7 @@ repositories {
 dependencies {
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
     implementation("com.github.ajalt.clikt:clikt-markdown:5.0.3")
-    implementation("org.jline:jline:3.30.0")
+    implementation("org.jline:jline:3.30.4")
 
     testImplementation(kotlin("test"))
     testImplementation("io.mockk:mockk:1.14.2")
@@ -32,6 +33,27 @@ kotlin {
 
 application {
     mainClass = "host.flux.cli.MainKt"
+}
+
+graalvmNative {
+    toolchainDetection.set(true)
+    binaries {
+        named("main") {
+            imageName.set("flux")
+            mainClass.set("host.flux.cli.MainKt")
+            buildArgs.addAll(
+                "--no-fallback",
+                "--install-exit-handlers",
+                "--enable-url-protocols=https",
+                "--report-unsupported-elements-at-runtime",
+                "--initialize-at-build-time=kotlin",
+                "--initialize-at-run-time=org.jline"
+            )
+        }
+    }
+    binaries.all {
+        resources.autodetect()
+    }
 }
 
 tasks.shadowJar {
