@@ -6,8 +6,12 @@ on:
       - main
 
 jobs:
+  native-build:
+    uses: ./.github/workflows/native-build.yml
+
   release:
     runs-on: ubuntu-latest
+    needs: native-build
     permissions:
       contents: write
 
@@ -98,6 +102,19 @@ jobs:
           sudo rm -f /usr/local/bin/fz
           rm -rf $TEST_HOME
 
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: native-artifacts
+
+      - name: Prepare native executables for release
+        run: |
+          mkdir -p build/native-releases
+          cp native-artifacts/flux-linux-amd64/flux build/native-releases/flux-linux-amd64
+          cp native-artifacts/flux-macos-amd64/flux build/native-releases/flux-macos-amd64
+          cp native-artifacts/flux-macos-arm64/flux build/native-releases/flux-macos-arm64
+          chmod +x build/native-releases/*
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -106,5 +123,8 @@ jobs:
           files: |
             build/libs/fluxzero-cli.jar
             build/release-scripts/install.sh
+            build/native-releases/flux-linux-amd64
+            build/native-releases/flux-macos-amd64
+            build/native-releases/flux-macos-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

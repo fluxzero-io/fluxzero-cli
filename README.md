@@ -1,56 +1,142 @@
 # fluxzero-cli 
 
-The idea behind the fluxzero-cli is an easy way to interact with flux (and flux-cloud). 
-It can scaffold new projects, perform dependency upgrades, generate example code and manage flux cloud resources.
-
-## Compatibility
-
-The `fluxzero-cli` is built using Kotlin and distributed as a jar.
+A command-line interface for [Flux](https://fluxcapacitor.io/) that helps you scaffold new projects, perform dependency upgrades, generate example code, and manage Flux Cloud resources.
 
 ## Installation
 
-The fluxzero-cli is not installed globally. 
-Instead, each project determines which version of the cli it uses in the `.flux/config.yaml` file.
+### Option 1: Native Executables (Recommended)
 
-## Getting started
+Download the native executable for your platform from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases):
 
-You can scaffold a new project using the following command:
+- **Linux x86_64**: `flux-linux-amd64`
+- **Linux ARM64**: `flux-linux-arm64` 
+- **macOS Intel**: `flux-macos-amd64`
+- **macOS Apple Silicon**: `flux-macos-arm64`
 
-```shell
+```bash
+# Example for macOS Apple Silicon
+curl -L -o flux https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/flux-macos-arm64
+chmod +x flux
+sudo mv flux /usr/local/bin/fz
+```
+
+**Benefits of native executables:**
+- ⚡ **5x faster startup** (~0.27s vs ~1.36s for JAR)
+- 📦 **Self-contained** (no Java installation required)
+- 🚀 **Instant execution** (no JVM warm-up time)
+
+### Option 2: Install Script (JAR-based)
+
+```bash
 curl https://flux-capacitor/install.sh | sh
 ```
 
-During installation you will be prompted to create `/usr/bin/fz` so the CLI is available on your `PATH`.
+During installation you will be prompted to create `/usr/local/bin/fz` so the CLI is available on your `PATH`.
 
-## Commands
+### Option 3: Manual JAR Installation
 
- - project create
- - version
- - upgrade
+1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases)
+2. Run it with Java: `java -jar fluxzero-cli.jar`
 
-See the `--help` for more information.
+## Project Versioning
 
+The fluxzero-cli uses per-project versioning rather than global installation. Each project determines which version of the CLI it uses in the `.flux/config.yaml` file.
 
+## Usage
+
+Once installed, you can use the CLI with the `fz` command:
+
+```bash
+# Initialize a new project (interactive template selection)
+fz init my-project
+
+# List available templates
+fz templates list
+
+# Show version
+fz version
+
+# Upgrade CLI to latest version
+fz upgrade
+```
+
+See `fz --help` for more information on available commands.
+
+## Requirements
+
+- **Native executables**: No requirements (self-contained)
+- **JAR version**: Java 21 or higher
 
 ## Templates
 
-Are all located in this repository
-All templates are fully working examples and are modified by the cli to customize to your preferences
+All templates are located in this repository under the `templates/` directory. Templates are fully working examples that are customized by the CLI to match your preferences.
 
-Features 
-- replace package names ""
-- remove files 
-- remove certain lines 
+**Template features:**
+- Package name replacement
+- File removal based on configuration
+- Line-by-line content modification
+- Interactive customization during project creation
 
-## Building the CLI
+Available templates:
+- `flux-kotlin-single` - Single-module Kotlin project
+- `flux-java-single` - Single-module Java project  
+- `gamerental` - Example multi-feature application
 
-```shell
+## Development
+
+### Building the CLI
+
+```bash
 ./gradlew build shadowJar
-java -jar build/libs/fluxzero-cli-1.0.0-all.jar version
 ```
 
+### Building Native Executable
 
-TODO
+Requires GraalVM with native-image support:
 
-- GitHub action
-- Dockerfile 
+```bash
+# Switch to GraalVM (example using jenv)
+jenv local oracle64-21.0.1
+
+# Build native executable
+./gradlew nativeCompile
+
+# Test the native executable
+./build/native/nativeCompile/flux version
+```
+
+### Running
+
+```bash
+./gradlew run
+# or
+java -jar build/libs/fluxzero-cli-dev-all.jar version
+```
+
+### Testing
+
+```bash
+./gradlew test
+```
+
+## Architecture
+
+- **Kotlin-based** with Clikt for command-line parsing and JLine for interactive prompts
+- **Template system** with ZIP-based project scaffolding and YAML-based customization
+- **Multi-platform builds** via GitHub Actions for Linux and macOS (ARM64/x86_64)
+- **Native image compilation** using GraalVM for optimal performance
+- **Per-project versioning** via `.flux/config.yaml`
+
+## CI/CD
+
+- **Native Build Workflow**: Builds native executables for all platforms
+- **Release Workflow**: Auto-versioning with git tags and multi-artifact releases
+- **Automated testing**: Unit tests with MockK and build verification
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

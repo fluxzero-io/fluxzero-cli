@@ -1,0 +1,61 @@
+name: Native Image Build
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  native-build:
+    name: Build Native Image - ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux-amd64
+            runner: ubuntu-latest
+            artifact-name: flux-linux-amd64
+          - os: macos-amd64
+            runner: macos-13
+            artifact-name: flux-macos-amd64
+          - os: macos-arm64
+            runner: macos-14
+            artifact-name: flux-macos-arm64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build native image
+        timeout-minutes: 15
+        run: |
+          echo "Building ${{ matrix.os }} native image"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "Host: $(uname -m), CPU cores: $(sysctl -n hw.ncpu)"
+          else
+            echo "Host: $(uname -m), CPU cores: $(nproc), Memory: $(free -h | head -2)"
+          fi
+          ./gradlew nativeCompile --info
+
+      - name: Verify native image
+        run: |
+          echo "Testing native executable..."
+          ./build/native/nativeCompile/flux version
+          ./build/native/nativeCompile/flux templates list
+          echo "Native image verification successful!"
+
+      - name: Upload native executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ./build/native/nativeCompile/flux
+          retention-days: 30

@@ -2,6 +2,13 @@
 ##
 ## This script checks prerequisites and installs the fluxzero-cli
 ##
+## Note: Native executables are also available for multiple platforms:
+##   - flux-linux-amd64 (Linux x86_64)
+##   - flux-macos-amd64 (macOS Intel)
+##   - flux-macos-arm64 (macOS Apple Silicon)
+## Download them directly from the GitHub release if you prefer
+## standalone executables without requiring Java.
+##
 
 # Parse command line arguments
 INSTALL_PATH=""
