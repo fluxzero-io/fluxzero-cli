@@ -20,6 +20,12 @@ fluxzero-cli is a Kotlin-based command-line tool for interacting with Flux and F
 - Static analysis is configured via Detekt (config in `config/detekt/detekt.yml`)
 - Code style follows Kotlin conventions with line length limit of 180 characters
 
+### Native Image Build
+- `./gradlew nativeCompile` - Builds native executable using GraalVM
+- Requires GraalVM with native-image tool installed (e.g., `jenv local oracle64-21.0.1`)
+- Native executable provides ~5x faster startup time (~0.27s vs ~1.36s for JAR)
+- Self-contained binary (no JVM required), but larger file size (~42MB vs ~7.5MB JAR)
+
 ### Template Management
 - `./gradlew zipTemplates` - Archives template folders from `templates/` directory as ZIP files for distribution
 - Templates are packaged into the JAR resources during build
@@ -56,8 +62,25 @@ Templates are stored in `templates/` directory and packaged as ZIP files during 
 Uses Gradle with Kotlin DSL:
 - Kotlin 2.1.20 with JVM target 21
 - Shadow plugin for fat JAR creation
+- GraalVM Native Build Tools plugin for native image compilation
 - Custom `zipTemplates` task for template packaging
 - Dependencies: Clikt (commands), JLine (prompts), MockK (testing)
+
+### CI/CD Workflows
+
+**Native Build Workflow** (`.github/workflows/native-build.yml`):
+- Builds native executables for Linux (x86_64, ARM64) and macOS (Intel, Apple Silicon)
+- Uses GitHub's native ARM64 runners and standard x86_64 runners
+- Triggered on pushes to main/feature branches and PRs
+
+**Release Workflow** (`.github/workflows/release.yml`):
+- Integrates native build artifacts with JAR releases
+- Auto-versioning with git tags
+- Distributes multiple artifacts:
+  - `fluxzero-cli.jar` (cross-platform JAR)
+  - `flux-linux-amd64`, `flux-linux-arm64` (Linux native executables)
+  - `flux-macos-amd64`, `flux-macos-arm64` (macOS native executables)
+  - `install.sh` (installation script)
 
 ### Project Structure
 
@@ -80,9 +103,10 @@ config/detekt/              - Code quality configuration
 ### Key Dependencies
 
 - **Clikt 5.0.3** - Command-line interface framework
-- **JLine 3.30.0** - Interactive console input
+- **JLine 3.30.4** - Interactive console input
 - **MockK 1.14.2** - Mocking framework for tests
 - **Detekt** - Static code analysis
+- **GraalVM Native Build Tools 0.10.6** - Native image compilation
 
 ## Development Notes
 
@@ -91,3 +115,14 @@ config/detekt/              - Code quality configuration
 - Update checking happens automatically on startup
 - Interactive prompts handle template selection and project naming
 - Package structure follows reverse domain naming: `host.flux.cli`
+
+### GraalVM Configuration
+
+Native image build is configured with:
+- `--no-fallback` - Pure native mode (no JVM fallback)
+- `--install-exit-handlers` - Proper shutdown handling
+- `--enable-url-protocols=https` - HTTPS support for downloads
+- `--report-unsupported-elements-at-runtime` - Runtime error reporting
+- `--initialize-at-build-time=kotlin` - Kotlin classes initialized at build time
+- `--initialize-at-run-time=org.jline` - JLine initialized at runtime (terminal compatibility)
+- Resource autodetection enabled for templates and static resources
