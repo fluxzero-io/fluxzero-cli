@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class DefaultInstallerTest {
     @Test
-    fun `downloads jar and script`() {
+    fun `fresh install when no current version`() {
         val tempHome = Files.createTempDirectory("flux-home")
 
         val httpClient = mockk<HttpClient>()
@@ -31,11 +31,16 @@ class DefaultInstallerTest {
         every { jarResponse.body() } returns jarStream
         every { httpClient.send(match { it.uri().toString().contains("v2.0.0/fluxzero-cli.jar") }, any<HttpResponse.BodyHandler<InputStream>>()) } returns jarResponse
 
-        val installer = DefaultInstaller(httpClient, tempHome)
-        val version = installer.installLatest()
+        // Create installer with mocked version that returns null (no current version)
+        val installer = object : DefaultInstaller(httpClient, tempHome) {
+            override fun getCurrentVersion(): String? = null
+        }
+        
+        val result = installer.install()
 
-        assertEquals("v2.0.0", version)
-        assertTrue(Files.exists(tempHome.resolve(".flux/fluxzero-cli.jar")))
-        assertTrue(Files.exists(tempHome.resolve(".flux/cli")))
+        assertTrue(result is InstallResult.FreshInstall)
+        assertEquals("v2.0.0", (result as InstallResult.FreshInstall).version)
+        assertTrue(Files.exists(tempHome.resolve(".fluxzero/fluxzero-cli.jar")))
+        assertTrue(Files.exists(tempHome.resolve(".fluxzero/cli")))
     }
 }

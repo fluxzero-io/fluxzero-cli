@@ -1,5 +1,6 @@
 package host.flux.cli.install
 
+import host.flux.cli.UpdateChecker
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -15,17 +16,28 @@ internal const val JAR_URL_TEMPLATE =
     "https://github.com/flux-capacitor-io/flux-cli/releases/download/%s/fluxzero-cli.jar"
 internal const val SCRIPT_TEMPLATE = "#!/usr/bin/env sh\njava -jar ~/.flux/fluxzero-cli.jar \"\$@\"\n"
 
-internal class DefaultInstaller(
+open class DefaultInstaller(
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.ALWAYS)
         .build(),
     private val homeDir: Path = Paths.get(System.getProperty("user.home")),
 ) : Installer {
 
-    override fun installLatest(): String {
+    override fun install(): InstallResult {
         val latest = fetchLatestTag() ?: throw IllegalStateException("Could not determine latest release")
-        install(latest)
-        return latest
+        val current = getCurrentVersion()
+        
+        return when {
+            current == null -> {
+                installVersion(latest)
+                InstallResult.FreshInstall(latest)
+            }
+            UpdateChecker.isNewer(current, latest) -> {
+                installVersion(latest)
+                InstallResult.Upgraded(current, latest)
+            }
+            else -> InstallResult.AlreadyLatest(current)
+        }
     }
 
     private fun fetchLatestTag(): String? {
@@ -39,8 +51,17 @@ internal class DefaultInstaller(
         return tagRegex.find(response.body())?.groupValues?.get(1)
     }
 
-    private fun install(tag: String) {
-        val installDir = homeDir.resolve(".flux")
+    open fun getCurrentVersion(): String? {
+        return try {
+            // Try to get version from the currently running JAR
+            DefaultInstaller::class.java.`package`.implementationVersion
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun installVersion(tag: String) {
+        val installDir = homeDir.resolve(".fluxzero")
         Files.createDirectories(installDir)
 
         val jarUrl = JAR_URL_TEMPLATE.format(tag)
