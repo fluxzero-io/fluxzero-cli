@@ -17,7 +17,6 @@ repositories {
 
 dependencies {
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation("com.github.ajalt.clikt:clikt-markdown:5.0.3")
     implementation("org.jline:jline:3.30.4")
 
     testImplementation(kotlin("test"))
