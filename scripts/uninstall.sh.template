@@ -4,15 +4,23 @@
 ## Removes both current (.fluxzero) and legacy (.flux) installations
 ##
 
-# Colors for better output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Colors for better output (only if running in a terminal or forced)
+if [ -n "$FORCE_COLORS" ] || ([ -t 1 ] && [ -t 0 ]); then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
+fi
 
 # Parse command line arguments
 FORCE_UNINSTALL=""
 QUIET=""
+FORCE_COLORS=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --force)
@@ -23,9 +31,13 @@ while [ $# -gt 0 ]; do
             QUIET="y"
             shift
             ;;
+        --force-colors)
+            FORCE_COLORS="y"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--force] [--quiet]"
+            echo "Usage: $0 [--force] [--quiet] [--force-colors]"
             exit 1
             ;;
     esac

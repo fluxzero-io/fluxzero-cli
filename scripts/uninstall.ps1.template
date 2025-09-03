@@ -9,6 +9,23 @@ param(
     [switch]$Quiet
 )
 
+# Check if running in interactive mode for colored output
+$UseColors = [Environment]::UserInteractive -and -not ([Console]::IsOutputRedirected)
+
+# Function to write colored output
+function Write-ColorHost {
+    param(
+        [string]$Message,
+        [string]$ForegroundColor = "White"
+    )
+    
+    if ($UseColors) {
+        Write-Host $Message -ForegroundColor $ForegroundColor
+    } else {
+        Write-Host $Message
+    }
+}
+
 # Function to ask for confirmation
 function Confirm-Action {
     param([string]$Message)
@@ -34,17 +51,17 @@ function Remove-Directory {
     
     if (Test-Path $Path) {
         if ($Quiet -and -not $Force) {
-            Write-Host "Found $Description at: $Path" -ForegroundColor Yellow
-            Write-Host "Use -Force to remove without prompts" -ForegroundColor Yellow
+            Write-ColorHost "Found $Description at: $Path" -ForegroundColor Yellow
+            Write-ColorHost "Use -Force to remove without prompts" -ForegroundColor Yellow
             return $false
         }
         
-        Write-Host "Found ${Description}:" -ForegroundColor Yellow
+        Write-ColorHost "Found ${Description}:" -ForegroundColor Yellow
         Write-Host "  $Path"
         
         $items = Get-ChildItem $Path -Force -ErrorAction SilentlyContinue
         if ($items.Count -gt 0) {
-            Write-Host "Contents:" -ForegroundColor Yellow
+            Write-ColorHost "Contents:" -ForegroundColor Yellow
             $items | ForEach-Object { Write-Host "  $($_.Name)" }
         }
         
@@ -52,16 +69,16 @@ function Remove-Directory {
             Write-Host "Removing $Path..."
             try {
                 Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
-                Write-Host "✓ Removed $Description" -ForegroundColor Green
+                Write-ColorHost "✓ Removed $Description" -ForegroundColor Green
                 return $true
             }
             catch {
-                Write-Host "✗ Failed to remove ${Description}: $($_.Exception.Message)" -ForegroundColor Red
+                Write-ColorHost "✗ Failed to remove ${Description}: $($_.Exception.Message)" -ForegroundColor Red
                 return $false
             }
         }
         else {
-            Write-Host "Skipped $Description" -ForegroundColor Yellow
+            Write-ColorHost "Skipped $Description" -ForegroundColor Yellow
             return $false
         }
     }
@@ -73,12 +90,12 @@ function Remove-PathEntry {
     param([string]$PathToRemove)
     
     if ($Quiet -and -not $Force) {
-        Write-Host "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
-        Write-Host "Use -Force to remove without prompts" -ForegroundColor Yellow
+        Write-ColorHost "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
+        Write-ColorHost "Use -Force to remove without prompts" -ForegroundColor Yellow
         return $false
     }
     
-    Write-Host "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
+    Write-ColorHost "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
     
     if (Confirm-Action "Remove FluxZero from PATH?") {
         Write-Host "Removing from PATH..."
@@ -88,23 +105,23 @@ function Remove-PathEntry {
             $newPath = $pathEntries -join ";"
             
             [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
-            Write-Host "✓ Removed FluxZero from PATH" -ForegroundColor Green
-            Write-Host "Please restart your terminal for PATH changes to take effect" -ForegroundColor Cyan
+            Write-ColorHost "✓ Removed FluxZero from PATH" -ForegroundColor Green
+            Write-ColorHost "Please restart your terminal for PATH changes to take effect" -ForegroundColor Cyan
             return $true
         }
         catch {
-            Write-Host "✗ Failed to remove from PATH: $($_.Exception.Message)" -ForegroundColor Red
+            Write-ColorHost "✗ Failed to remove from PATH: $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
     }
     else {
-        Write-Host "Skipped PATH removal" -ForegroundColor Yellow
+        Write-ColorHost "Skipped PATH removal" -ForegroundColor Yellow
         return $false
     }
 }
 
-Write-Host "FluxZero CLI Uninstaller" -ForegroundColor Cyan
-Write-Host "=======================" -ForegroundColor Cyan
+Write-ColorHost "FluxZero CLI Uninstaller" -ForegroundColor Cyan
+Write-ColorHost "=======================" -ForegroundColor Cyan
 Write-Host ""
 
 # Use HOME if available (for CI environments), otherwise USERPROFILE
@@ -126,7 +143,7 @@ $FOUND_PATH = $currentPath -split ";" | Where-Object { $_ -eq $FLUXZERO_BIN }
 
 # Check if anything was found
 if (-not $FOUND_CURRENT -and -not $FOUND_LEGACY -and -not $FOUND_PATH) {
-    Write-Host "No FluxZero CLI installation found." -ForegroundColor Green
+    Write-ColorHost "No FluxZero CLI installation found." -ForegroundColor Green
     Write-Host "Locations checked:"
     Write-Host "  - $CURRENT_DIR"
     Write-Host "  - $LEGACY_DIR"
@@ -134,14 +151,14 @@ if (-not $FOUND_CURRENT -and -not $FOUND_LEGACY -and -not $FOUND_PATH) {
     exit 0
 }
 
-Write-Host "Found FluxZero CLI installations:" -ForegroundColor Yellow
+Write-ColorHost "Found FluxZero CLI installations:" -ForegroundColor Yellow
 if ($FOUND_CURRENT) { Write-Host "  ✓ Current installation: $CURRENT_DIR" }
 if ($FOUND_LEGACY) { Write-Host "  ✓ Legacy installation: $LEGACY_DIR" }
 if ($FOUND_PATH) { Write-Host "  ✓ PATH entry: $FLUXZERO_BIN" }
 Write-Host ""
 
 if (-not $Force -and -not $Quiet) {
-    Write-Host "This will remove FluxZero CLI from your system." -ForegroundColor Red
+    Write-ColorHost "This will remove FluxZero CLI from your system." -ForegroundColor Red
     Write-Host "You will be asked to confirm each removal."
     Write-Host ""
     if (-not (Confirm-Action "Continue with uninstallation?")) {
@@ -176,30 +193,30 @@ if ($FOUND_PATH) {
 }
 
 Write-Host ""
-Write-Host "Uninstallation Summary:" -ForegroundColor Cyan
+Write-ColorHost "Uninstallation Summary:" -ForegroundColor Cyan
 Write-Host "======================" -ForegroundColor Cyan
 
 if ($REMOVED_COUNT -eq 0) {
-    Write-Host "No items were removed." -ForegroundColor Yellow
+    Write-ColorHost "No items were removed." -ForegroundColor Yellow
     Write-Host "FluxZero CLI may still be present on your system."
 }
 elseif ($REMOVED_COUNT -eq 1) {
-    Write-Host "Successfully removed 1 item." -ForegroundColor Green
+    Write-ColorHost "Successfully removed 1 item." -ForegroundColor Green
 }
 else {
-    Write-Host "Successfully removed $REMOVED_COUNT items." -ForegroundColor Green
+    Write-ColorHost "Successfully removed $REMOVED_COUNT items." -ForegroundColor Green
 }
 
 # Final verification
 $stillExists = (Test-Path $CURRENT_DIR) -or (Test-Path $LEGACY_DIR) -or ($currentPath -like "*$FLUXZERO_BIN*")
 
 if (-not $stillExists) {
-    Write-Host "✓ FluxZero CLI has been completely removed from your system." -ForegroundColor Green
+    Write-ColorHost "✓ FluxZero CLI has been completely removed from your system." -ForegroundColor Green
 }
 else {
-    Write-Host "Some FluxZero CLI components may still remain on your system." -ForegroundColor Yellow
+    Write-ColorHost "Some FluxZero CLI components may still remain on your system." -ForegroundColor Yellow
     Write-Host "You may need to run this script again or remove them manually."
 }
 
 Write-Host ""
-Write-Host "Thank you for using FluxZero CLI!" -ForegroundColor Green
+Write-ColorHost "Thank you for using FluxZero CLI!" -ForegroundColor Green
