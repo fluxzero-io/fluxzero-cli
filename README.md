@@ -4,39 +4,73 @@ A command-line interface for [Flux](https://fluxcapacitor.io/) that helps you sc
 
 ## Installation
 
-### Option 1: Native Executables (Recommended)
+### Option 1: Automated Installation (Recommended)
+
+**Unix/Linux/macOS:**
+```bash
+curl -sSL https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/install.sh | sh
+```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/install.ps1 | iex
+```
+
+The installer will:
+- 🎯 **Auto-detect** your platform and architecture
+- 📦 **Download native binary** (no Java required)
+- ⚡ **Install to `~/.fluxzero/bin/fz`** 
+- 🔗 **Add to PATH** (optional - you'll be prompted)
+- ✅ **Verify installation** with test commands
+
+### Option 2: Manual Native Executable Download
 
 Download the native executable for your platform from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases):
 
 - **Linux x86_64**: `flux-linux-amd64`
-- **Linux ARM64**: `flux-linux-arm64` 
 - **macOS Intel**: `flux-macos-amd64`
 - **macOS Apple Silicon**: `flux-macos-arm64`
+- **Windows x64**: `flux-windows-amd64.exe`
 
 ```bash
 # Example for macOS Apple Silicon
-curl -L -o flux https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/flux-macos-arm64
-chmod +x flux
-sudo mv flux /usr/local/bin/fz
+curl -L -o fz https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/flux-macos-arm64
+chmod +x fz
+sudo mv fz /usr/local/bin/fz
 ```
 
 **Benefits of native executables:**
 - ⚡ **5x faster startup** (~0.27s vs ~1.36s for JAR)
 - 📦 **Self-contained** (no Java installation required)
 - 🚀 **Instant execution** (no JVM warm-up time)
+- 🌍 **Cross-platform** (Linux, macOS, Windows)
 
-### Option 2: Install Script (JAR-based)
-
-```bash
-curl https://flux-capacitor/install.sh | sh
-```
-
-During installation you will be prompted to create `/usr/local/bin/fz` so the CLI is available on your `PATH`.
-
-### Option 3: Manual JAR Installation
+### Option 3: Manual JAR Installation (Legacy)
 
 1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases)
 2. Run it with Java: `java -jar fluxzero-cli.jar`
+
+## Uninstallation
+
+To remove FluxZero CLI from your system:
+
+**Unix/Linux/macOS:**
+```bash
+curl -sSL https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/uninstall.sh | sh
+```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/uninstall.ps1 | iex
+```
+
+The uninstaller will:
+- 🔍 **Detect installations** (both current `.fluxzero` and legacy `.flux` directories)
+- 📋 **Show what will be removed** with confirmation prompts
+- 🗑️ **Clean removal** of binaries, directories, and PATH entries
+- ✨ **Complete cleanup** leaves no traces
+
+Add `--force` (Unix) or `-Force` (Windows) to skip confirmation prompts.
 
 ## Project Versioning
 
@@ -61,6 +95,15 @@ fz upgrade
 ```
 
 See `fz --help` for more information on available commands.
+
+## Installation Location
+
+FluxZero CLI installs to:
+- **Directory**: `~/.fluxzero/bin/fz` (or `fz.exe` on Windows)
+- **PATH Integration**: 
+  - **Unix**: `/usr/local/bin/fz` → `~/.fluxzero/bin/fz`
+  - **Windows**: `~/.fluxzero/bin` added to user PATH
+- **Legacy Support**: Also detects and can upgrade from old `.flux/flux-cli.jar` installations
 
 ## Requirements
 
@@ -123,15 +166,24 @@ java -jar build/libs/fluxzero-cli-dev-all.jar version
 
 - **Kotlin-based** with Clikt for command-line parsing and JLine for interactive prompts
 - **Template system** with ZIP-based project scaffolding and YAML-based customization
-- **Multi-platform builds** via GitHub Actions for Linux and macOS (ARM64/x86_64)
+- **Multi-platform builds** via GitHub Actions for Linux, macOS, and Windows (ARM64/x86_64)
 - **Native image compilation** using GraalVM for optimal performance
+- **Automated installation** with platform detection and PATH integration
 - **Per-project versioning** via `.flux/config.yaml`
 
 ## CI/CD
 
-- **Native Build Workflow**: Builds native executables for all platforms
-- **Release Workflow**: Auto-versioning with git tags and multi-artifact releases
-- **Automated testing**: Unit tests with MockK and build verification
+- **Native Build Workflow**: Builds native executables for Linux, macOS, and Windows with integration testing
+- **Release Workflow**: Auto-versioning with git tags and comprehensive artifact releases
+- **Automated testing**: 
+  - Unit tests with MockK
+  - Integration tests (CLI functionality + project generation)
+  - Installation script verification
+  - Cross-platform build verification
+- **Release Artifacts**:
+  - Native executables for all platforms
+  - JAR for cross-platform compatibility
+  - Installation and uninstallation scripts
 
 ## License
 
