@@ -14,11 +14,14 @@ class Upgrade(
 
     override fun run() {
         try {
+            echo("Checking for latest version...")
             when (val result = installer.install()) {
-                is InstallResult.Upgraded -> 
-                    echo("fluxzero-cli upgraded from ${result.fromVersion} to ${result.toVersion}")
-                is InstallResult.FreshInstall -> 
-                    echo("fluxzero-cli installed (version: ${result.version})")
+                is InstallResult.Upgraded -> {
+                    echo("✅ fluxzero-cli upgraded from ${result.fromVersion} to ${result.toVersion}")
+                }
+                is InstallResult.FreshInstall -> {
+                    echo("✅ fluxzero-cli installed (version: ${result.version})")
+                }
                 is InstallResult.AlreadyLatest -> 
                     echo("fluxzero-cli is already up to date (current version: ${result.currentVersion})")
             }

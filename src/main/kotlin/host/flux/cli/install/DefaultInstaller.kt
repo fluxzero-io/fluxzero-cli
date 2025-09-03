@@ -206,6 +206,9 @@ open class DefaultInstaller(
         val (platform, arch) = detectPlatform()
         val binaryName = getBinaryName(platform, arch)
         
+        // Inform user about download  
+        System.err.println("Downloading fluxzero-cli $tag for $platform-$arch...")
+        
         // Download native binary - try primary repository first, then fallback
         val binaryResponse = downloadBinary(tag, binaryName)
             ?: throw IllegalStateException("Failed to download native binary: $binaryName from both repositories")
@@ -216,6 +219,8 @@ open class DefaultInstaller(
             Files.copy(input, binaryPath, StandardCopyOption.REPLACE_EXISTING)
         }
         binaryPath.toFile().setExecutable(true)
+        
+        System.err.println("Installation complete!")
         
         // Clean up old installations if they exist
         cleanupLegacyInstallation()
