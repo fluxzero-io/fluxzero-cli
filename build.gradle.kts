@@ -130,17 +130,24 @@ tasks.named("processResources") {
 tasks.register<Copy>("generateScripts") {
     val scriptsOutputDir = layout.buildDirectory.dir("release-scripts")
     from("scripts") {
-        include("install.sh.template")
+        include("install.sh.template", "install.ps1.template")
         filter<ReplaceTokens>(
             "tokens" to mapOf(
                 "VERSION" to version,
             )
         )
     }
-    rename("install.sh.template", "install.sh")
+    rename { name ->
+        when (name) {
+            "install.sh.template" -> "install.sh"
+            "install.ps1.template" -> "install.ps1"
+            else -> name
+        }
+    }
     into(scriptsOutputDir)
 
     doLast {
         file(layout.buildDirectory.file("release-scripts/install.sh")).setExecutable(true)
+        // Note: PowerShell scripts don't need executable permissions on Unix systems
     }
 }

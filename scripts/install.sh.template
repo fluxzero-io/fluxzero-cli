@@ -1,18 +1,12 @@
 #!/usr/bin/env sh
 ##
-## This script checks prerequisites and installs the fluxzero-cli
-##
-## Note: Native executables are also available for multiple platforms:
-##   - flux-linux-amd64 (Linux x86_64)
-##   - flux-macos-amd64 (macOS Intel)
-##   - flux-macos-arm64 (macOS Apple Silicon)
-## Download them directly from the GitHub release if you prefer
-## standalone executables without requiring Java.
+## This script installs the fluxzero-cli native executable
+## for your platform. No Java required!
 ##
 
 # Parse command line arguments
 INSTALL_PATH=""
-CUSTOM_JAR=""
+CUSTOM_BINARY=""
 FORCE_INSTALL=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -20,8 +14,8 @@ while [ $# -gt 0 ]; do
             INSTALL_PATH="y"
             shift
             ;;
-        --jar=*)
-            CUSTOM_JAR="${1#*=}"
+        --binary=*)
+            CUSTOM_BINARY="${1#*=}"
             shift
             ;;
         --force)
@@ -30,7 +24,7 @@ while [ $# -gt 0 ]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--install-path] [--jar=PATH_OR_URL] [--force]"
+            echo "Usage: $0 [--install-path] [--binary=PATH_OR_URL] [--force]"
             exit 1
             ;;
     esac
@@ -38,81 +32,114 @@ done
 
 VERSION=@VERSION@
 FLUX_DIR="$HOME/.fluxzero"
-FLUX_JAR="$FLUX_DIR/fluxzero-cli.jar"
-CLI_SCRIPT="$FLUX_DIR/cli"
+FLUX_BIN_DIR="$FLUX_DIR/bin"
+FLUX_BINARY="$FLUX_BIN_DIR/fz"
 TARGET_SCRIPT="/usr/local/bin/fz"
-JAR_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/fluxzero-cli.jar"
 
-echo "Creating installation directory..."
-if ! mkdir -p "$FLUX_DIR"; then
-  echo "Error: Failed to create directory $FLUX_DIR. Please check permissions and try again."
+# Detect platform and architecture
+OS=$(uname -s)
+ARCH=$(uname -m)
+
+case "$OS" in
+    Linux)
+        PLATFORM="linux"
+        ;;
+    Darwin)
+        PLATFORM="macos"
+        ;;
+    *)
+        echo "Error: Unsupported operating system: $OS"
+        echo "Supported platforms: Linux, macOS"
+        exit 1
+        ;;
+esac
+
+case "$ARCH" in
+    x86_64|amd64)
+        ARCH_NAME="amd64"
+        ;;
+    arm64|aarch64)
+        if [ "$PLATFORM" = "macos" ]; then
+            ARCH_NAME="arm64"
+        else
+            echo "Error: ARM64 architecture only supported on macOS"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: Unsupported architecture: $ARCH"
+        echo "Supported architectures: x86_64/amd64, arm64 (macOS only)"
+        exit 1
+        ;;
+esac
+
+BINARY_NAME="flux-${PLATFORM}-${ARCH_NAME}"
+BINARY_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/${BINARY_NAME}"
+
+echo "Creating installation directories..."
+if ! mkdir -p "$FLUX_BIN_DIR"; then
+  echo "Error: Failed to create directory $FLUX_BIN_DIR. Please check permissions and try again."
   exit 1
 fi
 
-if [ -n "$CUSTOM_JAR" ]; then
-  echo "Using custom JAR: $CUSTOM_JAR"
+echo "Platform: $PLATFORM-$ARCH_NAME"
+echo "Binary: $BINARY_NAME"
+
+if [ -n "$CUSTOM_BINARY" ]; then
+  echo "Using custom binary: $CUSTOM_BINARY"
   
   # Check if it's a local file or URL
-  if [ -f "$CUSTOM_JAR" ]; then
-    echo "Copying local JAR file..."
-    if ! cp "$CUSTOM_JAR" "$FLUX_JAR"; then
-      echo "Error: Failed to copy JAR file from $CUSTOM_JAR"
+  if [ -f "$CUSTOM_BINARY" ]; then
+    echo "Copying local binary..."
+    if ! cp "$CUSTOM_BINARY" "$FLUX_BINARY"; then
+      echo "Error: Failed to copy binary from $CUSTOM_BINARY"
       exit 1
     fi
   else
-    echo "Downloading JAR from custom URL..."
-    if ! curl -s -L -o "$FLUX_JAR" "$CUSTOM_JAR"; then
-      echo "Error: Failed to download JAR from $CUSTOM_JAR"
+    echo "Downloading binary from custom URL..."
+    if ! curl -s -L -o "$FLUX_BINARY" "$CUSTOM_BINARY"; then
+      echo "Error: Failed to download binary from $CUSTOM_BINARY"
       exit 1
     fi
   fi
   
-  if [ ! -s "$FLUX_JAR" ]; then
-    echo "Error: JAR file is empty after copy/download."
+  if [ ! -s "$FLUX_BINARY" ]; then
+    echo "Error: Binary file is empty after copy/download."
     exit 1
   fi
   
-  echo "Custom JAR installation successful."
-elif [ -s "$FLUX_JAR" ] && [ -z "$FORCE_INSTALL" ]; then
-  echo "$FLUX_JAR already exists. Skipping installation. Run 'fz upgrade' or use --force to reinstall."
+  echo "Custom binary installation successful."
+elif [ -s "$FLUX_BINARY" ] && [ -z "$FORCE_INSTALL" ]; then
+  echo "$FLUX_BINARY already exists. Skipping installation. Run 'fz upgrade' or use --force to reinstall."
 else
-  if [ -s "$FLUX_JAR" ] && [ -n "$FORCE_INSTALL" ]; then
-    echo "Forcing reinstallation of $FLUX_JAR..."
+  if [ -s "$FLUX_BINARY" ] && [ -n "$FORCE_INSTALL" ]; then
+    echo "Forcing reinstallation of $FLUX_BINARY..."
   fi
   
-  echo "Checking if fluxzero-cli.jar is available at remote URL..."
-  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$JAR_URL")
+  echo "Checking if $BINARY_NAME is available at remote URL..."
+  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "$BINARY_URL")
   if [ "$HTTP_STATUS" -ne 200 ]; then
     echo "Error: Remote file not available (HTTP status $HTTP_STATUS). Aborting download."
+    echo "URL: $BINARY_URL"
     exit 1
   fi
 
-  echo "Downloading fluxzero-cli.jar..."
-  if ! curl -s -L -o "$FLUX_JAR" "$JAR_URL"; then
-    echo "Error: Failed to download fluxzero-cli.jar. Please check your internet connection and try again."
+  echo "Downloading $BINARY_NAME..."
+  if ! curl -s -L -o "$FLUX_BINARY" "$BINARY_URL"; then
+    echo "Error: Failed to download $BINARY_NAME. Please check your internet connection and try again."
     exit 1
   fi
 
-  if [ ! -s "$FLUX_JAR" ]; then
-    echo "Error: fluxzero-cli.jar was downloaded but is empty. Please try again."
+  if [ ! -s "$FLUX_BINARY" ]; then
+    echo "Error: $BINARY_NAME was downloaded but is empty. Please try again."
     exit 1
   fi
 
   echo "Download successful."
 fi
 
-echo "Creating cli script..."
-if ! cat > "$CLI_SCRIPT" << EOF
-#!/usr/bin/env sh
-java -jar $FLUX_JAR \$@
-EOF
-then
-  echo "Error: Failed to create cli script. Please check permissions and try again."
-  exit 1
-fi
-
-echo "Setting executable permissions..."
-if ! chmod +x "$CLI_SCRIPT"; then
+echo "Setting executable permissions on native binary..."
+if ! chmod +x "$FLUX_BINARY"; then
   echo "Error: Failed to set executable permissions. Please check permissions and try again."
   exit 1
 fi
@@ -133,7 +160,7 @@ case "${INSTALL_PATH}" in ([Yy]*)
       SUDO=""
     fi
 
-    if ! printf '#!/usr/bin/env sh\nexec ~/.fluxzero/cli "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
+    if ! printf '#!/usr/bin/env sh\nexec ~/.fluxzero/bin/fz "$@"' | $SUDO tee "$TARGET_SCRIPT" > /dev/null; then
       echo "Error: Failed to create ${TARGET_SCRIPT}. Please check permissions and try again."
       exit 1
     fi
@@ -146,7 +173,7 @@ case "${INSTALL_PATH}" in ([Yy]*)
     echo "Installation completed successfully. You can now use the fluxzero-cli by running fz from anywhere."
     ;;
   *)
-    echo "Skipping PATH installation. You can run the CLI using ~/.fluxzero/cli"
+    echo "Skipping PATH installation. You can run the CLI using ~/.fluxzero/bin/fz"
     echo "Installation completed successfully."
     ;;
 esac

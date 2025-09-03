@@ -1,0 +1,156 @@
+#!/usr/bin/env pwsh
+##
+## This script installs the fluxzero-cli native executable for Windows.
+## No Java required!
+##
+
+param(
+    [switch]$InstallPath,
+    [string]$Binary,
+    [switch]$Force
+)
+
+$VERSION = "@VERSION@"
+# Use HOME if available (for CI environments), otherwise USERPROFILE
+$HOME_DIR = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+$FLUX_DIR = Join-Path $HOME_DIR ".fluxzero"
+$FLUX_BIN_DIR = Join-Path $FLUX_DIR "bin"
+$FLUX_BINARY = Join-Path $FLUX_BIN_DIR "fz.exe"
+$TARGET_DIR = Join-Path $HOME_DIR ".fluxzero\bin"
+
+# Detect architecture
+$ARCH = $env:PROCESSOR_ARCHITECTURE
+switch ($ARCH) {
+    "AMD64" { $ARCH_NAME = "amd64" }
+    "ARM64" { $ARCH_NAME = "arm64" }
+    default {
+        Write-Host "Error: Unsupported architecture: $ARCH" -ForegroundColor Red
+        Write-Host "Supported architectures: AMD64, ARM64" -ForegroundColor Red
+        exit 1
+    }
+}
+
+$BINARY_NAME = "flux-windows-$ARCH_NAME.exe"
+$BINARY_URL = "https://github.com/flux-capacitor-io/flux-cli/releases/download/$VERSION/$BINARY_NAME"
+
+Write-Host "Creating installation directories..."
+Write-Host "Target directory: $FLUX_BIN_DIR"
+if (-not (Test-Path $FLUX_BIN_DIR)) {
+    try {
+        New-Item -ItemType Directory -Path $FLUX_BIN_DIR -Force | Out-Null
+        Write-Host "Created directory: $FLUX_BIN_DIR"
+    } catch {
+        Write-Host "Error: Failed to create directory $FLUX_BIN_DIR. Please check permissions and try again." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "Directory already exists: $FLUX_BIN_DIR"
+}
+
+Write-Host "Platform: windows-$ARCH_NAME"
+Write-Host "Binary: $BINARY_NAME"
+
+if ($Binary) {
+    Write-Host "Using custom binary: $Binary"
+    
+    # Check if it's a local file or URL
+    if (Test-Path $Binary) {
+        Write-Host "Copying local binary..."
+        Write-Host "From: $Binary"
+        Write-Host "To: $FLUX_BINARY"
+        try {
+            Copy-Item $Binary $FLUX_BINARY -Force
+            Write-Host "Copy completed successfully"
+        } catch {
+            Write-Host "Error: Failed to copy binary from $Binary" -ForegroundColor Red
+            Write-Host "Exception: $($_.Exception.Message)"
+            exit 1
+        }
+    } else {
+        Write-Host "Downloading binary from custom URL..."
+        try {
+            Invoke-WebRequest -Uri $Binary -OutFile $FLUX_BINARY -UseBasicParsing
+        } catch {
+            Write-Host "Error: Failed to download binary from $Binary" -ForegroundColor Red
+            exit 1
+        }
+    }
+    
+    if (-not (Test-Path $FLUX_BINARY) -or (Get-Item $FLUX_BINARY).Length -eq 0) {
+        Write-Host "Error: Binary file is empty or missing after copy/download." -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host "Custom binary installation successful." -ForegroundColor Green
+} elseif ((Test-Path $FLUX_BINARY) -and -not $Force) {
+    Write-Host "$FLUX_BINARY already exists. Skipping installation. Run 'fz upgrade' or use -Force to reinstall." -ForegroundColor Yellow
+} else {
+    if ((Test-Path $FLUX_BINARY) -and $Force) {
+        Write-Host "Forcing reinstallation of $FLUX_BINARY..."
+    }
+    
+    Write-Host "Checking if $BINARY_NAME is available at remote URL..."
+    try {
+        $response = Invoke-WebRequest -Uri $BINARY_URL -Method Head -UseBasicParsing
+        if ($response.StatusCode -ne 200) {
+            throw "HTTP status $($response.StatusCode)"
+        }
+    } catch {
+        Write-Host "Error: Remote file not available. $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "URL: $BINARY_URL" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "Downloading $BINARY_NAME..."
+    try {
+        Invoke-WebRequest -Uri $BINARY_URL -OutFile $FLUX_BINARY -UseBasicParsing
+    } catch {
+        Write-Host "Error: Failed to download $BINARY_NAME. Please check your internet connection and try again." -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Test-Path $FLUX_BINARY) -or (Get-Item $FLUX_BINARY).Length -eq 0) {
+        Write-Host "Error: $BINARY_NAME was downloaded but is empty. Please try again." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "Download successful." -ForegroundColor Green
+}
+
+## PATH Installation
+
+# Check if already in PATH
+$currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$pathAdded = $currentPath -split ";" | Where-Object { $_ -eq $TARGET_DIR }
+
+if ($InstallPath -or (-not $pathAdded)) {
+    if (-not $InstallPath) {
+        $response = Read-Host "Would you like to add fluxzero-cli to your PATH? [y/N]"
+        $InstallPath = $response -match "^[Yy]"
+    }
+    
+    if ($InstallPath) {
+        Write-Host "Adding $TARGET_DIR to your PATH..."
+        
+        if (-not $pathAdded) {
+            $newPath = if ($currentPath) { "$currentPath;$TARGET_DIR" } else { $TARGET_DIR }
+            try {
+                [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+                Write-Host "PATH updated successfully. Please restart your terminal or run:" -ForegroundColor Green
+                Write-Host "`$env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'User')" -ForegroundColor Cyan
+            } catch {
+                Write-Host "Error: Failed to update PATH. Please add $TARGET_DIR to your PATH manually." -ForegroundColor Red
+                exit 1
+            }
+        } else {
+            Write-Host "$TARGET_DIR is already in your PATH." -ForegroundColor Yellow
+        }
+        
+        Write-Host "Installation completed successfully. You can now use the fluxzero-cli by running 'fz' from anywhere." -ForegroundColor Green
+    } else {
+        Write-Host "Skipping PATH installation. You can run the CLI using: $FLUX_BINARY" -ForegroundColor Yellow
+        Write-Host "Installation completed successfully." -ForegroundColor Green
+    }
+} else {
+    Write-Host "Installation completed successfully. You can now use the fluxzero-cli by running 'fz' from anywhere." -ForegroundColor Green
+}

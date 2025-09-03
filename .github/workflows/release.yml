@@ -79,26 +79,29 @@ jobs:
           fi
           echo "JAR verification successful!"
 
-      - name: Verify install script
+      - name: Verify install scripts
         run: |
-          echo "Testing install script..."
-          # Create a test environment
+          echo "Testing install scripts with native binaries..."
+          
+          # Test bash install script with Linux binary
+          echo "Testing bash install script..."
           export TEST_HOME=$(mktemp -d)
           export HOME=$TEST_HOME
           
-          # Run install script with --install-path flag and local JAR
-          bash build/release-scripts/install.sh --install-path --jar="$(pwd)/build/libs/fluxzero-cli.jar"
+          # Use Linux native binary for testing
+          LINUX_BINARY="$(pwd)/build/native-releases/flux-linux-amd64"
+          bash build/release-scripts/install.sh --install-path --binary="$LINUX_BINARY"
           
-          # Check if the CLI script was created
-          if [ ! -x "$TEST_HOME/.fluxzero/cli" ]; then
-            echo "Install script failed to create CLI script!"
+          # Check if the native binary was installed
+          if [ ! -x "$TEST_HOME/.fluxzero/bin/fz" ]; then
+            echo "Install script failed to install native binary!"
             exit 1
           fi
           
           # Test the installed CLI
-          $TEST_HOME/.fluxzero/cli version
+          $TEST_HOME/.fluxzero/bin/fz version
           if [ $? -ne 0 ]; then
-            echo "Installed CLI verification failed!"
+            echo "Installed native binary verification failed!"
             exit 1
           fi
           
@@ -122,7 +125,18 @@ jobs:
             exit 1
           fi
           
-          echo "Install script verification successful!"
+          echo "Bash install script verification successful!"
+          
+          # Test PowerShell install script syntax (we can't fully test on Linux)
+          echo "Verifying PowerShell script syntax..."
+          if command -v pwsh >/dev/null 2>&1; then
+            pwsh -Command "try { . build/release-scripts/install.ps1 -WhatIf } catch { Write-Host 'Syntax Error'; exit 1 }"
+            echo "PowerShell script syntax verification successful!"
+          else
+            echo "PowerShell not available - skipping syntax check"
+          fi
+          
+          echo "Install scripts verification successful!"
           
           # Cleanup
           sudo rm -f /usr/local/bin/fz
@@ -150,6 +164,7 @@ jobs:
           files: |
             build/libs/fluxzero-cli.jar
             build/release-scripts/install.sh
+            build/release-scripts/install.ps1
             build/native-releases/flux-linux-amd64
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64
