@@ -77,6 +77,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Download JAR artifact
         uses: actions/download-artifact@v4
         with:
@@ -85,12 +91,6 @@ jobs:
 
       - name: Rename files
         run: mv build/libs/${{ needs.build-and-test.outputs.jar-name }} build/libs/fluxzero-cli.jar
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
 
       - name: Verify JAR functionality
         run: |

@@ -112,16 +112,20 @@ if [ -n "$CUSTOM_BINARY" ]; then
   echo "Checking if file exists: $CUSTOM_BINARY"
   if [ -f "$CUSTOM_BINARY" ]; then
     echo "File exists, copying local binary..."
+    # Always overwrite when using custom binary
     if ! cp "$CUSTOM_BINARY" "$FLUX_BINARY"; then
       echo "Error: Failed to copy binary from $CUSTOM_BINARY"
       exit 1
     fi
+    echo "${BLUE}Copied binary from: $CUSTOM_BINARY${NC}"
   else
     echo "File does not exist, treating as URL and downloading..."
+    # Always overwrite when using custom binary
     if ! curl -s -L -o "$FLUX_BINARY" "$CUSTOM_BINARY"; then
       echo "Error: Failed to download binary from $CUSTOM_BINARY"
       exit 1
     fi
+    echo "${BLUE}Downloaded binary from: $CUSTOM_BINARY${NC}"
   fi
   
   if [ ! -s "$FLUX_BINARY" ]; then
@@ -131,7 +135,7 @@ if [ -n "$CUSTOM_BINARY" ]; then
   
   echo "${GREEN}Custom binary installation successful.${NC}"
 elif [ -s "$FLUX_BINARY" ] && [ -z "$FORCE_INSTALL" ]; then
-  echo "$FLUX_BINARY already exists. Skipping installation. Run 'fz upgrade' or use --force to reinstall."
+  echo "${YELLOW}$FLUX_BINARY already exists. Skipping installation. Run 'fz upgrade' or use --force to reinstall.${NC}"
 else
   if [ -s "$FLUX_BINARY" ] && [ -n "$FORCE_INSTALL" ]; then
     echo "Forcing reinstallation of $FLUX_BINARY..."
