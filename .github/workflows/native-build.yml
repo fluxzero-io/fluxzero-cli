@@ -2,7 +2,29 @@ name: Native Image Build
 
 on:
   workflow_call:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        type: string
+        default: 'dev'
+      jar-name:
+        description: 'JAR filename to use for native build'
+        required: false
+        type: string
+        default: 'fluxzero-cli-dev-all.jar'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        type: string
+        default: 'dev'
+      jar-name:
+        description: 'JAR filename to use for native build'
+        required: false
+        type: string
+        default: 'fluxzero-cli-dev-all.jar'
 
 jobs:
   native-build:
@@ -28,6 +50,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jar-artifact
+          path: build/
+
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
@@ -51,7 +79,9 @@ jobs:
           else
             echo "Host: $(uname -m), CPU cores: $(nproc), Memory: $(free -h | head -2)"
           fi
-          ./gradlew nativeCompile -x test --info
+          # Native compilation needs to compile classes but can reuse cached artifacts
+          # Skip tests since we already ran them, but allow compilation for native-image
+          ./gradlew nativeCompile -x test --info -PappVersion=${{ inputs.version }}
 
       - name: Verify native image
         shell: bash
@@ -117,8 +147,8 @@ jobs:
         run: |
           echo "Testing installation script with native binary..."
           
-          # Generate the install script
-          ./gradlew generateScripts
+          # Generate scripts with correct version for testing
+          ./gradlew generateScripts -PappVersion=${{ inputs.version }}
           
           # Create a test home directory to avoid conflicts
           TEST_HOME=$(mktemp -d)
@@ -192,8 +222,8 @@ jobs:
         run: |
           echo "Testing uninstall script..."
           
-          # Generate the uninstall script
-          ./gradlew generateScripts
+          # Generate scripts with correct version for testing  
+          ./gradlew generateScripts -PappVersion=${{ inputs.version }}
           
           # Create a test home directory and install first
           TEST_HOME=$(mktemp -d)
