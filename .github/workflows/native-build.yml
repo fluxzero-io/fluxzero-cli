@@ -66,6 +66,52 @@ jobs:
           fi
           echo "Native image verification successful!"
 
+      - name: Integration test - Generate example project
+        shell: bash
+        run: |
+          echo "Running integration test - generating example project..."
+          
+          # Create test directory and navigate to it
+          mkdir -p test-workspace
+          cd test-workspace
+          
+          # Run the CLI to generate an example project
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ../build/native/nativeCompile/flux.exe init --template=flux-java-single --name=example-project --git
+          else
+            ../build/native/nativeCompile/flux init --template=flux-java-single --name=example-project --git
+          fi
+          
+          # Verify the project was created
+          if [ ! -d "example-project" ]; then
+            echo "ERROR: example-project directory was not created!"
+            exit 1
+          fi
+          
+          # Check for key files that should exist in a Java project
+          cd example-project
+          if [ ! -f "pom.xml" ]; then
+            echo "ERROR: pom.xml not found!"
+            exit 1
+          fi
+          
+          if [ ! -d "src/main/java" ]; then
+            echo "ERROR: src/main/java directory not found!"
+            exit 1
+          fi
+          
+          # Verify git repository was initialized
+          if [ ! -d ".git" ]; then
+            echo "ERROR: Git repository was not initialized!"
+            exit 1
+          fi
+          
+          # List the generated structure for debugging
+          echo "Generated project structure:"
+          find . -type f | head -20
+          
+          echo "Integration test successful - example project generated correctly!"
+
       - name: Upload native executable
         uses: actions/upload-artifact@v4
         with:
