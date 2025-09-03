@@ -45,4 +45,17 @@ class UpgradeTest {
         verify(exactly = 1) { installer.install() }
         assertTrue(result.stdout.contains("fluxzero-cli installed (version: v1.2.3)"))
     }
+
+    @Test
+    fun `shows clean error message when installation fails`() {
+        val installer = mockk<Installer>()
+        every { installer.install() } throws IllegalStateException("Installation failed: Could not download binary. Please try reinstalling using the installation script at https://fluxzero.io/docs/getting-started")
+
+        val cmd = Upgrade(installer)
+        val result = cmd.test(emptyList())
+
+        verify(exactly = 1) { installer.install() }
+        assertTrue(result.stderr.contains("Error: Installation failed: Could not download binary. Please try reinstalling using the installation script at https://fluxzero.io/docs/getting-started"))
+        assertTrue(result.stdout.isEmpty())
+    }
 }

@@ -94,4 +94,5 @@ class InitTest {
         }
         Assertions.assertTrue(exception.message!!.contains("Invalid name format"))
     }
+
 }

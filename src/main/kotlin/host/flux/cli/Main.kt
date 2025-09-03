@@ -30,14 +30,19 @@ class FluxCli : CliktCommand() {
 
 
 fun main(args: Array<String>) {
-    val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
-    UpdateChecker.notifyIfNewVersion(currentVersion) { System.err.println(it) }
-    FluxCli()
-        .subcommands(
-            Init(),
-            Version(),
-            Upgrade(),
-            Templates(),
-        )
-        .main(args)
+    try {
+        val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
+        UpdateChecker.notifyIfNewVersion(currentVersion) { System.err.println(it) }
+        FluxCli()
+            .subcommands(
+                Init(),
+                Version(),
+                Upgrade(),
+                Templates(),
+            )
+            .main(args)
+    } catch (e: Exception) {
+        System.err.println("Error: ${e.message}")
+        kotlin.system.exitProcess(1)
+    }
 }

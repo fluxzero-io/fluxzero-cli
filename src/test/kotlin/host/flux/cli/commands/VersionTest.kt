@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.testing.test
 import host.flux.cli.commands.Version
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class VersionTest {
     @Test
@@ -12,4 +13,5 @@ class VersionTest {
         val result = cmd.test(emptyList())
         assertEquals("1.2.3\n", result.stdout)
     }
+
 }
