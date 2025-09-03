@@ -131,7 +131,7 @@ tasks.named("processResources") {
 tasks.register<Copy>("generateScripts") {
     val scriptsOutputDir = layout.buildDirectory.dir("release-scripts")
     from("scripts") {
-        include("install.sh.template", "install.ps1.template")
+        include("install.sh.template", "install.ps1.template", "uninstall.sh.template", "uninstall.ps1.template")
         filter<ReplaceTokens>(
             "tokens" to mapOf(
                 "VERSION" to version,
@@ -142,6 +142,8 @@ tasks.register<Copy>("generateScripts") {
         when (name) {
             "install.sh.template" -> "install.sh"
             "install.ps1.template" -> "install.ps1"
+            "uninstall.sh.template" -> "uninstall.sh"
+            "uninstall.ps1.template" -> "uninstall.ps1"
             else -> name
         }
     }
@@ -149,6 +151,7 @@ tasks.register<Copy>("generateScripts") {
 
     doLast {
         file(layout.buildDirectory.file("release-scripts/install.sh")).setExecutable(true)
+        file(layout.buildDirectory.file("release-scripts/uninstall.sh")).setExecutable(true)
         // Note: PowerShell scripts don't need executable permissions on Unix systems
     }
 }

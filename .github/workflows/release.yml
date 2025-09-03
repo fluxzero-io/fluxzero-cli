@@ -157,6 +157,77 @@ jobs:
           sudo rm -f /usr/local/bin/fz
           rm -rf $TEST_HOME
 
+      - name: Test uninstall scripts
+        run: |
+          echo "Testing uninstall scripts after installation..."
+          
+          # Test bash uninstall script with installed CLI
+          echo "Testing bash uninstall script..."
+          export TEST_HOME=$(mktemp -d)
+          export HOME=$TEST_HOME
+          
+          # Install first using Linux binary
+          LINUX_BINARY="$(pwd)/build/native-releases/flux-linux-amd64"
+          bash build/release-scripts/install.sh --install-path --binary="$LINUX_BINARY"
+          
+          # Verify installation exists
+          if [ ! -x "$TEST_HOME/.fluxzero/bin/fz" ]; then
+            echo "ERROR: Installation failed - cannot test uninstall!"
+            exit 1
+          fi
+          
+          # Test uninstall
+          bash build/release-scripts/uninstall.sh --force
+          
+          # Verify everything was removed
+          if [ -d "$TEST_HOME/.fluxzero" ]; then
+            echo "ERROR: Uninstall script failed to remove .fluxzero directory!"
+            exit 1
+          fi
+          
+          # Verify system link was removed
+          if [ -f "/usr/local/bin/fz" ]; then
+            echo "ERROR: Uninstall script failed to remove /usr/local/bin/fz!"
+            exit 1
+          fi
+          
+          echo "Bash uninstall script test successful!"
+          
+          # Test legacy installation cleanup
+          echo "Testing legacy installation cleanup..."
+          export TEST_HOME2=$(mktemp -d)
+          export HOME=$TEST_HOME2
+          
+          # Create a fake legacy installation
+          mkdir -p "$TEST_HOME2/.flux"
+          echo "fake jar content" > "$TEST_HOME2/.flux/flux-cli.jar"
+          
+          # Run uninstall script
+          bash build/release-scripts/uninstall.sh --force
+          
+          # Verify legacy directory was removed
+          if [ -d "$TEST_HOME2/.flux" ]; then
+            echo "ERROR: Uninstall script failed to remove legacy .flux directory!"
+            exit 1
+          fi
+          
+          echo "Legacy cleanup test successful!"
+          
+          # Test PowerShell uninstall script syntax
+          echo "Testing PowerShell uninstall script syntax..."
+          if command -v pwsh >/dev/null 2>&1; then
+            # Just check PowerShell syntax without executing
+            pwsh -Command "try { \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content 'build/release-scripts/uninstall.ps1' -Raw), [ref]\$null) } catch { Write-Host \"PowerShell Uninstall Syntax Error: \$(\$_.Exception.Message)\"; exit 1 }"
+            echo "PowerShell uninstall script syntax verification successful!"
+          else
+            echo "PowerShell not available - skipping uninstall syntax check"
+          fi
+          
+          echo "Uninstall scripts verification successful!"
+          
+          # Cleanup
+          rm -rf $TEST_HOME $TEST_HOME2
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -166,6 +237,8 @@ jobs:
             build/libs/fluxzero-cli.jar
             build/release-scripts/install.sh
             build/release-scripts/install.ps1
+            build/release-scripts/uninstall.sh
+            build/release-scripts/uninstall.ps1
             build/native-releases/flux-linux-amd64
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64

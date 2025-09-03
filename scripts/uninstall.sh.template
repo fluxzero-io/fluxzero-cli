@@ -1,0 +1,223 @@
+#!/usr/bin/env sh
+##
+## This script uninstalls the fluxzero-cli from your system
+## Removes both current (.fluxzero) and legacy (.flux) installations
+##
+
+# Colors for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Parse command line arguments
+FORCE_UNINSTALL=""
+QUIET=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force)
+            FORCE_UNINSTALL="y"
+            shift
+            ;;
+        --quiet)
+            QUIET="y"
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--force] [--quiet]"
+            exit 1
+            ;;
+    esac
+done
+
+# Function to ask for confirmation
+confirm() {
+    if [ -n "$FORCE_UNINSTALL" ]; then
+        return 0
+    fi
+    
+    if [ -n "$QUIET" ]; then
+        return 1
+    fi
+    
+    echo -n "$1 [y/N] "
+    read -r response < /dev/tty
+    case "$response" in
+        [Yy]|[Yy][Ee][Ss])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Function to remove directory if it exists
+remove_dir() {
+    local dir="$1"
+    local description="$2"
+    
+    if [ -d "$dir" ]; then
+        if [ -n "$QUIET" ] && [ -z "$FORCE_UNINSTALL" ]; then
+            echo "${YELLOW}Found $description at: $dir${NC}"
+            echo "${YELLOW}Use --force to remove without prompts${NC}"
+            return 1
+        fi
+        
+        echo "${YELLOW}Found $description:${NC}"
+        echo "  $dir"
+        
+        if [ "$(ls -A "$dir" 2>/dev/null | wc -l)" -gt 0 ]; then
+            echo "${YELLOW}Contents:${NC}"
+            ls -la "$dir" | sed 's/^/  /'
+        fi
+        
+        if confirm "Remove $description?"; then
+            echo "Removing $dir..."
+            if rm -rf "$dir"; then
+                echo "${GREEN}✓ Removed $description${NC}"
+                return 0
+            else
+                echo "${RED}✗ Failed to remove $description${NC}"
+                return 1
+            fi
+        else
+            echo "${YELLOW}Skipped $description${NC}"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# Function to remove file if it exists
+remove_file() {
+    local file="$1"
+    local description="$2"
+    
+    if [ -f "$file" ] || [ -L "$file" ]; then
+        if [ -n "$QUIET" ] && [ -z "$FORCE_UNINSTALL" ]; then
+            echo "${YELLOW}Found $description at: $file${NC}"
+            echo "${YELLOW}Use --force to remove without prompts${NC}"
+            return 1
+        fi
+        
+        echo "${YELLOW}Found $description: $file${NC}"
+        
+        if confirm "Remove $description?"; then
+            echo "Removing $file..."
+            if sudo rm -f "$file"; then
+                echo "${GREEN}✓ Removed $description${NC}"
+                return 0
+            else
+                echo "${RED}✗ Failed to remove $description (permission denied?)${NC}"
+                return 1
+            fi
+        else
+            echo "${YELLOW}Skipped $description${NC}"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+echo "FluxZero CLI Uninstaller"
+echo "======================="
+echo
+
+# Check for current installation (.fluxzero)
+CURRENT_DIR="$HOME/.fluxzero"
+FOUND_CURRENT=0
+if [ -d "$CURRENT_DIR" ]; then
+    FOUND_CURRENT=1
+fi
+
+# Check for legacy installation (.flux)
+LEGACY_DIR="$HOME/.flux"
+LEGACY_JAR="$LEGACY_DIR/flux-cli.jar"
+FOUND_LEGACY=0
+if [ -d "$LEGACY_DIR" ] && [ -f "$LEGACY_JAR" ]; then
+    FOUND_LEGACY=1
+fi
+
+# Check for system-wide installation
+SYSTEM_LINK="/usr/local/bin/fz"
+FOUND_SYSTEM=0
+if [ -f "$SYSTEM_LINK" ] || [ -L "$SYSTEM_LINK" ]; then
+    FOUND_SYSTEM=1
+fi
+
+# Check if anything was found
+if [ $FOUND_CURRENT -eq 0 ] && [ $FOUND_LEGACY -eq 0 ] && [ $FOUND_SYSTEM -eq 0 ]; then
+    echo "${GREEN}No FluxZero CLI installation found.${NC}"
+    echo "Locations checked:"
+    echo "  - $CURRENT_DIR"
+    echo "  - $LEGACY_DIR"
+    echo "  - $SYSTEM_LINK"
+    exit 0
+fi
+
+echo "${YELLOW}Found FluxZero CLI installations:${NC}"
+[ $FOUND_CURRENT -eq 1 ] && echo "  ✓ Current installation: $CURRENT_DIR"
+[ $FOUND_LEGACY -eq 1 ] && echo "  ✓ Legacy installation: $LEGACY_DIR"
+[ $FOUND_SYSTEM -eq 1 ] && echo "  ✓ System command: $SYSTEM_LINK"
+echo
+
+if [ -z "$FORCE_UNINSTALL" ] && [ -z "$QUIET" ]; then
+    echo "${RED}This will remove FluxZero CLI from your system.${NC}"
+    echo "You will be asked to confirm each removal."
+    echo
+    if ! confirm "Continue with uninstallation?"; then
+        echo "Uninstallation cancelled."
+        exit 0
+    fi
+    echo
+fi
+
+# Track what was removed
+REMOVED_COUNT=0
+
+# Remove current installation
+if [ $FOUND_CURRENT -eq 1 ]; then
+    if remove_dir "$CURRENT_DIR" "current FluxZero installation"; then
+        REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+fi
+
+# Remove legacy installation
+if [ $FOUND_LEGACY -eq 1 ]; then
+    if remove_dir "$LEGACY_DIR" "legacy Flux installation"; then
+        REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+fi
+
+# Remove system link
+if [ $FOUND_SYSTEM -eq 1 ]; then
+    if remove_file "$SYSTEM_LINK" "system command (fz)"; then
+        REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+fi
+
+echo
+echo "Uninstallation Summary:"
+echo "======================"
+
+if [ $REMOVED_COUNT -eq 0 ]; then
+    echo "${YELLOW}No items were removed.${NC}"
+    echo "FluxZero CLI may still be present on your system."
+elif [ $REMOVED_COUNT -eq 1 ]; then
+    echo "${GREEN}Successfully removed 1 item.${NC}"
+elif [ $REMOVED_COUNT -gt 1 ]; then
+    echo "${GREEN}Successfully removed $REMOVED_COUNT items.${NC}"
+fi
+
+# Final verification
+if [ ! -d "$CURRENT_DIR" ] && [ ! -d "$LEGACY_DIR" ] && [ ! -f "$SYSTEM_LINK" ]; then
+    echo "${GREEN}✓ FluxZero CLI has been completely removed from your system.${NC}"
+else
+    echo "${YELLOW}Some FluxZero CLI components may still remain on your system.${NC}"
+    echo "You may need to run this script again or remove them manually."
+fi
+
+echo
+echo "Thank you for using FluxZero CLI!"

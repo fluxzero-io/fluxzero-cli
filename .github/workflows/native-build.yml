@@ -186,6 +186,75 @@ jobs:
           fi
           
           echo "Installation script test successful!"
+
+      - name: Test uninstall script
+        shell: bash
+        run: |
+          echo "Testing uninstall script..."
+          
+          # Generate the uninstall script
+          ./gradlew generateScripts
+          
+          # Create a test home directory and install first
+          TEST_HOME=$(mktemp -d)
+          export HOME=$TEST_HOME
+          
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Test PowerShell scripts
+            BINARY_PATH="$(pwd)/build/native/nativeCompile/flux.exe"
+            INSTALL_SCRIPT="$(pwd)/build/release-scripts/install.ps1"
+            UNINSTALL_SCRIPT="$(pwd)/build/release-scripts/uninstall.ps1"
+            
+            echo "Installing first..."
+            pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
+            
+            # Verify installation exists
+            if [ ! -f "$TEST_HOME/.fluxzero/bin/fz.exe" ]; then
+              echo "ERROR: Installation failed - cannot test uninstall!"
+              exit 1
+            fi
+            
+            echo "Testing PowerShell uninstall script..."
+            pwsh -File "$UNINSTALL_SCRIPT" -Force
+            
+            # Verify everything was removed
+            if [ -d "$TEST_HOME/.fluxzero" ]; then
+              echo "ERROR: Uninstall script failed to remove .fluxzero directory!"
+              exit 1
+            fi
+            
+          else
+            # Test bash scripts
+            BINARY_PATH="$(pwd)/build/native/nativeCompile/flux"
+            INSTALL_SCRIPT="$(pwd)/build/release-scripts/install.sh"
+            UNINSTALL_SCRIPT="$(pwd)/build/release-scripts/uninstall.sh"
+            
+            echo "Installing first..."
+            bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path
+            
+            # Verify installation exists
+            if [ ! -f "$TEST_HOME/.fluxzero/bin/fz" ]; then
+              echo "ERROR: Installation failed - cannot test uninstall!"
+              exit 1
+            fi
+            
+            echo "Testing bash uninstall script..."
+            bash "$UNINSTALL_SCRIPT" --force
+            
+            # Verify everything was removed
+            if [ -d "$TEST_HOME/.fluxzero" ]; then
+              echo "ERROR: Uninstall script failed to remove .fluxzero directory!"
+              exit 1
+            fi
+            
+            # Check if system link was removed (on Linux)
+            if [[ "$RUNNER_OS" == "Linux" ]] && [ -f "/usr/local/bin/fz" ]; then
+              echo "ERROR: Uninstall script failed to remove /usr/local/bin/fz!"
+              exit 1
+            fi
+          fi
+          
+          echo "Uninstall script test successful!"
           
           # Cleanup
           rm -rf "$TEST_HOME"

@@ -1,0 +1,205 @@
+#!/usr/bin/env pwsh
+##
+## This script uninstalls the fluxzero-cli from your Windows system
+## Removes both current (.fluxzero) and legacy (.flux) installations
+##
+
+param(
+    [switch]$Force,
+    [switch]$Quiet
+)
+
+# Function to ask for confirmation
+function Confirm-Action {
+    param([string]$Message)
+    
+    if ($Force) {
+        return $true
+    }
+    
+    if ($Quiet) {
+        return $false
+    }
+    
+    $response = Read-Host "$Message [y/N]"
+    return $response -match "^[Yy]([Ee][Ss])?$"
+}
+
+# Function to remove directory if it exists
+function Remove-Directory {
+    param(
+        [string]$Path,
+        [string]$Description
+    )
+    
+    if (Test-Path $Path) {
+        if ($Quiet -and -not $Force) {
+            Write-Host "Found $Description at: $Path" -ForegroundColor Yellow
+            Write-Host "Use -Force to remove without prompts" -ForegroundColor Yellow
+            return $false
+        }
+        
+        Write-Host "Found $Description:" -ForegroundColor Yellow
+        Write-Host "  $Path"
+        
+        $items = Get-ChildItem $Path -Force -ErrorAction SilentlyContinue
+        if ($items.Count -gt 0) {
+            Write-Host "Contents:" -ForegroundColor Yellow
+            $items | ForEach-Object { Write-Host "  $($_.Name)" }
+        }
+        
+        if (Confirm-Action "Remove $Description?") {
+            Write-Host "Removing $Path..."
+            try {
+                Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
+                Write-Host "✓ Removed $Description" -ForegroundColor Green
+                return $true
+            }
+            catch {
+                Write-Host "✗ Failed to remove $Description`: $($_.Exception.Message)" -ForegroundColor Red
+                return $false
+            }
+        }
+        else {
+            Write-Host "Skipped $Description" -ForegroundColor Yellow
+            return $false
+        }
+    }
+    return $true
+}
+
+# Function to remove PATH entry
+function Remove-PathEntry {
+    param([string]$PathToRemove)
+    
+    if ($Quiet -and -not $Force) {
+        Write-Host "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
+        Write-Host "Use -Force to remove without prompts" -ForegroundColor Yellow
+        return $false
+    }
+    
+    Write-Host "Found FluxZero in PATH: $PathToRemove" -ForegroundColor Yellow
+    
+    if (Confirm-Action "Remove FluxZero from PATH?") {
+        Write-Host "Removing from PATH..."
+        try {
+            $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+            $pathEntries = $currentPath -split ";" | Where-Object { $_ -ne $PathToRemove }
+            $newPath = $pathEntries -join ";"
+            
+            [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+            Write-Host "✓ Removed FluxZero from PATH" -ForegroundColor Green
+            Write-Host "Please restart your terminal for PATH changes to take effect" -ForegroundColor Cyan
+            return $true
+        }
+        catch {
+            Write-Host "✗ Failed to remove from PATH: $($_.Exception.Message)" -ForegroundColor Red
+            return $false
+        }
+    }
+    else {
+        Write-Host "Skipped PATH removal" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+Write-Host "FluxZero CLI Uninstaller" -ForegroundColor Cyan
+Write-Host "=======================" -ForegroundColor Cyan
+Write-Host ""
+
+# Use HOME if available (for CI environments), otherwise USERPROFILE
+$HOME_DIR = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+
+# Check for current installation (.fluxzero)
+$CURRENT_DIR = Join-Path $HOME_DIR ".fluxzero"
+$FOUND_CURRENT = Test-Path $CURRENT_DIR
+
+# Check for legacy installation (.flux)
+$LEGACY_DIR = Join-Path $HOME_DIR ".flux"
+$LEGACY_JAR = Join-Path $LEGACY_DIR "flux-cli.jar"
+$FOUND_LEGACY = (Test-Path $LEGACY_DIR) -and (Test-Path $LEGACY_JAR)
+
+# Check for PATH entry
+$FLUXZERO_BIN = Join-Path $HOME_DIR ".fluxzero\bin"
+$currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$FOUND_PATH = $currentPath -split ";" | Where-Object { $_ -eq $FLUXZERO_BIN }
+
+# Check if anything was found
+if (-not $FOUND_CURRENT -and -not $FOUND_LEGACY -and -not $FOUND_PATH) {
+    Write-Host "No FluxZero CLI installation found." -ForegroundColor Green
+    Write-Host "Locations checked:"
+    Write-Host "  - $CURRENT_DIR"
+    Write-Host "  - $LEGACY_DIR"
+    Write-Host "  - PATH environment variable"
+    exit 0
+}
+
+Write-Host "Found FluxZero CLI installations:" -ForegroundColor Yellow
+if ($FOUND_CURRENT) { Write-Host "  ✓ Current installation: $CURRENT_DIR" }
+if ($FOUND_LEGACY) { Write-Host "  ✓ Legacy installation: $LEGACY_DIR" }
+if ($FOUND_PATH) { Write-Host "  ✓ PATH entry: $FLUXZERO_BIN" }
+Write-Host ""
+
+if (-not $Force -and -not $Quiet) {
+    Write-Host "This will remove FluxZero CLI from your system." -ForegroundColor Red
+    Write-Host "You will be asked to confirm each removal."
+    Write-Host ""
+    if (-not (Confirm-Action "Continue with uninstallation?")) {
+        Write-Host "Uninstallation cancelled."
+        exit 0
+    }
+    Write-Host ""
+}
+
+# Track what was removed
+$REMOVED_COUNT = 0
+
+# Remove current installation
+if ($FOUND_CURRENT) {
+    if (Remove-Directory $CURRENT_DIR "current FluxZero installation") {
+        $REMOVED_COUNT++
+    }
+}
+
+# Remove legacy installation
+if ($FOUND_LEGACY) {
+    if (Remove-Directory $LEGACY_DIR "legacy Flux installation") {
+        $REMOVED_COUNT++
+    }
+}
+
+# Remove PATH entry
+if ($FOUND_PATH) {
+    if (Remove-PathEntry $FLUXZERO_BIN) {
+        $REMOVED_COUNT++
+    }
+}
+
+Write-Host ""
+Write-Host "Uninstallation Summary:" -ForegroundColor Cyan
+Write-Host "======================" -ForegroundColor Cyan
+
+if ($REMOVED_COUNT -eq 0) {
+    Write-Host "No items were removed." -ForegroundColor Yellow
+    Write-Host "FluxZero CLI may still be present on your system."
+}
+elseif ($REMOVED_COUNT -eq 1) {
+    Write-Host "Successfully removed 1 item." -ForegroundColor Green
+}
+else {
+    Write-Host "Successfully removed $REMOVED_COUNT items." -ForegroundColor Green
+}
+
+# Final verification
+$stillExists = (Test-Path $CURRENT_DIR) -or (Test-Path $LEGACY_DIR) -or ($currentPath -like "*$FLUXZERO_BIN*")
+
+if (-not $stillExists) {
+    Write-Host "✓ FluxZero CLI has been completely removed from your system." -ForegroundColor Green
+}
+else {
+    Write-Host "Some FluxZero CLI components may still remain on your system." -ForegroundColor Yellow
+    Write-Host "You may need to run this script again or remove them manually."
+}
+
+Write-Host ""
+Write-Host "Thank you for using FluxZero CLI!" -ForegroundColor Green
