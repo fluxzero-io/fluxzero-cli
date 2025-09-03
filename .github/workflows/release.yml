@@ -139,7 +139,8 @@ jobs:
           cp native-artifacts/flux-linux-amd64/flux build/native-releases/flux-linux-amd64
           cp native-artifacts/flux-macos-amd64/flux build/native-releases/flux-macos-amd64
           cp native-artifacts/flux-macos-arm64/flux build/native-releases/flux-macos-arm64
-          chmod +x build/native-releases/*
+          cp native-artifacts/flux-windows-amd64/flux.exe build/native-releases/flux-windows-amd64.exe
+          chmod +x build/native-releases/flux-*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -152,5 +153,6 @@ jobs:
             build/native-releases/flux-linux-amd64
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64
+            build/native-releases/flux-windows-amd64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
