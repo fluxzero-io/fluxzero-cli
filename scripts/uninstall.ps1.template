@@ -39,7 +39,7 @@ function Remove-Directory {
             return $false
         }
         
-        Write-Host "Found $Description:" -ForegroundColor Yellow
+        Write-Host "Found ${Description}:" -ForegroundColor Yellow
         Write-Host "  $Path"
         
         $items = Get-ChildItem $Path -Force -ErrorAction SilentlyContinue
@@ -48,7 +48,7 @@ function Remove-Directory {
             $items | ForEach-Object { Write-Host "  $($_.Name)" }
         }
         
-        if (Confirm-Action "Remove $Description?") {
+        if (Confirm-Action "Remove ${Description}?") {
             Write-Host "Removing $Path..."
             try {
                 Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
@@ -56,7 +56,7 @@ function Remove-Directory {
                 return $true
             }
             catch {
-                Write-Host "✗ Failed to remove $Description`: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "✗ Failed to remove ${Description}: $($_.Exception.Message)" -ForegroundColor Red
                 return $false
             }
         }
