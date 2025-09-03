@@ -79,26 +79,43 @@ jobs:
           fi
           echo "JAR verification successful!"
 
-      - name: Verify install script
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: native-artifacts
+
+      - name: Prepare native executables for release
         run: |
-          echo "Testing install script..."
-          # Create a test environment
+          mkdir -p build/native-releases
+          cp native-artifacts/flux-linux-amd64/flux build/native-releases/flux-linux-amd64
+          cp native-artifacts/flux-macos-amd64/flux build/native-releases/flux-macos-amd64
+          cp native-artifacts/flux-macos-arm64/flux build/native-releases/flux-macos-arm64
+          cp native-artifacts/flux-windows-amd64/flux.exe build/native-releases/flux-windows-amd64.exe
+          chmod +x build/native-releases/flux-*
+
+      - name: Verify install scripts
+        run: |
+          echo "Testing install scripts with native binaries..."
+          
+          # Test bash install script with Linux binary
+          echo "Testing bash install script..."
           export TEST_HOME=$(mktemp -d)
           export HOME=$TEST_HOME
           
-          # Run install script with --install-path flag and local JAR
-          bash build/release-scripts/install.sh --install-path --jar="$(pwd)/build/libs/fluxzero-cli.jar"
+          # Use Linux native binary for testing
+          LINUX_BINARY="$(pwd)/build/native-releases/flux-linux-amd64"
+          bash build/release-scripts/install.sh --install-path --binary="$LINUX_BINARY"
           
-          # Check if the CLI script was created
-          if [ ! -x "$TEST_HOME/.fluxzero/cli" ]; then
-            echo "Install script failed to create CLI script!"
+          # Check if the native binary was installed
+          if [ ! -x "$TEST_HOME/.fluxzero/bin/fz" ]; then
+            echo "Install script failed to install native binary!"
             exit 1
           fi
           
           # Test the installed CLI
-          $TEST_HOME/.fluxzero/cli version
+          $TEST_HOME/.fluxzero/bin/fz version
           if [ $? -ne 0 ]; then
-            echo "Installed CLI verification failed!"
+            echo "Installed native binary verification failed!"
             exit 1
           fi
           
@@ -122,25 +139,23 @@ jobs:
             exit 1
           fi
           
-          echo "Install script verification successful!"
+          echo "Bash install script verification successful!"
+          
+          # Test PowerShell install script syntax (we can't fully test on Linux)
+          echo "Verifying PowerShell script syntax..."
+          if command -v pwsh >/dev/null 2>&1; then
+            # Just check PowerShell syntax without executing
+            pwsh -Command "try { \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content 'build/release-scripts/install.ps1' -Raw), [ref]\$null) } catch { Write-Host \"PowerShell Syntax Error: \$(\$_.Exception.Message)\"; exit 1 }"
+            echo "PowerShell script syntax verification successful!"
+          else
+            echo "PowerShell not available - skipping syntax check"
+          fi
+          
+          echo "Install scripts verification successful!"
           
           # Cleanup
           sudo rm -f /usr/local/bin/fz
           rm -rf $TEST_HOME
-
-      - name: Download native artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: native-artifacts
-
-      - name: Prepare native executables for release
-        run: |
-          mkdir -p build/native-releases
-          cp native-artifacts/flux-linux-amd64/flux build/native-releases/flux-linux-amd64
-          cp native-artifacts/flux-macos-amd64/flux build/native-releases/flux-macos-amd64
-          cp native-artifacts/flux-macos-arm64/flux build/native-releases/flux-macos-arm64
-          cp native-artifacts/flux-windows-amd64/flux.exe build/native-releases/flux-windows-amd64.exe
-          chmod +x build/native-releases/flux-*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -150,6 +165,7 @@ jobs:
           files: |
             build/libs/fluxzero-cli.jar
             build/release-scripts/install.sh
+            build/release-scripts/install.ps1
             build/native-releases/flux-linux-amd64
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64

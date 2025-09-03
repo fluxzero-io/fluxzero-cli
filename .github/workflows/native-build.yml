@@ -112,6 +112,87 @@ jobs:
           
           echo "Integration test successful - example project generated correctly!"
 
+      - name: Test installation script
+        shell: bash
+        run: |
+          echo "Testing installation script with native binary..."
+          
+          # Generate the install script
+          ./gradlew generateScripts
+          
+          # Create a test home directory to avoid conflicts
+          TEST_HOME=$(mktemp -d)
+          export HOME=$TEST_HOME
+          
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Test PowerShell script
+            BINARY_PATH="$(pwd)/build/native/nativeCompile/flux.exe"
+            INSTALL_SCRIPT="$(pwd)/build/release-scripts/install.ps1"
+            
+            echo "Testing PowerShell installation script..."
+            pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
+            
+            # Debug: List what was actually installed
+            echo "Contents of $TEST_HOME/.fluxzero/bin/:"
+            ls -la "$TEST_HOME/.fluxzero/bin/" || echo "Directory does not exist"
+            
+            # Verify installation
+            if [ ! -f "$TEST_HOME/.fluxzero/bin/fz.exe" ]; then
+              echo "ERROR: fz.exe was not installed correctly!"
+              exit 1
+            fi
+            
+            # Test the installed binary
+            "$TEST_HOME/.fluxzero/bin/fz.exe" version
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Installed flux.exe failed to run!"
+              exit 1
+            fi
+            
+          else
+            # Test bash script
+            BINARY_PATH="$(pwd)/build/native/nativeCompile/flux"
+            INSTALL_SCRIPT="$(pwd)/build/release-scripts/install.sh"
+            
+            echo "Testing bash installation script..."
+            bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path
+            
+            # Verify installation
+            if [ ! -f "$TEST_HOME/.fluxzero/bin/fz" ]; then
+              echo "ERROR: fz was not installed correctly!"
+              exit 1
+            fi
+            
+            # Test the installed binary
+            "$TEST_HOME/.fluxzero/bin/fz" version
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Installed flux failed to run!"
+              exit 1
+            fi
+            
+            # Test the PATH installation (fz command)
+            if [[ "$RUNNER_OS" == "Linux" ]]; then
+              # On Linux, test that fz was created and works
+              if [ -x "/usr/local/bin/fz" ]; then
+                /usr/local/bin/fz version
+                if [ $? -ne 0 ]; then
+                  echo "ERROR: fz command failed to run!"
+                  exit 1
+                fi
+              else
+                echo "WARNING: /usr/local/bin/fz was not created (permissions issue expected in CI)"
+              fi
+            fi
+          fi
+          
+          echo "Installation script test successful!"
+          
+          # Cleanup
+          rm -rf "$TEST_HOME"
+          if [[ "$RUNNER_OS" == "Linux" ]] && [ -f "/usr/local/bin/fz" ]; then
+            sudo rm -f /usr/local/bin/fz || true
+          fi
+
       - name: Upload native executable
         uses: actions/upload-artifact@v4
         with:
