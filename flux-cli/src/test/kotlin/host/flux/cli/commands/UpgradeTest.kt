@@ -4,8 +4,8 @@ import com.github.ajalt.clikt.testing.test
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import host.flux.templates.models.InstallResult
-import host.flux.templates.services.InstallationService
+import host.flux.cli.services.InstallResult
+import host.flux.cli.services.InstallationService
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

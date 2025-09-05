@@ -9,7 +9,7 @@ import host.flux.cli.commands.Init
 import host.flux.cli.commands.Upgrade
 import host.flux.cli.commands.Version
 import host.flux.cli.commands.templates.Templates
-import host.flux.templates.services.UpdateService
+import host.flux.cli.services.UpdateService
 
 /**
  * Checks for updates on startup and then launches the CLI.

@@ -1,4 +1,4 @@
-package host.flux.templates.models
+package host.flux.cli.services
 
 sealed class InstallResult {
     data class Upgraded(val fromVersion: String, val toVersion: String) : InstallResult()

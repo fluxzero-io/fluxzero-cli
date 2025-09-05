@@ -1,4 +1,4 @@
-package host.flux.templates.services
+package host.flux.cli.services
 
 import java.net.URI
 import java.net.http.HttpClient

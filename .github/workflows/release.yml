@@ -42,13 +42,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
-        run: ./gradlew build shadowJar generateScripts -PappVersion=${{ needs.version.outputs.version }}
+        run: ./gradlew build shadowJar :flux-cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
 
       - name: Test JAR functionality
         run: |
           echo "Testing JAR with basic commands..."
-          java -jar build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar version
-          java -jar build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar templates list
+          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar version
+          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar templates list
           echo "JAR functionality test successful!"
 
       - name: Upload JAR artifact
@@ -56,8 +56,8 @@ jobs:
         with:
           name: jar-artifact
           path: |
-            build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar
-            build/release-scripts/
+            flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar
+            flux-cli/build/release-scripts/
           retention-days: 1
 
   native-build:

@@ -1,4 +1,4 @@
-package host.flux.templates.services
+package host.flux.cli.services
 
 object VersionService {
     

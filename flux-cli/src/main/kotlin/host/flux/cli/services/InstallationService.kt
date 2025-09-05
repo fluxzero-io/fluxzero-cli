@@ -1,6 +1,6 @@
-package host.flux.templates.services
+package host.flux.cli.services
 
-import host.flux.templates.models.InstallResult
+import host.flux.cli.services.InstallResult
 import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient

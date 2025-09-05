@@ -30,18 +30,3 @@ data class VersionResponse(
     val latestVersion: String? = null,
     val hasUpdate: Boolean = false
 )
-
-@Serializable
-data class InstallResponse(
-    val success: Boolean,
-    val message: String,
-    val fromVersion: String? = null,
-    val toVersion: String? = null,
-    val error: String? = null
-)
-
-@Serializable
-data class ErrorResponse(
-    val error: String,
-    val message: String
-)

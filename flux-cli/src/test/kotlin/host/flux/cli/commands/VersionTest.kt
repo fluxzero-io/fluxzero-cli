@@ -2,7 +2,7 @@ package host.flux.cli.commands
 
 import com.github.ajalt.clikt.testing.test
 import host.flux.cli.commands.Version
-import host.flux.templates.services.VersionService
+import host.flux.cli.services.VersionService
 import io.mockk.every
 import io.mockk.mockk
 import kotlin.test.Test

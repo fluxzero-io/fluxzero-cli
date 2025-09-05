@@ -2,9 +2,9 @@ package host.flux.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import host.flux.templates.services.InstallationService
-import host.flux.templates.services.DefaultInstallationService
-import host.flux.templates.models.InstallResult
+import host.flux.cli.services.InstallationService
+import host.flux.cli.services.DefaultInstallationService
+import host.flux.cli.services.InstallResult
 
 class Upgrade(
     private val installer: InstallationService = DefaultInstallationService(),
