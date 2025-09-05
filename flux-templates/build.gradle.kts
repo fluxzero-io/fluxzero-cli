@@ -11,20 +11,11 @@ dependencies {
     // Uses built-in Java HTTP client, no external web dependencies
 }
 
-sourceSets {
-    main {
-        resources {
-            srcDir("templates")
-            srcDir("build/generated/resources")
-        }
-    }
-}
-
 val zipTemplates by tasks.registering {
     group = "build"
     description = "Archives each subfolder inside templates as a zip and moves them to build/"
 
-    val templatesDir = file("templates")
+    val templatesDir = file("src/main/resources/templates")
     val outputDir = file("build/generated/resources/templates")
 
     inputs.dir(templatesDir)
@@ -48,7 +39,7 @@ val zipTemplates by tasks.registering {
             println("Archiving template folder: $folderName")
 
             // Run git archive command
-            val command = listOf("git", "archive", "--format=zip", "HEAD:flux-templates/templates/$folderName")
+            val command = listOf("git", "archive", "--format=zip", "HEAD:flux-templates/src/main/resources/templates/$folderName")
 
             val processBuilder = ProcessBuilder(command)
                 .redirectOutput(outputFile)
@@ -64,6 +55,14 @@ val zipTemplates by tasks.registering {
             println("Created zip: ${outputFile.absolutePath}")
         }
         indexFile.writeText(indexEntries.joinToString("\n"))
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir("build/generated/resources")
+        }
     }
 }
 
