@@ -9,6 +9,9 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/flux-api" />
+            <option value="$PROJECT_DIR$/flux-cli" />
+            <option value="$PROJECT_DIR$/flux-templates" />
           </set>
         </option>
       </GradleProjectSettings>
