@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: version
     outputs:
-      jar-name: fluxzero-cli-${{ needs.version.outputs.version }}-all.jar
+      jar-name: fluxzero-cli-${{ needs.version.outputs.version }}.jar
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,8 +47,8 @@ jobs:
       - name: Test JAR functionality
         run: |
           echo "Testing JAR with basic commands..."
-          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar version
-          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar templates list
+          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
+          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
           echo "JAR functionality test successful!"
 
       - name: Upload JAR artifact
@@ -56,7 +56,7 @@ jobs:
         with:
           name: jar-artifact
           path: |
-            flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}-all.jar
+            flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
             flux-cli/build/release-scripts/
           retention-days: 1
 
