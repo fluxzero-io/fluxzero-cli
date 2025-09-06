@@ -44,48 +44,58 @@ jobs:
           echo "Deploying version: $VERSION"
 
       - name: Build API JAR
-        run: ./gradlew :flux-api:shadowJar -PappVersion=${{ steps.get_version.outputs.version }}
+        run: ./gradlew :api:shadowJar -PappVersion=${{ steps.get_version.outputs.version }}
 
       - name: Verify API JAR
         run: |
           echo "Verifying API JAR exists..."
-          if [ ! -f "flux-api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar" ]; then
+          if [ ! -f "api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar" ]; then
             echo "API JAR not found!"
             exit 1
           fi
-          echo "API JAR verified: $(ls -lh flux-api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar)"
+          echo "API JAR verified: $(ls -lh api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar)"
 
-# TODO: deploy to
-#      - name: Set up Fly CLI
-#        uses: superfly/flyctl-actions/setup-flyctl@master
-#
-#      - name: Deploy to Fly.io
-#        run: |
-#          cd flux-api
-#          # Copy JAR to expected location for Dockerfile
-#          cp build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar build/libs/flux-api.jar
-#
-#          # Deploy to Fly.io
-#          flyctl deploy --remote-only --config fly.toml
-#        env:
-#          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-#
-#      - name: Verify deployment
-#        run: |
-#          echo "Waiting for deployment to be ready..."
-#          sleep 30
-#
-#          # Get the app URL from fly.toml
-#          APP_NAME=$(grep '^app = ' flux-api/fly.toml | sed 's/app = "//;s/"//')
-#          APP_URL="https://${APP_NAME}.fly.dev"
-#
-#          echo "Testing deployed API at: $APP_URL"
-#
-#          # Test health endpoint
-#          if curl -f "$APP_URL/api/health"; then
-#            echo "✅ API deployment successful! Health check passed."
-#            echo "🚀 API is live at: $APP_URL"
-#          else
-#            echo "❌ API deployment failed! Health check did not pass."
-#            exit 1
-#          fi
+      - name: Prepare API for deployment
+        run: |
+          cd api
+          # Copy JAR to expected location for Dockerfile
+          cp build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar build/libs/flux-api.jar
+          # Install Node.js dependencies for Wrangler
+          npm install
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'api/package-lock.json'
+
+      - name: Deploy to Cloudflare Containers
+        run: |
+          cd api
+          # Deploy using Wrangler
+          npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for deployment to be ready..."
+          sleep 30
+
+          # Test health endpoint on Cloudflare
+          # Note: The URL will be flux-api-prod.your-subdomain.workers.dev
+          # You'll need to update this with your actual worker URL
+          API_URL="https://flux-api-prod.your-subdomain.workers.dev"
+          
+          echo "Testing deployed API at: $API_URL"
+
+          # Test health endpoint
+          if curl -f "$API_URL/health"; then
+            echo "✅ API deployment successful! Health check passed."
+            echo "🚀 API is live at: $API_URL"
+          else
+            echo "❌ API deployment failed! Health check did not pass."
+            echo "Note: You may need to update the API_URL in the workflow with your actual worker subdomain"
+            exit 1
+          fi

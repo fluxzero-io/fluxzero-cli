@@ -1,0 +1,14 @@
+{
+  "name": "flux-api-cloudflare",
+  "version": "1.0.0",
+  "description": "Flux API deployed to Cloudflare Containers",
+  "main": "src/worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/containers": "^0.1.0",
+    "wrangler": "^3.0.0"
+  }
+}
