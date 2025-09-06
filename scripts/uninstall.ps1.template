@@ -133,7 +133,7 @@ $FOUND_CURRENT = Test-Path $CURRENT_DIR
 
 # Check for legacy installation (.flux)
 $LEGACY_DIR = Join-Path $HOME_DIR ".flux"
-$LEGACY_JAR = Join-Path $LEGACY_DIR "flux-cli.jar"
+$LEGACY_JAR = Join-Path $LEGACY_DIR "fluxzero-cli.jar"
 $FOUND_LEGACY = (Test-Path $LEGACY_DIR) -and (Test-Path $LEGACY_JAR)
 
 # Check for PATH entry

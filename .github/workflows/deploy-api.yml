@@ -1,0 +1,91 @@
+name: Deploy API to Fly.io
+
+on:
+  workflow_run:
+    workflows: ["Auto Release and Version Bump"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy API to Fly.io
+    runs-on: ubuntu-latest
+    # Only deploy if the release workflow completed successfully
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Get latest release version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # For manual deployment, use the latest git tag
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+          else
+            # For automatic deployment after release, get version from the release workflow
+            VERSION=$(echo "${{ github.event.workflow_run.head_branch }}" | sed 's/.*\///g')
+            if [ -z "$VERSION" ] || [ "$VERSION" == "main" ]; then
+              VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Build API JAR
+        run: ./gradlew :flux-api:shadowJar -PappVersion=${{ steps.get_version.outputs.version }}
+
+      - name: Verify API JAR
+        run: |
+          echo "Verifying API JAR exists..."
+          if [ ! -f "flux-api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar" ]; then
+            echo "API JAR not found!"
+            exit 1
+          fi
+          echo "API JAR verified: $(ls -lh flux-api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar)"
+
+# TODO: deploy to
+#      - name: Set up Fly CLI
+#        uses: superfly/flyctl-actions/setup-flyctl@master
+#
+#      - name: Deploy to Fly.io
+#        run: |
+#          cd flux-api
+#          # Copy JAR to expected location for Dockerfile
+#          cp build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar build/libs/flux-api.jar
+#
+#          # Deploy to Fly.io
+#          flyctl deploy --remote-only --config fly.toml
+#        env:
+#          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+#
+#      - name: Verify deployment
+#        run: |
+#          echo "Waiting for deployment to be ready..."
+#          sleep 30
+#
+#          # Get the app URL from fly.toml
+#          APP_NAME=$(grep '^app = ' flux-api/fly.toml | sed 's/app = "//;s/"//')
+#          APP_URL="https://${APP_NAME}.fly.dev"
+#
+#          echo "Testing deployed API at: $APP_URL"
+#
+#          # Test health endpoint
+#          if curl -f "$APP_URL/api/health"; then
+#            echo "✅ API deployment successful! Health check passed."
+#            echo "🚀 API is live at: $APP_URL"
+#          else
+#            echo "❌ API deployment failed! Health check did not pass."
+#            exit 1
+#          fi

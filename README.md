@@ -8,12 +8,12 @@ A command-line interface for [Flux](https://fluxcapacitor.io/) that helps you sc
 
 **Unix/Linux/macOS:**
 ```bash
-curl -sSL https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/install.sh | sh
+curl -sSL https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/install.sh | sh
 ```
 
 **Windows PowerShell:**
 ```powershell
-iwr -useb https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/install.ps1 | iex
+iwr -useb https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/install.ps1 | iex
 ```
 
 The installer will:
@@ -25,7 +25,7 @@ The installer will:
 
 ### Option 2: Manual Native Executable Download
 
-Download the native executable for your platform from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases):
+Download the native executable for your platform from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases):
 
 - **Linux x86_64**: `flux-linux-amd64`
 - **macOS Intel**: `flux-macos-amd64`
@@ -34,7 +34,7 @@ Download the native executable for your platform from the [releases page](https:
 
 ```bash
 # Example for macOS Apple Silicon
-curl -L -o fz https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/flux-macos-arm64
+curl -L -o fz https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/flux-macos-arm64
 chmod +x fz
 sudo mv fz /usr/local/bin/fz
 ```
@@ -47,7 +47,7 @@ sudo mv fz /usr/local/bin/fz
 
 ### Option 3: Manual JAR Installation (Legacy)
 
-1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/flux-capacitor-io/flux-cli/releases)
+1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases)
 2. Run it with Java: `java -jar fluxzero-cli.jar`
 
 ## Uninstallation
@@ -56,12 +56,12 @@ To remove FluxZero CLI from your system:
 
 **Unix/Linux/macOS:**
 ```bash
-curl -sSL https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/uninstall.sh | sh
+curl -sSL https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/uninstall.sh | sh
 ```
 
 **Windows PowerShell:**
 ```powershell
-iwr -useb https://github.com/flux-capacitor-io/flux-cli/releases/latest/download/uninstall.ps1 | iex
+iwr -useb https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/uninstall.ps1 | iex
 ```
 
 The uninstaller will:
@@ -103,7 +103,7 @@ FluxZero CLI installs to:
 - **PATH Integration**: 
   - **Unix**: `/usr/local/bin/fz` → `~/.fluxzero/bin/fz`
   - **Windows**: `~/.fluxzero/bin` added to user PATH
-- **Legacy Support**: Also detects and can upgrade from old `.flux/flux-cli.jar` installations
+- **Legacy Support**: Also detects and can upgrade from old `.flux/fluxzero-cli.jar` installations
 
 ## Requirements
 

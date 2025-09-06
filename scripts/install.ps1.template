@@ -31,7 +31,7 @@ switch ($ARCH) {
 }
 
 $BINARY_NAME = "flux-windows-$ARCH_NAME.exe"
-$BINARY_URL = "https://github.com/flux-capacitor-io/flux-cli/releases/download/$VERSION/$BINARY_NAME"
+$BINARY_URL = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$VERSION/$BINARY_NAME"
 
 Write-Host "Creating installation directories..."
 Write-Host "Target directory: $FLUX_BIN_DIR"

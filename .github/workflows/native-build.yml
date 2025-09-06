@@ -81,18 +81,18 @@ jobs:
           fi
           # Native compilation needs to compile classes but can reuse cached artifacts
           # Skip tests since we already ran them, but allow compilation for native-image
-          ./gradlew :flux-cli:nativeCompile -x test --info -PappVersion=${{ inputs.version }}
+          ./gradlew :fluxzero-cli:nativeCompile -x test --info -PappVersion=${{ inputs.version }}
 
       - name: Verify native image
         shell: bash
         run: |
           echo "Testing native executable..."
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            ./flux-cli/build/native/nativeCompile/flux.exe version
-            ./flux-cli/build/native/nativeCompile/flux.exe templates list
+            ./fluxzero-cli/build/native/nativeCompile/flux.exe version
+            ./fluxzero-cli/build/native/nativeCompile/flux.exe templates list
           else
-            ./flux-cli/build/native/nativeCompile/flux version
-            ./flux-cli/build/native/nativeCompile/flux templates list
+            ./fluxzero-cli/build/native/nativeCompile/flux version
+            ./fluxzero-cli/build/native/nativeCompile/flux templates list
           fi
           echo "Native image verification successful!"
 
@@ -107,9 +107,9 @@ jobs:
           
           # Run the CLI to generate an example project
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            ../flux-cli/build/native/nativeCompile/flux.exe init --template=flux-java-single --name=example-project --git
+            ../fluxzero-cli/build/native/nativeCompile/flux.exe init --template=flux-java-single --name=example-project --git
           else
-            ../flux-cli/build/native/nativeCompile/flux init --template=flux-java-single --name=example-project --git
+            ../fluxzero-cli/build/native/nativeCompile/flux init --template=flux-java-single --name=example-project --git
           fi
           
           # Verify the project was created
@@ -148,7 +148,7 @@ jobs:
           echo "Testing installation script with native binary..."
           
           # Generate scripts with correct version for testing
-          ./gradlew :flux-cli:generateScripts -PappVersion=${{ inputs.version }}
+          ./gradlew :fluxzero-cli:generateScripts -PappVersion=${{ inputs.version }}
           
           # Create a test home directory to avoid conflicts
           TEST_HOME=$(mktemp -d)
@@ -156,8 +156,8 @@ jobs:
           
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell script
-            BINARY_PATH="$(pwd)/flux-cli/build/native/nativeCompile/flux.exe"
-            INSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/install.ps1"
+            BINARY_PATH="$(pwd)/fluxzero-cli/build/native/nativeCompile/flux.exe"
+            INSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/install.ps1"
             
             echo "Testing PowerShell installation script..."
             pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
@@ -181,8 +181,8 @@ jobs:
             
           else
             # Test bash script
-            BINARY_PATH="$(pwd)/flux-cli/build/native/nativeCompile/flux"
-            INSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/install.sh"
+            BINARY_PATH="$(pwd)/fluxzero-cli/build/native/nativeCompile/flux"
+            INSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/install.sh"
             
             echo "Testing bash installation script..."
             bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path
@@ -223,7 +223,7 @@ jobs:
           echo "Testing uninstall script..."
           
           # Generate scripts with correct version for testing  
-          ./gradlew :flux-cli:generateScripts -PappVersion=${{ inputs.version }}
+          ./gradlew :fluxzero-cli:generateScripts -PappVersion=${{ inputs.version }}
           
           # Create a test home directory and install first
           TEST_HOME=$(mktemp -d)
@@ -231,9 +231,9 @@ jobs:
           
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell scripts
-            BINARY_PATH="$(pwd)/flux-cli/build/native/nativeCompile/flux.exe"
-            INSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/install.ps1"
-            UNINSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/uninstall.ps1"
+            BINARY_PATH="$(pwd)/fluxzero-cli/build/native/nativeCompile/flux.exe"
+            INSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/install.ps1"
+            UNINSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/uninstall.ps1"
             
             echo "Installing first..."
             pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
@@ -255,9 +255,9 @@ jobs:
             
           else
             # Test bash scripts
-            BINARY_PATH="$(pwd)/flux-cli/build/native/nativeCompile/flux"
-            INSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/install.sh"
-            UNINSTALL_SCRIPT="$(pwd)/flux-cli/build/release-scripts/uninstall.sh"
+            BINARY_PATH="$(pwd)/fluxzero-cli/build/native/nativeCompile/flux"
+            INSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/install.sh"
+            UNINSTALL_SCRIPT="$(pwd)/fluxzero-cli/build/release-scripts/uninstall.sh"
             
             echo "Installing first..."
             bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path
@@ -296,5 +296,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact-name }}
-          path: ./flux-cli/build/native/nativeCompile/flux${{ runner.os == 'Windows' && '.exe' || '' }}
+          path: ./fluxzero-cli/build/native/nativeCompile/flux${{ runner.os == 'Windows' && '.exe' || '' }}
           retention-days: 30

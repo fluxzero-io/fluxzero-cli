@@ -2,8 +2,8 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
-rootProject.name = "fluxzero"
+rootProject.name = "fluxzero-cli"
 
-include("flux-templates")
-include("flux-cli") 
-include("flux-api")
+include("templates")
+include("cli")
+include("api")

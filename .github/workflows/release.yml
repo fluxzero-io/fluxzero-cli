@@ -42,22 +42,43 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
-        run: ./gradlew build shadowJar :flux-cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
+        run: ./gradlew build shadowJar :fluxzero-cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
 
       - name: Test JAR functionality
         run: |
-          echo "Testing JAR with basic commands..."
-          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
-          java -jar flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
-          echo "JAR functionality test successful!"
+          echo "Testing CLI JAR with basic commands..."
+          java -jar fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
+          java -jar fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
+          echo "CLI JAR functionality test successful!"
+          
+          echo "Testing API JAR startup..."
+          # Test that API JAR can start and respond to health check
+          timeout 30s bash -c '
+            java -jar flux-api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar &
+            API_PID=$!
+            sleep 15
+            if curl -f http://localhost:8080/api/health; then
+              echo "API health check successful!"
+            else
+              echo "API health check failed!"
+              kill $API_PID 2>/dev/null || true
+              exit 1
+            fi
+            kill $API_PID 2>/dev/null || true
+          ' || {
+            echo "API JAR test failed!"
+            exit 1
+          }
+          echo "API JAR functionality test successful!"
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: jar-artifact
           path: |
-            flux-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
-            flux-cli/build/release-scripts/
+            fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
+            flux-api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
+            fluxzero-cli/build/release-scripts/
           retention-days: 1
 
   native-build:
@@ -90,7 +111,9 @@ jobs:
           path: build/
 
       - name: Rename files
-        run: mv build/libs/${{ needs.build-and-test.outputs.jar-name }} build/libs/fluxzero-cli.jar
+        run: |
+          mv build/libs/${{ needs.build-and-test.outputs.jar-name }} build/libs/fluxzero-cli.jar
+          mv build/libs/flux-api-${{ needs.version.outputs.version }}.jar build/libs/flux-api.jar
 
       - name: Verify JAR functionality
         run: |
@@ -223,7 +246,7 @@ jobs:
           
           # Create a fake legacy installation
           mkdir -p "$TEST_HOME2/.flux"
-          echo "fake jar content" > "$TEST_HOME2/.flux/flux-cli.jar"
+          echo "fake jar content" > "$TEST_HOME2/.flux/fluxzero-cli.jar"
           
           # Run uninstall script
           bash build/release-scripts/uninstall.sh --force
@@ -258,6 +281,7 @@ jobs:
           name: Release ${{ needs.version.outputs.version }}
           files: |
             build/libs/fluxzero-cli.jar
+            build/libs/flux-api.jar
             build/release-scripts/install.sh
             build/release-scripts/install.ps1
             build/release-scripts/uninstall.sh

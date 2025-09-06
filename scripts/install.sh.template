@@ -79,7 +79,7 @@ case "$ARCH" in
 esac
 
 BINARY_NAME="flux-${PLATFORM}-${ARCH_NAME}"
-BINARY_URL="https://github.com/flux-capacitor-io/flux-cli/releases/download/${VERSION}/${BINARY_NAME}"
+BINARY_URL="https://github.com/fluxzero-io/fluxzero-cli/releases/download/${VERSION}/${BINARY_NAME}"
 
 # Colors for better output (only if running in a terminal or forced)
 if [ -n "$FORCE_COLORS" ] || ([ -t 1 ] && [ -t 0 ]); then

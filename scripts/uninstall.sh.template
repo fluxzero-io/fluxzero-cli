@@ -146,7 +146,7 @@ fi
 
 # Check for legacy installation (.flux)
 LEGACY_DIR="$HOME/.flux"
-LEGACY_JAR="$LEGACY_DIR/flux-cli.jar"
+LEGACY_JAR="$LEGACY_DIR/fluxzero-cli.jar"
 FOUND_LEGACY=0
 if [ -d "$LEGACY_DIR" ] && [ -f "$LEGACY_JAR" ]; then
     FOUND_LEGACY=1
