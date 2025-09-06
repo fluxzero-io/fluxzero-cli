@@ -84,9 +84,7 @@ jobs:
           sleep 30
 
           # Test health endpoint on Cloudflare
-          # Note: The URL will be flux-api-prod.your-subdomain.workers.dev
-          # You'll need to update this with your actual worker URL
-          API_URL="https://flux-api-prod.your-subdomain.workers.dev"
+          API_URL="https://fluxzero-cli-api-prod.rene7346.workers.dev"
           
           echo "Testing deployed API at: $API_URL"
 

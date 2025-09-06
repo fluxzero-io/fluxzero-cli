@@ -1,12 +1,12 @@
 import { Container, getContainer } from "@cloudflare/containers";
 
-export class FluxAPI extends Container {
+export class FluxzeroCliApi extends Container {
   defaultPort = 8080;
   sleepAfter = "10m";
   
   async startup() {
     // Container startup hook - nothing special needed for our API
-    console.log("Flux API container starting up");
+    console.log("Fluxzero CLI API container starting up");
   }
 }
 
@@ -23,7 +23,7 @@ export default {
     }
     
     // Get or create container instance
-    const container = await getContainer(env.FLUX_API, "FluxAPI");
+    const container = await getContainer(env.FLUX_API, "FluxzeroCliApi");
     
     // Forward all API requests to the container
     return container.fetch(request);

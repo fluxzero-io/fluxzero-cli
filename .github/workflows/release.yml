@@ -42,19 +42,19 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
-        run: ./gradlew build shadowJar :fluxzero-cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
+        run: ./gradlew build shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
 
       - name: Test JAR functionality
         run: |
           echo "Testing CLI JAR with basic commands..."
-          java -jar fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
-          java -jar fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
+          java -jar cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
+          java -jar cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
           echo "CLI JAR functionality test successful!"
           
           echo "Testing API JAR startup..."
           # Test that API JAR can start and respond to health check
           timeout 30s bash -c '
-            java -jar flux-api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar &
+            java -jar api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar &
             API_PID=$!
             sleep 15
             if curl -f http://localhost:8080/api/health; then
@@ -76,9 +76,9 @@ jobs:
         with:
           name: jar-artifact
           path: |
-            fluxzero-cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
-            flux-api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
-            fluxzero-cli/build/release-scripts/
+            cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
+            api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
+            cli/build/release-scripts/
           retention-days: 1
 
   native-build:
