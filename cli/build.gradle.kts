@@ -51,6 +51,7 @@ tasks.shadowJar {
 }
 
 tasks.withType<Jar>().configureEach {
+    archiveBaseName.set("fluxzero-cli")
     manifest {
         attributes(
             "Implementation-Version" to project.version,
@@ -58,6 +59,22 @@ tasks.withType<Jar>().configureEach {
     }
 }
 
+// Fix dependency ordering issues
+tasks.named("distZip") {
+    dependsOn("shadowJar")
+}
+
+tasks.named("distTar") {
+    dependsOn("shadowJar")
+}
+
+tasks.named("startScripts") {
+    dependsOn("shadowJar")
+}
+
+tasks.named("startShadowScripts") {
+    dependsOn("jar")
+}
 
 tasks.register<Copy>("generateScripts") {
     val scriptsOutputDir = layout.buildDirectory.dir("release-scripts")
