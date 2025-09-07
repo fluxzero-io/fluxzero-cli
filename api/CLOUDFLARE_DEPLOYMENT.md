@@ -52,11 +52,17 @@ To deploy manually:
 
 ```bash
 cd api
-./gradlew shadowJar
+../gradlew :api:shadowJar
 cp build/libs/flux-api-*.jar build/libs/flux-api.jar
 npm install
 npx wrangler deploy --env production
 ```
+
+## Package Versions
+
+The deployment uses the following key dependencies:
+- `@cloudflare/containers`: ^0.0.23 (Container class and helper functions)
+- `wrangler`: ^4.0.0 (Cloudflare CLI tool)
 
 ## Configuration
 

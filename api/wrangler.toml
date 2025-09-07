@@ -9,10 +9,6 @@ class_name = "FluxzeroCliApi"
 image = "./Dockerfile"
 instances = 1
 
-[[durable_objects.bindings]]
-class_name = "FluxzeroCliApi"
-name = "FLUX_API"
-
 [env.production]
 name = "fluxzero-cli-api-prod"
 
