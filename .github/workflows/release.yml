@@ -112,8 +112,9 @@ jobs:
 
       - name: Rename files
         run: |
-          mv build/libs/${{ needs.build-and-test.outputs.jar-name }} build/libs/fluxzero-cli.jar
-          mv build/libs/flux-api-${{ needs.version.outputs.version }}.jar build/libs/flux-api.jar
+          mkdir -p build/libs
+          mv build/cli/build/libs/${{ needs.build-and-test.outputs.jar-name }} build/libs/fluxzero-cli.jar
+          mv build/api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar build/libs/flux-api.jar
 
       - name: Verify JAR functionality
         run: |
