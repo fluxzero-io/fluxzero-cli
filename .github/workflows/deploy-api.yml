@@ -1,4 +1,4 @@
-name: Deploy API to Fly.io
+name: Deploy API to Cloudflare
 
 on:
   workflow_run:
