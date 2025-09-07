@@ -51,6 +51,7 @@ tasks.shadowJar {
 }
 
 tasks.withType<Jar>().configureEach {
+    archiveBaseName.set("fluxzero-cli")
     manifest {
         attributes(
             "Implementation-Version" to project.version,
