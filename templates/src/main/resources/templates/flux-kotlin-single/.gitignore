@@ -1,15 +1,16 @@
+# Gradle
 .gradle
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+# Maven
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IntelliJ IDEA
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -17,10 +18,7 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-### Kotlin ###
-.kotlin
-
-### Eclipse ###
+# Eclipse
 .apt_generated
 .classpath
 .factorypath
@@ -32,15 +30,42 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-### NetBeans ###
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+# VS Code
 .vscode/
 
-### Mac OS ###
+# Kotlin
+.kotlin
+
+# Mac OS
 .DS_Store
+
+# Logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity

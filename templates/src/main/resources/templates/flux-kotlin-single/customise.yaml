@@ -1,9 +1,0 @@
-
-
-steps:
-  - action: replace
-    files:
-      - src/main/kotlin/**.kt
-      - src/test/kotlin/**.kt
-    find: "'import com.example.flux.'(?<package>.*)"
-    replace: import ${basePackage}.${match.package}
