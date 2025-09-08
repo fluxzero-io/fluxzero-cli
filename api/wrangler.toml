@@ -1,13 +1,18 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "fluxzero-cli-api"
+account_id = "fbb4ae392a349c3a4c7b713ec57dbc29"
 main = "src/worker.js"
-compatibility_date = "2024-09-02"
+compatibility_date = "2025-06-04"
 compatibility_flags = ["nodejs_compat"]
 
 [[containers]]
 class_name = "FluxzeroCliApi"
 image = "./Dockerfile"
-instances = 1
+max_instances = 3
+
+[[durable_objects.bindings]]
+class_name = "FluxzeroCliApi"
+name = "FLUXZERO_CLI_API"
 
 [env.production]
 name = "fluxzero-cli-api-prod"
