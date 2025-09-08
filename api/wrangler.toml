@@ -14,10 +14,6 @@ max_instances = 3
 class_name = "FluxzeroCliApi"
 name = "FLUXZERO_CLI_API"
 
-[env.production]
-name = "fluxzero-cli-api-prod"
-
-[[env.production.containers]]
-class_name = "FluxzeroCliApi"
-image = "./Dockerfile"
-instances = 5
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FluxzeroCliApi"]

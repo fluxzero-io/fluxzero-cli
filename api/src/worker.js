@@ -23,7 +23,7 @@ export default {
     }
     
     // Get or create container instance
-    const container = await getContainer(env.FLUX_API, "FluxzeroCliApi");
+    const container = await getContainer(env.FLUXZERO_CLI_API, "FluxzeroCliApi");
     
     // Forward all API requests to the container
     return container.fetch(request);
