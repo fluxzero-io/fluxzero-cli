@@ -43,23 +43,47 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Deploying version: $VERSION"
 
-      - name: Build API JAR
-        run: ./gradlew :api:shadowJar -PappVersion=${{ steps.get_version.outputs.version }}
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
 
-      - name: Verify API JAR
+      - name: Build API Native Image
         run: |
-          echo "Verifying API JAR exists..."
-          if [ ! -f "api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar" ]; then
-            echo "API JAR not found!"
+          echo "Building native image for API..."
+          ./gradlew :api:nativeCompile -PappVersion=${{ steps.get_version.outputs.version }} --info
+          echo "Native image build completed"
+
+      - name: Verify Native Image
+        run: |
+          echo "Verifying native image exists..."
+          if [ ! -f "api/build/native/nativeCompile/flux-api" ]; then
+            echo "Native image not found!"
             exit 1
           fi
-          echo "API JAR verified: $(ls -lh api/build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar)"
+          echo "Native image verified: $(ls -lh api/build/native/nativeCompile/flux-api)"
+          
+          # Test the native binary quickly
+          echo "Testing native binary..."
+          timeout 10s ./api/build/native/nativeCompile/flux-api &
+          sleep 5
+          if curl -f http://localhost:8080/api/health; then
+            echo "✅ Native API health check passed"
+          else
+            echo "⚠️ Native API health check failed (but continuing deployment)"
+          fi
+          pkill -f flux-api || true
 
       - name: Prepare API for deployment
         run: |
           cd api
-          # Copy JAR to expected location for Dockerfile
-          cp build/libs/flux-api-${{ steps.get_version.outputs.version }}.jar build/libs/flux-api.jar
+          # Copy the native binary to the expected location for Docker build
+          cp build/native/nativeCompile/flux-api ./flux-api
+          # Make the binary executable
+          chmod +x ./flux-api
           # Install Node.js dependencies for Wrangler
           npm install
 

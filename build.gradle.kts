@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.1.20" apply false
+    id("org.graalvm.buildtools.native") version "0.10.6" apply false
 }
 
 group = "host.flux"

@@ -1,0 +1,35 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": ".*\\.properties$"
+      },
+      {
+        "pattern": ".*\\.yaml$"
+      },
+      {
+        "pattern": ".*\\.yml$"
+      },
+      {
+        "pattern": ".*\\.zip$"
+      },
+      {
+        "pattern": ".*\\.xml$"
+      },
+      {
+        "pattern": "templates/.*"
+      },
+      {
+        "pattern": "logback.*\\.xml"
+      },
+      {
+        "pattern": "META-INF/.*"
+      }
+    ]
+  },
+  "bundles": [
+    {
+      "name": "kotlinx.serialization.json.internal.JsonExceptionMessages"
+    }
+  ]
+}

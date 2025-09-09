@@ -1,0 +1,23 @@
+[
+  {
+    "name": "host.flux.api.models.InitRequest"
+  },
+  {
+    "name": "host.flux.api.models.InitFailure"
+  },
+  {
+    "name": "host.flux.api.models.TemplateResponse"
+  },
+  {
+    "name": "host.flux.api.models.VersionResponse"
+  },
+  {
+    "name": "host.flux.templates.models.BuildSystem"
+  },
+  {
+    "name": "host.flux.templates.models.ScaffoldProject"
+  },
+  {
+    "name": "host.flux.templates.models.ScaffoldResult"
+  }
+]

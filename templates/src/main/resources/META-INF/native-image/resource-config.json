@@ -1,0 +1,12 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "templates/.*\\.zip$"
+      },
+      {
+        "pattern": "templates/templates\\.csv$"
+      }
+    ]
+  }
+}

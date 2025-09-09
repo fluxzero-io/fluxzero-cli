@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm")
     application
     id("com.gradleup.shadow") version "8.3.6"
-    id("org.graalvm.buildtools.native") version "0.10.6"
+    id("org.graalvm.buildtools.native")
 }
 
 kotlin {

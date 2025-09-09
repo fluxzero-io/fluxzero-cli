@@ -22,7 +22,7 @@ val zipTemplates by tasks.registering {
     group = "build"
     description = "Archives each subfolder inside templates as a zip and moves them to build/"
 
-    val templatesDir = file("src/main/resources/templates")
+    val templatesDir = file("src/main/templates")
     val outputDir = file("build/generated/resources/templates")
 
     inputs.dir(templatesDir)
@@ -46,7 +46,7 @@ val zipTemplates by tasks.registering {
             println("Archiving template folder: $folderName")
 
             // Run git archive command
-            val command = listOf("git", "archive", "--format=zip", "HEAD:templates/src/main/resources/templates/$folderName")
+            val command = listOf("git", "archive", "--format=zip", "HEAD:templates/src/main/templates/$folderName")
 
             val processBuilder = ProcessBuilder(command)
                 .redirectOutput(outputFile)
