@@ -114,5 +114,19 @@ class ScaffoldService(
         }
     }
     
+    /**
+     * Scaffolds a project into a temporary directory and returns the path.
+     * This is useful for API endpoints that need to zip the project.
+     */
+    fun scaffoldProjectToTempDir(request: ScaffoldProject): ScaffoldResult {
+        val tempDir = Files.createTempDirectory("flux-scaffold-")
+        
+        val modifiedRequest = request.copy(
+            outputDir = tempDir.toString()
+        )
+        
+        return scaffoldProject(modifiedRequest)
+    }
+    
     fun listAvailableTemplates() = templateService.listTemplates()
 }

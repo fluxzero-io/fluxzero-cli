@@ -6,18 +6,15 @@ import kotlinx.serialization.Serializable
 data class InitRequest(
     val template: String,
     val name: String,
-    val outputDir: String? = null,
     val initGit: Boolean = false,
     val packageName: String = "com.example.app",
-    val groupId: String? = null
+    val groupId: String? = null,
+    val buildSystem: String? = null // "maven" or "gradle"
 )
 
 @Serializable
-data class InitResponse(
-    val success: Boolean,
-    val message: String,
-    val outputPath: String? = null,
-    val error: String? = null
+data class InitFailure(
+    val error: String
 )
 
 @Serializable

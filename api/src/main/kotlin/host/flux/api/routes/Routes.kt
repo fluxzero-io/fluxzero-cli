@@ -1,11 +1,10 @@
 package host.flux.api.routes
 
+import host.flux.api.models.InitFailure
 import host.flux.api.models.InitRequest
-import host.flux.api.models.InitResponse
 import host.flux.api.models.TemplateResponse
 import host.flux.api.models.VersionResponse
-import host.flux.templates.models.ScaffoldProject
-import host.flux.templates.services.ScaffoldService
+import host.flux.api.services.ApiScaffoldService
 import host.flux.templates.services.TemplateService
 import host.flux.templates.services.VersionUtils
 import io.ktor.http.*
@@ -43,36 +42,46 @@ fun Application.configureRoutes() {
                 })
             }
 
-            // Initialize project
+            // Initialize project - returns a zip file
             post("/init") {
                 try {
                     val request = call.receive<InitRequest>()
-                    val initService = ScaffoldService()
+                    val apiScaffoldService = ApiScaffoldService()
 
-                    val templatesRequest = ScaffoldProject(
-                        template = request.template,
-                        name = request.name,
-                        outputDir = request.outputDir,
-                        initGit = request.initGit
-                    )
+                    val result = apiScaffoldService.scaffoldProjectAsZip(request)
 
-                    val result = initService.scaffoldProject(templatesRequest)
-
-                    call.respond(
-                        InitResponse(
-                            success = result.success,
-                            message = result.message,
-                            outputPath = result.outputPath,
-                            error = result.error
+                    if (!result.success) {
+                        call.respond(
+                            status = HttpStatusCode.BadRequest,
+                            message = InitFailure(
+                                error = result.error ?: "Unknown error occurred"
+                            )
                         )
+                        return@post
+                    }
+
+                    // Return streaming zip file
+                    call.response.header(
+                        HttpHeaders.ContentDisposition,
+                        ContentDisposition.Attachment.withParameter(
+                            ContentDisposition.Parameters.FileName,
+                            "${request.name}.zip"
+                        ).toString()
                     )
+                    
+                    call.response.status(HttpStatusCode.OK)
+                    call.response.header(HttpHeaders.ContentType, ContentType.Application.Zip.toString())
+                    call.respondOutputStream(ContentType.Application.Zip) {
+                        result.inputStream!!.use { input ->
+                            input.copyTo(this)
+                        }
+                    }
+
                 } catch (e: Exception) {
                     call.respond(
-                        status = HttpStatusCode.BadRequest,
-                        message = InitResponse(
-                            success = false,
-                            message = "Failed to process request",
-                            error = e.message
+                        status = HttpStatusCode.InternalServerError,
+                        message = InitFailure(
+                            error = e.message ?: "Unknown error"
                         )
                     )
                 }
