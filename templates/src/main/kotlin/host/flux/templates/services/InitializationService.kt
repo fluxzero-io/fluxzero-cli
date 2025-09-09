@@ -2,13 +2,16 @@ package host.flux.templates.services
 
 import host.flux.templates.models.InitRequest
 import host.flux.templates.models.InitResult
+import host.flux.templates.refactor.TemplateRefactor
+import host.flux.templates.refactor.TemplateVariables
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.absolute
 
 class InitializationService(
-    private val templateService: TemplateService = TemplateService()
+    private val templateService: TemplateService = TemplateService(),
+    private val templateRefactor: TemplateRefactor = TemplateRefactor()
 ) {
     
     fun initializeProject(request: InitRequest): InitResult {
@@ -48,14 +51,44 @@ class InitializationService(
             // Extract template
             templateService.extractTemplate(request.template, outputDir)
             
+            // Apply template refactoring
+            val variables = TemplateVariables(
+                packageName = request.packageName,
+                projectName = request.name,
+                groupId = request.groupId
+            )
+            val refactorResult = templateRefactor.refactorTemplate(
+                templateRoot = outputDir,
+                variables = variables
+            )
+            
+            // If refactoring failed, return the error
+            if (!refactorResult.success) {
+                return InitResult(
+                    success = false,
+                    message = refactorResult.message,
+                    error = refactorResult.error
+                )
+            }
+            
             // Initialize Git if requested
             if (request.initGit) {
                 initializeGit(outputDir)
             }
             
+            val finalMessage = buildString {
+                append("Successfully generated your project at '${outputDir.absolute()}'")
+                if (refactorResult.warnings.isNotEmpty()) {
+                    append("\n\nWarnings during template refactoring:")
+                    refactorResult.warnings.forEach { warning ->
+                        append("\n- $warning")
+                    }
+                }
+            }
+            
             InitResult(
                 success = true,
-                message = "Successfully generated your project at '${outputDir.absolute()}'",
+                message = finalMessage,
                 outputPath = outputDir.absolute().toString()
             )
             

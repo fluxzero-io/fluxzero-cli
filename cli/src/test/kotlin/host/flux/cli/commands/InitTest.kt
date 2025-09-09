@@ -53,6 +53,7 @@ class InitTest {
             listOf(
                 "--template", "webapp",
                 "--name", "valid_name",
+                "--package", "com.test.myapp",
                 "--dir", Paths.get("").toAbsolutePath().toString()
             )
         )
@@ -63,7 +64,8 @@ class InitTest {
 
     @Test
     fun `prompts for name when not provided`() {
-        every { mockPrompt.readLine(any()) } returns "prompted-name"
+        every { mockPrompt.readLine(match { it.contains("Enter name") }) } returns "prompted-name"
+        every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
 
         initCommand = Init(
             initializationService = mockInitService,
@@ -73,13 +75,15 @@ class InitTest {
         val result = initCommand.test(listOf("--template", "cli"))
 
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter name") }) }
+        verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter package") }) }
         verify { mockInitService.initializeProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
     }
 
     @Test
     fun `prompts for template when invalid template provided`() {
-        every { mockPrompt.readLine(any()) } returns "1"
+        every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1"
+        every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
 
         initCommand = Init(
             initializationService = mockInitService,
@@ -89,6 +93,7 @@ class InitTest {
         val result = initCommand.test(listOf("--template", "invalid-template", "--name", "valid_name"))
 
         verify { mockPrompt.readLine(match { it.contains("Enter choice") }) }
+        verify { mockPrompt.readLine(match { it.contains("Enter package") }) }
         verify { mockInitService.initializeProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Template 'invalid-template' does not exist."))
     }

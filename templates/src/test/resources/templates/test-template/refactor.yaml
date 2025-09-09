@@ -1,0 +1,26 @@
+operations:
+  - type: replace
+    files: ["**/*.kt"]
+    find: "package com\\.example\\.template"
+    replace: "package ${package}"
+    regex: true
+  - type: replace
+    files: ["**/*.xml", "**/*.kts"]
+    find: "com.example.template"
+    replace: "${package}"
+    regex: false
+  - type: replace
+    files: ["**/*.xml", "**/*.kts"]
+    find: "test-template"
+    replace: "${projectName}"
+    regex: false
+  - type: delete
+    files: ["**/*.tmp"]
+  - type: rename
+    from: "src/main/kotlin/com/example/template"
+    to: "src/main/kotlin/${packagePath}"
+  - type: rename
+    from: "src/test/kotlin/com/example/template"
+    to: "src/test/kotlin/${packagePath}"
+  - type: createDirectory
+    directory: "logs"

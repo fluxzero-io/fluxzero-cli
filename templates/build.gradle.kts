@@ -7,8 +7,15 @@ kotlin {
 }
 
 dependencies {
-    // Template module has minimal dependencies - only template processing logic
-    // Uses built-in Java HTTP client, no external web dependencies
+    // YAML parsing for refactor.yaml files
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
+    
+    // Testing
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("io.mockk:mockk:1.14.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 val zipTemplates by tasks.registering {
@@ -68,4 +75,8 @@ sourceSets {
 
 tasks.named("processResources") {
     dependsOn(zipTemplates)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

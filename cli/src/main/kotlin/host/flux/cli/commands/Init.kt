@@ -37,6 +37,15 @@ class Init(
         }
     }
 
+    val packageRegex = Regex("^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)*$")
+    val packageName by option("--package", help = "Java package name (e.g., com.example.myapp)").validate {
+        require(packageRegex.matches(it)) {
+            "Invalid package format: must be lowercase letters and dots (e.g., com.example.myapp)"
+        }
+    }
+
+    val groupId by option("--group-id", help = "Maven/Gradle group ID (defaults to package name)")
+
     val initGit by option(
         "--git",
         help = "Initialize a Git repository in the generated project directory"
@@ -51,12 +60,15 @@ class Init(
     override fun run() {
         val finalTemplate = getTemplateName()
         val finalName = name ?: promptForName()
+        val finalPackage = packageName ?: promptForPackage()
         
         val request = InitRequest(
             template = finalTemplate,
             name = finalName,
             outputDir = if (dir.toString().isEmpty()) null else dir.toString(),
-            initGit = initGit
+            initGit = initGit,
+            packageName = finalPackage,
+            groupId = groupId
         )
         
         val result = initializationService.initializeProject(request)
@@ -75,6 +87,17 @@ class Init(
                 return input
             }
             echo("Invalid name format. Please use only digits, lowercase letters, '-' or '_', max length 50.")
+        }
+    }
+
+    private fun promptForPackage(): String {
+        while (true) {
+            val input = prompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ").trim()
+            val finalInput = if (input.isEmpty()) "com.example.app" else input
+            if (packageRegex.matches(finalInput)) {
+                return finalInput
+            }
+            echo("Invalid package format. Please use lowercase letters and dots (e.g., com.example.myapp).")
         }
     }
 
