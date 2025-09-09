@@ -1,11 +1,10 @@
-import { Container, getContainer } from "@cloudflare/containers";
+import { Container, getRandom } from "@cloudflare/containers";
 
 export class FluxzeroCliApi extends Container {
   defaultPort = 8080;
   sleepAfter = "10m";
-  
-  async startup() {
-    // Container startup hook - nothing special needed for our API
+
+  onStart() {
     console.log("Fluxzero CLI API container starting up");
   }
 }
@@ -13,19 +12,19 @@ export class FluxzeroCliApi extends Container {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
-    // Health check endpoint handled by worker directly
-    if (url.pathname === '/health') {
-      return new Response('OK', { 
+
+    if (url.pathname === "/health") {
+      return new Response("OK", {
         status: 200,
-        headers: { 'Content-Type': 'text/plain' }
+        headers: { "Content-Type": "text/plain" },
       });
     }
-    
-    // Get or create container instance
-    const container = await getContainer(env.FLUXZERO_CLI_API, "FluxzeroCliApi");
-    
-    // Forward all API requests to the container
+
+    // Option A: sticky instance
+    // const container = env.FLUXZERO_CLI_API.getByName("cli-api");
+
+    // Option B: simple load balancing
+    const container = getRandom(env.FLUXZERO_CLI_API, 3);
     return container.fetch(request);
-  }
+  },
 };
