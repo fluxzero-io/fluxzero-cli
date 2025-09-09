@@ -4,7 +4,7 @@ import host.flux.api.routes.configureRoutes
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
-import io.ktor.server.netty.*
+import io.ktor.server.cio.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
@@ -12,7 +12,7 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 
 fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+    embeddedServer(CIO, port = 8080, host = "0.0.0.0") {
         configurePlugins()
         configureRoutes()
     }.start(wait = true)
