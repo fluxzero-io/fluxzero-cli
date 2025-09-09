@@ -1,9 +1,12 @@
 package host.flux.templates.refactor
 
+import host.flux.templates.models.BuildSystem
+
 data class TemplateVariables(
     val packageName: String,
     val projectName: String,
-    val groupId: String? = null
+    val groupId: String? = null,
+    val buildSystem: BuildSystem? = null
 ) {
     /**
      * Get the final group ID, using packageName as fallback if groupId is null
@@ -23,12 +26,14 @@ data class TemplateVariables(
         fun create(
             packageName: String = "com.example.app",
             projectName: String,
-            groupId: String? = null
+            groupId: String? = null,
+            buildSystem: BuildSystem? = null
         ): TemplateVariables {
             return TemplateVariables(
                 packageName = packageName,
                 projectName = projectName,
-                groupId = groupId
+                groupId = groupId,
+                buildSystem = buildSystem
             )
         }
     }

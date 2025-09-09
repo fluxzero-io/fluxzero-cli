@@ -3,6 +3,7 @@ package host.flux.templates.refactor
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import host.flux.templates.models.BuildSystem
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -34,6 +35,14 @@ class TemplateRefactor {
                 allInfo.addAll(messages.info)
             }
             
+            // Delete unused build files based on build system selection
+            val buildSystemOperations = getBuildSystemDeleteOperations(variables)
+            buildSystemOperations.forEach { operation ->
+                val messages = operation.execute(templateRoot, variables)
+                allWarnings.addAll(messages.warnings)
+                allInfo.addAll(messages.info)
+            }
+            
             // Always run cleanup of empty directories after all other operations
             val cleanupOperation = CleanupEmptyDirectoriesOperation()
             val cleanupMessages = cleanupOperation.execute(templateRoot, variables)
@@ -43,9 +52,10 @@ class TemplateRefactor {
             // Clean up the refactor.yaml file after processing
             Files.deleteIfExists(refactorConfigFile)
             
+            val totalOperations = config.operations.size + buildSystemOperations.size + 1 // +1 for cleanup
             RefactorResult.success(
                 "Successfully applied template refactoring", 
-                operationsExecuted = config.operations.size + 1, // +1 for cleanup operation
+                operationsExecuted = totalOperations,
                 warnings = allWarnings
             )
             
@@ -91,5 +101,34 @@ class TemplateRefactor {
         }
         
         return RefactorConfig(operations = operationConfigs)
+    }
+    
+    private fun getBuildSystemDeleteOperations(variables: TemplateVariables): List<DeleteOperation> {
+        return when (variables.buildSystem) {
+            BuildSystem.MAVEN -> {
+                // Delete Gradle files when Maven is chosen
+                listOf(
+                    DeleteOperation(listOf(
+                        "build.gradle.kts",
+                        "settings.gradle.kts", 
+                        "gradle.properties",
+                        "gradlew",
+                        "gradlew.bat",
+                        "gradle"
+                    ))
+                )
+            }
+            BuildSystem.GRADLE -> {
+                // Delete Maven files when Gradle is chosen
+                listOf(
+                    DeleteOperation(listOf("pom.xml")),
+                    DeleteOperation(listOf(".mvn"))
+                )
+            }
+            null -> {
+                // No build system specified, don't delete anything
+                emptyList()
+            }
+        }
     }
 }

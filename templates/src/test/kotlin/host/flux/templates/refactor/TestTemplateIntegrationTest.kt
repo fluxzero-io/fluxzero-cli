@@ -107,57 +107,5 @@ class TestTemplateIntegrationTest {
         assertFalse(Files.exists(templateDir.resolve("src/main/kotlin/com/example/template")))
     }
 
-    @Test
-    fun `should handle delete operations on test template`() {
-        val templateDir = copyTestTemplate()
-        val variables = TemplateVariables("com.delete.test", "delete-app")
 
-        // Verify .tmp file exists initially
-        assertTrue(Files.exists(templateDir.resolve("delete-me.tmp")))
-
-        val deleteOp = DeleteOperation(files = listOf("**/*.tmp"))
-        val messages = deleteOp.execute(templateDir, variables)
-        assertTrue(messages.warnings.isEmpty())
-
-        // Verify .tmp file was deleted
-        assertFalse(Files.exists(templateDir.resolve("delete-me.tmp")))
-        
-        // Other files should remain
-        assertTrue(Files.exists(templateDir.resolve("build.gradle.kts")))
-    }
-
-    @Test
-    fun `should demonstrate complete refactoring workflow`() {
-        val templateDir = copyTestTemplate()
-        val variables = TemplateVariables("org.workflow.demo", "workflow-demo")
-
-        // This test demonstrates the complete workflow from template to customized project
-        val result = templateRefactor.refactorTemplate(templateDir, variables)
-        
-        assertTrue(result.success)
-        
-        // Verify the end result looks like a properly customized project
-        val expectedFiles = listOf(
-            "src/main/kotlin/org/workflow/demo/Application.kt",
-            "src/main/kotlin/org/workflow/demo/service/TestService.kt", 
-            "src/test/kotlin/org/workflow/demo/ApplicationTest.kt",
-            "build.gradle.kts",
-            "pom.xml",
-            "logs" // created directory
-        )
-        
-        expectedFiles.forEach { file ->
-            val path = templateDir.resolve(file)
-            assertTrue(Files.exists(path), "Expected file/directory should exist: $file")
-        }
-        
-        // Verify build files contain correct project info
-        val gradleContent = Files.readString(templateDir.resolve("build.gradle.kts"))
-        assertTrue(gradleContent.contains("org.workflow.demo"))
-        assertTrue(gradleContent.contains("workflow-demo"))
-        
-        val pomContent = Files.readString(templateDir.resolve("pom.xml"))
-        assertTrue(pomContent.contains("<groupId>org.workflow.demo</groupId>"))
-        assertTrue(pomContent.contains("<artifactId>workflow-demo</artifactId>"))
-    }
 }

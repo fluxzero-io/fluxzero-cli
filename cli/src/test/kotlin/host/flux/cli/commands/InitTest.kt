@@ -54,6 +54,7 @@ class InitTest {
                 "--template", "webapp",
                 "--name", "valid_name",
                 "--package", "com.test.myapp",
+                "--build", "maven",
                 "--dir", Paths.get("").toAbsolutePath().toString()
             )
         )
@@ -66,6 +67,7 @@ class InitTest {
     fun `prompts for name when not provided`() {
         every { mockPrompt.readLine(match { it.contains("Enter name") }) } returns "prompted-name"
         every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
+        every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1"
 
         initCommand = Init(
             initializationService = mockInitService,
@@ -76,13 +78,14 @@ class InitTest {
 
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter name") }) }
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter package") }) }
+        verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter choice") }) }
         verify { mockInitService.initializeProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
     }
 
     @Test
     fun `prompts for template when invalid template provided`() {
-        every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1"
+        every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1" andThen "2"
         every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
 
         initCommand = Init(
@@ -92,7 +95,7 @@ class InitTest {
 
         val result = initCommand.test(listOf("--template", "invalid-template", "--name", "valid_name"))
 
-        verify { mockPrompt.readLine(match { it.contains("Enter choice") }) }
+        verify(exactly = 2) { mockPrompt.readLine(match { it.contains("Enter choice") }) }
         verify { mockPrompt.readLine(match { it.contains("Enter package") }) }
         verify { mockInitService.initializeProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Template 'invalid-template' does not exist."))

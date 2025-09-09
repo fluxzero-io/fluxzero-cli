@@ -22,6 +22,14 @@ object FileOperationHelper {
                     }
                     return FileVisitResult.CONTINUE
                 }
+                
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    val relativePath = templateRoot.relativize(dir)
+                    if (matcher.matches(relativePath) && dir != templateRoot) {
+                        allFiles.add(dir)
+                    }
+                    return FileVisitResult.CONTINUE
+                }
             })
         }
         

@@ -1,5 +1,6 @@
 package host.flux.templates.refactor
 
+import host.flux.templates.models.BuildSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -10,13 +11,15 @@ class TemplateVariablesTest {
         val variables = TemplateVariables(
             packageName = "com.example.test",
             projectName = "my-project",
-            groupId = "org.example"
+            groupId = "org.example",
+            buildSystem = BuildSystem.MAVEN
         )
         
         assertEquals("com.example.test", variables.packageName)
         assertEquals("my-project", variables.projectName)
         assertEquals("org.example", variables.finalGroupId)
         assertEquals("com/example/test", variables.packagePath)
+        assertEquals(BuildSystem.MAVEN, variables.buildSystem)
     }
     
     @Test
@@ -68,12 +71,27 @@ class TemplateVariablesTest {
         val variables = TemplateVariables.create(
             packageName = "org.test.custom",
             projectName = "custom-project",
-            groupId = "io.custom"
+            groupId = "io.custom",
+            buildSystem = BuildSystem.GRADLE
         )
         
         assertEquals("org.test.custom", variables.packageName)
         assertEquals("custom-project", variables.projectName)
         assertEquals("io.custom", variables.finalGroupId)
         assertEquals("org/test/custom", variables.packagePath)
+        assertEquals(BuildSystem.GRADLE, variables.buildSystem)
+    }
+    
+    @Test
+    fun `should handle null build system`() {
+        val variables = TemplateVariables(
+            packageName = "com.null.test",
+            projectName = "null-test",
+            buildSystem = null
+        )
+        
+        assertEquals("com.null.test", variables.packageName)
+        assertEquals("null-test", variables.projectName)
+        assertEquals(null, variables.buildSystem)
     }
 }

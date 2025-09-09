@@ -6,11 +6,13 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.validate
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.path
 import host.flux.cli.prompt.JLinePrompt
 import host.flux.cli.prompt.Prompt
 import host.flux.templates.services.InitializationService
 import host.flux.templates.models.InitRequest
+import host.flux.templates.models.BuildSystem
 import java.nio.file.Paths
 import kotlin.io.path.absolute
 
@@ -46,6 +48,8 @@ class Init(
 
     val groupId by option("--group-id", help = "Maven/Gradle group ID (defaults to package name)")
 
+    val buildSystem by option("--build", help = "Build system to use").choice("maven", "gradle")
+
     val initGit by option(
         "--git",
         help = "Initialize a Git repository in the generated project directory"
@@ -61,14 +65,18 @@ class Init(
         val finalTemplate = getTemplateName()
         val finalName = name ?: promptForName()
         val finalPackage = packageName ?: promptForPackage()
+        val finalBuildSystem = buildSystem?.let { 
+            if (it == "maven") BuildSystem.MAVEN else BuildSystem.GRADLE 
+        } ?: promptForBuildSystem()
         
         val request = InitRequest(
             template = finalTemplate,
             name = finalName,
-            outputDir = if (dir.toString().isEmpty()) null else dir.toString(),
+            outputDir = dir.toString().ifEmpty { null },
             initGit = initGit,
             packageName = finalPackage,
-            groupId = groupId
+            groupId = groupId,
+            buildSystem = finalBuildSystem
         )
         
         val result = initializationService.initializeProject(request)
@@ -93,11 +101,25 @@ class Init(
     private fun promptForPackage(): String {
         while (true) {
             val input = prompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ").trim()
-            val finalInput = if (input.isEmpty()) "com.example.app" else input
+            val finalInput = input.ifEmpty { "com.example.app" }
             if (packageRegex.matches(finalInput)) {
                 return finalInput
             }
             echo("Invalid package format. Please use lowercase letters and dots (e.g., com.example.myapp).")
+        }
+    }
+
+    private fun promptForBuildSystem(): BuildSystem {
+        while (true) {
+            echo("Please select a build system:")
+            echo("1) Maven")
+            echo("2) Gradle")
+            val input = prompt.readLine("Enter choice [1-2]: ").trim()
+            when (input) {
+                "1" -> return BuildSystem.MAVEN
+                "2" -> return BuildSystem.GRADLE
+                else -> echo("Invalid choice, try again.")
+            }
         }
     }
 
