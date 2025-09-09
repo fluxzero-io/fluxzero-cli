@@ -1,0 +1,13 @@
+### Generate project
+POST http://localhost:8080/api/init
+Content-Type: application/json
+
+{
+    "template": "flux-java-single",
+    "name": "some-name",
+    "packageName": "some.package",
+    "groupId": "com.somegroup",
+    "buildSystem": "maven"
+}
+
+###

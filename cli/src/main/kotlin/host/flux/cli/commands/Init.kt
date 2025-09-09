@@ -89,7 +89,10 @@ class Init(
 
     private fun promptForName(): String {
         while (true) {
-            val input = prompt.readLine("Enter name (max 50 chars, 0-9 a-z - _): ").trim()
+            val input = prompt.readLine("Enter name (max 50 chars, 0-9 a-z - _): ")?.trim()
+            if (input == null) {
+                throw RuntimeException("Cannot read input in non-interactive mode. Please specify --name parameter.")
+            }
             if (nameRegex.matches(input)) {
                 return input
             }
@@ -99,8 +102,11 @@ class Init(
 
     private fun promptForPackage(): String {
         while (true) {
-            val input = prompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ").trim()
-            val finalInput = input.ifEmpty { "com.example.app" }
+            val input = prompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ")
+            if (input == null) {
+                throw RuntimeException("Cannot read input in non-interactive mode. Please specify --package parameter.")
+            }
+            val finalInput = input.trim().ifEmpty { "com.example.app" }
             if (packageRegex.matches(finalInput)) {
                 return finalInput
             }
@@ -113,10 +119,11 @@ class Init(
             echo("Please select a build system:")
             echo("1) Maven")
             echo("2) Gradle")
-            val input = prompt.readLine("Enter choice [1-2]: ").trim()
+            val input = prompt.readLine("Enter choice [1-2]: ")?.trim()
             when (input) {
                 "1" -> return BuildSystem.MAVEN
                 "2" -> return BuildSystem.GRADLE
+                null -> throw RuntimeException("Cannot read input in non-interactive mode. Please specify --build parameter.")
                 else -> echo("Invalid choice, try again.")
             }
         }
@@ -129,7 +136,10 @@ class Init(
             while (true) {
                 echo("Please select a template:")
                 templates.forEachIndexed { i, t -> echo("${i + 1}) ${t.name}") }
-                val input = prompt.readLine("Enter choice [1-${templates.size}]: ").trim()
+                val input = prompt.readLine("Enter choice [1-${templates.size}]: ")?.trim()
+                if (input == null) {
+                    throw RuntimeException("Cannot read input in non-interactive mode. Please specify --template parameter.")
+                }
                 val choice = input.toIntOrNull()
                 if (choice != null && choice in 1..templates.size) {
                     return templates[choice - 1].name
