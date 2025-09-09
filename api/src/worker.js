@@ -24,7 +24,7 @@ export default {
     // const container = env.FLUXZERO_CLI_API.getByName("cli-api");
 
     // Option B: simple load balancing
-    const container = getRandom(env.FLUXZERO_CLI_API, 3);
+    const container = await getRandom(env.FLUXZERO_CLI_API, 3);
     return container.fetch(request);
   },
 };

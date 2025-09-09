@@ -9,6 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 class_name = "FluxzeroCliApi"
 image = "./Dockerfile"
 max_instances = 3
+instance_type = "basic"
 
 [[durable_objects.bindings]]
 class_name = "FluxzeroCliApi"
@@ -17,3 +18,6 @@ name = "FLUXZERO_CLI_API"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["FluxzeroCliApi"]
+
+[observability.logs]
+enabled = true

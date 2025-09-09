@@ -84,7 +84,7 @@ jobs:
           sleep 30
 
           # Test health endpoint on Cloudflare
-          API_URL="https://fluxzero-cli-api-prod.rene7346.workers.dev"
+          API_URL="https://fluxzero-cli-api-production.rene7346.workers.dev"
           
           echo "Testing deployed API at: $API_URL"
 
