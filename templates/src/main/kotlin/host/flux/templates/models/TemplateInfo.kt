@@ -10,7 +10,7 @@ enum class BuildSystem(val displayName: String) {
     GRADLE("gradle")
 }
 
-data class InitRequest(
+data class ScaffoldProject(
     val template: String,
     val name: String,
     val outputDir: String? = null,
@@ -20,7 +20,7 @@ data class InitRequest(
     val buildSystem: BuildSystem? = null
 )
 
-data class InitResult(
+data class ScaffoldResult(
     val success: Boolean,
     val message: String,
     val outputPath: String? = null,

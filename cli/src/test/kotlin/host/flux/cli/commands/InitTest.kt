@@ -3,15 +3,11 @@ package host.flux.cli.commands
 import com.github.ajalt.clikt.core.BadParameterValue
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
-import host.flux.cli.commands.Init
 import host.flux.cli.prompt.Prompt
-import host.flux.templates.services.InitializationService
-import host.flux.templates.models.InitRequest
-import host.flux.templates.models.InitResult
+import host.flux.templates.services.ScaffoldService
+import host.flux.templates.models.ScaffoldResult
 import host.flux.templates.models.TemplateInfo
-import io.mockk.Runs
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions
@@ -22,7 +18,7 @@ import kotlin.test.Test
 class InitTest {
 
     private lateinit var mockPrompt: Prompt
-    private lateinit var mockInitService: InitializationService
+    private lateinit var mockInitService: ScaffoldService
     private lateinit var initCommand: Init
 
     @BeforeEach
@@ -35,7 +31,7 @@ class InitTest {
             TemplateInfo("webapp", "Web application template"),
             TemplateInfo("cli", "CLI template")
         )
-        every { mockInitService.initializeProject(any()) } returns InitResult(
+        every { mockInitService.scaffoldProject(any()) } returns ScaffoldResult(
             success = true,
             message = "Project initialized successfully",
             outputPath = "/test/path"
@@ -45,7 +41,7 @@ class InitTest {
     @Test
     fun `uses provided template and name options`() {
         initCommand = Init(
-            initializationService = mockInitService,
+            scaffoldService = mockInitService,
             prompt = mockPrompt
         )
 
@@ -59,7 +55,7 @@ class InitTest {
             )
         )
 
-        verify(exactly = 1) { mockInitService.initializeProject(any()) }
+        verify(exactly = 1) { mockInitService.scaffoldProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
     }
 
@@ -70,7 +66,7 @@ class InitTest {
         every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1"
 
         initCommand = Init(
-            initializationService = mockInitService,
+            scaffoldService = mockInitService,
             prompt = mockPrompt
         )
 
@@ -79,7 +75,7 @@ class InitTest {
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter name") }) }
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter package") }) }
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter choice") }) }
-        verify { mockInitService.initializeProject(any()) }
+        verify { mockInitService.scaffoldProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
     }
 
@@ -89,7 +85,7 @@ class InitTest {
         every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
 
         initCommand = Init(
-            initializationService = mockInitService,
+            scaffoldService = mockInitService,
             prompt = mockPrompt
         )
 
@@ -97,14 +93,14 @@ class InitTest {
 
         verify(exactly = 2) { mockPrompt.readLine(match { it.contains("Enter choice") }) }
         verify { mockPrompt.readLine(match { it.contains("Enter package") }) }
-        verify { mockInitService.initializeProject(any()) }
+        verify { mockInitService.scaffoldProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Template 'invalid-template' does not exist."))
     }
 
     @Test
     fun `fails with invalid name option`() {
         initCommand = Init(
-            initializationService = mockInitService,
+            scaffoldService = mockInitService,
             prompt = mockPrompt
         )
 

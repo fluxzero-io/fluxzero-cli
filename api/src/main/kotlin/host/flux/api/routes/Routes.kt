@@ -4,7 +4,8 @@ import host.flux.api.models.InitRequest
 import host.flux.api.models.InitResponse
 import host.flux.api.models.TemplateResponse
 import host.flux.api.models.VersionResponse
-import host.flux.templates.services.InitializationService
+import host.flux.templates.models.ScaffoldProject
+import host.flux.templates.services.ScaffoldService
 import host.flux.templates.services.TemplateService
 import host.flux.templates.services.VersionUtils
 import io.ktor.http.*
@@ -46,16 +47,16 @@ fun Application.configureRoutes() {
             post("/init") {
                 try {
                     val request = call.receive<InitRequest>()
-                    val initService = InitializationService()
+                    val initService = ScaffoldService()
 
-                    val templatesRequest = host.flux.templates.models.InitRequest(
+                    val templatesRequest = ScaffoldProject(
                         template = request.template,
                         name = request.name,
                         outputDir = request.outputDir,
                         initGit = request.initGit
                     )
 
-                    val result = initService.initializeProject(templatesRequest)
+                    val result = initService.scaffoldProject(templatesRequest)
 
                     call.respond(
                         InitResponse(

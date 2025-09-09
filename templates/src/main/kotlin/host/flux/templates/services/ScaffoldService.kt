@@ -1,7 +1,7 @@
 package host.flux.templates.services
 
-import host.flux.templates.models.InitRequest
-import host.flux.templates.models.InitResult
+import host.flux.templates.models.ScaffoldProject
+import host.flux.templates.models.ScaffoldResult
 import host.flux.templates.refactor.TemplateRefactor
 import host.flux.templates.refactor.TemplateVariables
 import java.nio.file.Files
@@ -9,16 +9,16 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.absolute
 
-class InitializationService(
+class ScaffoldService(
     private val templateService: TemplateService = TemplateService(),
     private val templateRefactor: TemplateRefactor = TemplateRefactor()
 ) {
     
-    fun initializeProject(request: InitRequest): InitResult {
+    fun scaffoldProject(request: ScaffoldProject): ScaffoldResult {
         return try {
             // Validate template exists
             if (!templateService.templateExists(request.template)) {
-                return InitResult(
+                return ScaffoldResult(
                     success = false,
                     message = "Template '${request.template}' does not exist",
                     error = "Template not found"
@@ -28,7 +28,7 @@ class InitializationService(
             // Validate project name
             val nameRegex = Regex("^[0-9a-z-_]{1,50}$")
             if (!nameRegex.matches(request.name)) {
-                return InitResult(
+                return ScaffoldResult(
                     success = false,
                     message = "Invalid name format: must be 1-50 chars of digits, lowercase letters, '-' or '_' only",
                     error = "Invalid name format"
@@ -41,7 +41,7 @@ class InitializationService(
             
             // Check if directory already exists
             if (Files.exists(outputDir) && Files.list(outputDir).use { it.findFirst().isPresent }) {
-                return InitResult(
+                return ScaffoldResult(
                     success = false,
                     message = "Directory '${outputDir.absolute()}' already exists and is not empty",
                     error = "Directory exists"
@@ -65,7 +65,7 @@ class InitializationService(
             
             // If refactoring failed, return the error
             if (!refactorResult.success) {
-                return InitResult(
+                return ScaffoldResult(
                     success = false,
                     message = refactorResult.message,
                     error = refactorResult.error
@@ -87,14 +87,14 @@ class InitializationService(
                 }
             }
             
-            InitResult(
+            ScaffoldResult(
                 success = true,
                 message = finalMessage,
                 outputPath = outputDir.absolute().toString()
             )
             
         } catch (e: Exception) {
-            InitResult(
+            ScaffoldResult(
                 success = false,
                 message = "Failed to initialize project: ${e.message}",
                 error = e.message

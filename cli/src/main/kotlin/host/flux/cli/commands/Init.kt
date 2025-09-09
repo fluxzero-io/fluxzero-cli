@@ -10,14 +10,13 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.path
 import host.flux.cli.prompt.JLinePrompt
 import host.flux.cli.prompt.Prompt
-import host.flux.templates.services.InitializationService
-import host.flux.templates.models.InitRequest
+import host.flux.templates.services.ScaffoldService
+import host.flux.templates.models.ScaffoldProject
 import host.flux.templates.models.BuildSystem
 import java.nio.file.Paths
-import kotlin.io.path.absolute
 
 class Init(
-    private val initializationService: InitializationService = InitializationService(),
+    private val scaffoldService: ScaffoldService = ScaffoldService(),
     private val prompt: Prompt = JLinePrompt()
 ) : CliktCommand() {
 
@@ -69,7 +68,7 @@ class Init(
             if (it == "maven") BuildSystem.MAVEN else BuildSystem.GRADLE 
         } ?: promptForBuildSystem()
         
-        val request = InitRequest(
+        val request = ScaffoldProject(
             template = finalTemplate,
             name = finalName,
             outputDir = dir.toString().ifEmpty { null },
@@ -79,7 +78,7 @@ class Init(
             buildSystem = finalBuildSystem
         )
         
-        val result = initializationService.initializeProject(request)
+        val result = scaffoldService.scaffoldProject(request)
         
         if (result.success) {
             echo(result.message)
@@ -124,7 +123,7 @@ class Init(
     }
 
     private fun getTemplateName(): String {
-        val templates = initializationService.listAvailableTemplates()
+        val templates = scaffoldService.listAvailableTemplates()
 
         fun promptForTemplate(): String {
             while (true) {
