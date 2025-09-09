@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     name: Deploy API to Cloudflare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24-04
     # Only deploy if the release workflow completed successfully
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
@@ -18,11 +18,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java (x64)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
+          architecture: x64
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -57,6 +58,11 @@ jobs:
           ./gradlew :api:nativeCompile -PappVersion=${{ steps.get_version.outputs.version }} --info
           echo "Native image build completed"
 
+      - name: Verify architecture (should be x86-64)
+        run: |
+          file ./flux-api/build/native/nativeCompile/flux-api || true
+          uname -m
+
       - name: Verify Native Image
         run: |
           echo "Verifying native image exists..."
@@ -77,16 +83,6 @@ jobs:
           fi
           pkill -f flux-api || true
 
-      - name: Prepare API for deployment
-        run: |
-          cd api
-          # Copy the native binary to the expected location for Docker build
-          cp build/native/nativeCompile/flux-api ./flux-api
-          # Make the binary executable
-          chmod +x ./flux-api
-          # Install Node.js dependencies for Wrangler
-          npm install
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -97,6 +93,13 @@ jobs:
       - name: Deploy to Cloudflare Containers
         run: |
           cd api
+          # Copy the native binary to the expected location for Docker build
+          cp build/native/nativeCompile/flux-api ./flux-api
+          # Make the binary executable
+          chmod +x ./flux-api
+          # Install Node.js dependencies for Wrangler
+          npm install
+          
           # Deploy using Wrangler
           npx wrangler deploy --env production
         env:

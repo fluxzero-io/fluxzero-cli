@@ -68,8 +68,7 @@ graalvmNative {
                 "--enable-url-protocols=https",
                 "--report-unsupported-elements-at-runtime",
                 "--initialize-at-build-time=kotlin",
-                "-H:+AddAllCharsets",
-                "--static-nolibc"
+                "-H:+AddAllCharsets"
             )
         }
     }
