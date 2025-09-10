@@ -112,7 +112,7 @@ FluxZero CLI installs to:
 
 ## Templates
 
-All templates are located in this repository under the `templates/` directory. Templates are fully working examples that are customized by the CLI to match your preferences.
+Templates are sourced from the external repository [fluxzero-examples](https://github.com/fluxzero-io/fluxzero-examples) at build time. The build downloads the templates ZIP and packages them for use by the CLI. There is no fallback to in-repo templates or git; if downloading fails, the build fails. The downloaded archive is cached under `templates/build/examples-snapshot` and reused on subsequent builds unless you force a refresh.
 
 **Template features:**
 - Package name replacement
@@ -120,10 +120,16 @@ All templates are located in this repository under the `templates/` directory. T
 - Line-by-line content modification
 - Interactive customization during project creation
 
-Available templates:
+Available templates (see the examples repo for the latest list):
 - `flux-kotlin-single` - Single-module Kotlin project
-- `flux-java-single` - Single-module Java project  
+- `flux-java-single` - Single-module Java project
 - `gamerental` - Example multi-feature application
+
+Advanced:
+- Override repo URL: `./gradlew -PexamplesRepoUrl=https://github.com/your-org/your-examples.git build`
+- Override branch: `./gradlew -PexamplesBranch=my-branch build`
+- Pin an explicit ZIP: `./gradlew -PexamplesZipUrl=https://github.com/your-org/your-examples/archive/refs/tags/v1.2.3.zip build`
+- Force refresh the cache: `./gradlew -PrefreshExamples=true build`
 
 ## Development
 
