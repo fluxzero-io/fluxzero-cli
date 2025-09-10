@@ -90,8 +90,10 @@ private fun expandVariables(template: String, variables: TemplateVariables): Str
     result = result.replace("{{projectName}}", variables.projectName)
     result = result.replace("\${groupId}", variables.finalGroupId)
     result = result.replace("{{groupId}}", variables.finalGroupId)
-    result = result.replace("\${artifactId}", variables.projectName) // artifactId = projectName
-    result = result.replace("{{artifactId}}", variables.projectName)
+    result = result.replace("\${artifactId}", variables.finalArtifactId)
+    result = result.replace("{{artifactId}}", variables.finalArtifactId)
+    result = result.replace("\${description}", variables.finalDescription)
+    result = result.replace("{{description}}", variables.finalDescription)
     
     return result
 }

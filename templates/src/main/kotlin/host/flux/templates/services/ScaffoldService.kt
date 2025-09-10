@@ -56,6 +56,8 @@ class ScaffoldService(
                 packageName = request.packageName,
                 projectName = request.name,
                 groupId = request.groupId,
+                artifactId = request.artifactId,
+                description = request.description,
                 buildSystem = request.buildSystem
             )
             val refactorResult = templateRefactor.refactorTemplate(

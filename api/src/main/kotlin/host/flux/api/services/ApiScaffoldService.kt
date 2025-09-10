@@ -52,6 +52,8 @@ class ApiScaffoldService(
                 outputDir = tempDir.toString(),
                 packageName = request.packageName,
                 groupId = request.groupId,
+                artifactId = request.artifactId,
+                description = request.description,
                 buildSystem = buildSystem,
                 initGit = request.initGit
             )

@@ -29,6 +29,11 @@ operations:
     find: "<name>Flux Kotlin Single</name>"
     replace: "<name>${projectName}</name>"
 
+  - type: replace
+    files: ["pom.xml"]
+    find: "<description>A Flux Capacitor application with Kotlin</description>"
+    replace: "<description>${description}</description>"
+
   # Update Gradle build.gradle.kts
   - type: replace
     files: ["build.gradle.kts"]

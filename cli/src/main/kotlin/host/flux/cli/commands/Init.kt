@@ -47,6 +47,10 @@ class Init(
 
     val groupId by option("--group-id", help = "Maven/Gradle group ID (defaults to package name)")
 
+    val artifactId by option("--artifact-id", help = "Maven/Gradle artifact ID (defaults to project name)")
+
+    val description by option("--description", help = "Project description (defaults to 'A Flux application')")
+
     val buildSystem by option("--build", help = "Build system to use").choice("maven", "gradle")
 
     val initGit by option(
@@ -75,6 +79,8 @@ class Init(
             initGit = initGit,
             packageName = finalPackage,
             groupId = groupId,
+            artifactId = artifactId,
+            description = description,
             buildSystem = finalBuildSystem
         )
         

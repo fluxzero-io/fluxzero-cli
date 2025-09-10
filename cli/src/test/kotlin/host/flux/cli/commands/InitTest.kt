@@ -50,6 +50,9 @@ class InitTest {
                 "--template", "webapp",
                 "--name", "valid_name",
                 "--package", "com.test.myapp",
+                "--group-id", "com.test",
+                "--artifact-id", "test-app",
+                "--description", "Test application for unit tests",
                 "--build", "maven",
                 "--dir", Paths.get("").toAbsolutePath().toString()
             )

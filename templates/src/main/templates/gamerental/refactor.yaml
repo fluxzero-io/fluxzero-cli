@@ -29,6 +29,11 @@ operations:
     find: "<name>demo</name>"
     replace: "<name>${projectName}</name>"
 
+  - type: replace
+    files: ["pom.xml"]
+    find: "<description>Demo project for Spring Boot</description>"
+    replace: "<description>${description}</description>"
+
   # Update Gradle build.gradle.kts
   - type: replace
     files: ["build.gradle.kts"]
