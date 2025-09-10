@@ -2,7 +2,6 @@
 #POST http://localhost:8080/api/init
 POST https://fluxzero-cli-api-production.rene7346.workers.dev/api/init
 Content-Type: application/json
-Accept-Encoding: gzip
 
 {
     "template": "flux-java-single",

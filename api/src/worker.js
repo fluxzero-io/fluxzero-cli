@@ -49,18 +49,24 @@ export default {
     // For /api/* add CORS and sanitize headers; otherwise return as-is
     if (url.pathname.startsWith('/api/')) {
       const headers = new Headers(upstream.headers);
+      const hasContentLength = headers.has("content-length");
+      const transferEncoding = headers.get("transfer-encoding");
 
       // Strip hop-by-hop headers that must not be forwarded
       const hopByHop = [
         "connection",
         "keep-alive",
         "proxy-connection",
-        "transfer-encoding",
         "upgrade",
         "te",
         "trailer",
       ];
       for (const h of hopByHop) headers.delete(h);
+
+      // Only strip transfer-encoding if we have content-length, otherwise keep it
+      if (hasContentLength || !transferEncoding?.toLowerCase().includes("chunked")) {
+        headers.delete("transfer-encoding");
+      }
 
       // For ZIP (or anything) never send Content-Encoding: identity
       if (headers.get("content-encoding")?.toLowerCase() === "identity") {
