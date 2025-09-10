@@ -17,37 +17,23 @@ class ApiScaffoldService(
     private val scaffoldService: ScaffoldService = ScaffoldService()
 ) {
     
-    /**
-     * InputStream wrapper that deletes a directory when the stream is closed
-     */
-    private class CleanupInputStream(
-        private val delegate: InputStream,
-        private val tempDir: Path
-    ) : FilterInputStream(delegate) {
-        
-        override fun close() {
-            try {
-                super.close()
-            } finally {
-                tempDir.toFile().deleteRecursively()
-            }
-        }
-    }
     
     /**
      * Result of API scaffolding operation
      */
     data class ApiScaffoldResult(
         val success: Boolean,
-        val inputStream: InputStream? = null,
+        val zipFile: Path? = null,
+        val size: Long? = null,
         val error: String? = null
     )
 
     /**
-     * Scaffolds a project and returns it as a streaming zip file
+     * Scaffolds a project and returns it as a zip file
      */
     fun scaffoldProjectAsZip(request: InitRequest): ApiScaffoldResult {
         var tempDir: Path? = null
+        var zipFile: Path? = null
         
         try {
             // Create temporary directory
@@ -82,21 +68,24 @@ class ApiScaffoldService(
                 )
             }
 
-            // Create streaming zip file from the scaffolded project
+            // Create zip file from the scaffolded project
             val projectPath = tempDir.resolve(request.name)
-            val rawInputStream = ZipUtils.zipDirectoryStreaming(projectPath, request.name)
+            zipFile = ZipUtils.zipDirectoryToFile(projectPath, request.name)
+            val zipSize = Files.size(zipFile)
             
-            // Wrap the stream to auto-cleanup temp directory when closed
-            val cleanupInputStream = CleanupInputStream(rawInputStream, tempDir)
+            // Clean up scaffolded project directory (but keep the zip file)
+            tempDir.toFile().deleteRecursively()
             
             return ApiScaffoldResult(
                 success = true,
-                inputStream = cleanupInputStream
+                zipFile = zipFile,
+                size = zipSize
             )
             
         } catch (e: Exception) {
-            // Clean up on error - delete entire temp directory
+            // Clean up on error - delete temp directory and zip file
             tempDir?.toFile()?.deleteRecursively()
+            zipFile?.let { Files.deleteIfExists(it) }
             return ApiScaffoldResult(
                 success = false,
                 error = e.message ?: "Unknown error occurred"

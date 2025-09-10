@@ -13,7 +13,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Handle CORS preflight requests for /api/* endpoints
+    // CORS preflight
     if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
       return new Response(null, {
         status: 200,
@@ -32,32 +32,58 @@ export default {
       });
     }
 
-    // Option A: sticky instance
-    // const container = env.FLUXZERO_CLI_API.getByName("cli-api");
-
-    // Option B: simple load balancing
+    // Route to container
     const container = await getRandom(env.FLUXZERO_CLI_API, 3);
-    const response = await container.fetch(request);
 
-    // Add CORS headers to /api/* responses
+    // Important: disable CF transforms; let us stream pass-through
+    const upstream = await container.fetch(request, {
+      cf: {
+        cacheEverything: false,
+        cacheTtl: 0,
+        brotli: "off",
+        polish: "off",
+        minify: { javascript: false, css: false, html: false },
+      },
+    });
+
+    // For /api/* add CORS and sanitize headers; otherwise return as-is
     if (url.pathname.startsWith('/api/')) {
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      };
+      const headers = new Headers(upstream.headers);
 
-      // Create new response with CORS headers
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: {
-          ...Object.fromEntries(response.headers),
-          ...corsHeaders,
-        },
+      // Strip hop-by-hop headers that must not be forwarded
+      const hopByHop = [
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "transfer-encoding",
+        "upgrade",
+        "te",
+        "trailer",
+      ];
+      for (const h of hopByHop) headers.delete(h);
+
+      // For ZIP (or anything) never send Content-Encoding: identity
+      if (headers.get("content-encoding")?.toLowerCase() === "identity") {
+        headers.delete("content-encoding");
+      }
+
+      // Strongly suggest no transforms on downloads
+      const cc = headers.get("cache-control");
+      headers.set("Cache-Control", `${cc ?? "no-cache, no-store, must-revalidate"}, no-transform`);
+
+      // Add CORS
+      headers.set("Access-Control-Allow-Origin", "*");
+      headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      // Stream the body through untouched
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers,
       });
     }
 
-    return response;
+    return upstream;
   },
-};
+}

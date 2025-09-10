@@ -12,6 +12,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import java.nio.file.Files
 
 fun Application.configureRoutes() {
     routing {
@@ -60,21 +61,32 @@ fun Application.configureRoutes() {
                         return@post
                     }
 
-                    // Return streaming zip file
-                    call.response.header(
-                        HttpHeaders.ContentDisposition,
-                        ContentDisposition.Attachment.withParameter(
-                            ContentDisposition.Parameters.FileName,
-                            "${request.name}.zip"
-                        ).toString()
-                    )
-                    
-                    call.response.status(HttpStatusCode.OK)
-                    call.response.header(HttpHeaders.ContentType, ContentType.Application.Zip.toString())
-                    call.respondOutputStream(ContentType.Application.Zip) {
-                        result.inputStream!!.use { input ->
-                            input.copyTo(this)
+                    val zipFile = result.zipFile!!
+                    val zipSize = result.size!!
+
+                    try {
+                        // Set headers including Content-Length
+                        call.response.header(
+                            HttpHeaders.ContentDisposition,
+                            ContentDisposition.Attachment.withParameter(
+                                ContentDisposition.Parameters.FileName,
+                                "${request.name}.zip"
+                            ).toString()
+                        )
+                        call.response.header(HttpHeaders.ContentType, ContentType.Application.Zip.toString())
+                        call.response.header(HttpHeaders.ContentLength, zipSize.toString())
+                        call.response.header(HttpHeaders.ContentEncoding, "identity")
+                        call.response.status(HttpStatusCode.OK)
+                        
+                        // Stream the file content
+                        call.respondOutputStream(ContentType.Application.Zip) {
+                            Files.newInputStream(zipFile).use { input ->
+                                input.copyTo(this)
+                            }
                         }
+                    } finally {
+                        // Clean up the temporary zip file
+                        Files.deleteIfExists(zipFile)
                     }
 
                 } catch (e: Exception) {

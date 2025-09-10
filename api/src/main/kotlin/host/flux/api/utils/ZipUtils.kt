@@ -16,6 +16,41 @@ import kotlin.concurrent.thread
 object ZipUtils {
 
     /**
+     * Creates a ZIP file containing all files and directories from the specified directory.
+     * Returns the Path to the created ZIP file.
+     */
+    fun zipDirectoryToFile(sourceDir: Path, projectName: String): Path {
+        val tempZipFile = Files.createTempFile("project-", ".zip")
+        
+        ZipOutputStream(Files.newOutputStream(tempZipFile)).use { zipOut ->
+            Files.walkFileTree(sourceDir, object : SimpleFileVisitor<Path>() {
+                override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    val relativePath = sourceDir.relativize(file)
+                    val zipEntry = ZipEntry("$projectName/$relativePath")
+
+                    zipOut.putNextEntry(zipEntry)
+                    Files.copy(file, zipOut)
+                    zipOut.closeEntry()
+
+                    return FileVisitResult.CONTINUE
+                }
+
+                override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                    if (dir != sourceDir) {
+                        val relativePath = sourceDir.relativize(dir)
+                        val zipEntry = ZipEntry("$projectName/$relativePath/")
+                        zipOut.putNextEntry(zipEntry)
+                        zipOut.closeEntry()
+                    }
+                    return FileVisitResult.CONTINUE
+                }
+            })
+        }
+        
+        return tempZipFile
+    }
+
+    /**
      * Creates a streaming ZIP file containing all files and directories from the specified directory.
      * Returns an InputStream that can be read to get the ZIP file content.
      */
