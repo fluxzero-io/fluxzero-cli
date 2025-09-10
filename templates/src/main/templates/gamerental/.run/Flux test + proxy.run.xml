@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flux test + proxy" type="CompoundRunConfigurationType">
-    <toRun name="Flux proxy" type="Application" />
-    <toRun name="Flux test server" type="Application" />
-    <method v="2" />
-  </configuration>
-</component>

@@ -1,6 +1,0 @@
-{
-  "@class": "com.example.flux.tasks.AddTask",
-  "taskId": "task-12345",
-  "title": "Scaffold Flux App",
-  "description": "Use the fluxzero-cli to scaffold a new application"
-}

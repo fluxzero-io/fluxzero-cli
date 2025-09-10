@@ -1,8 +1,0 @@
-{
-  "@class" : "CreateUser",
-  "userId": "customer",
-  "details": {
-    "name": "The customer"
-  },
-  "role": "customer"
-}

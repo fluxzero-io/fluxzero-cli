@@ -1,4 +1,0 @@
-### GET a single task through proxy-server to your flux application
-GET http://localhost:8080/task/1
-
-###
