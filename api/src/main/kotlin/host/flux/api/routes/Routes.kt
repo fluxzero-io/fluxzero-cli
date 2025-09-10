@@ -12,7 +12,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
+import kotlinx.coroutines.*
 import java.nio.file.Files
+import java.nio.file.Path
 
 fun Application.configureRoutes() {
     routing {
@@ -62,32 +65,27 @@ fun Application.configureRoutes() {
                     }
 
                     val zipFile = result.zipFile!!
-                    val zipSize = result.size!!
 
-                    try {
-                        // Set headers including Content-Length
-                        call.response.header(
-                            HttpHeaders.ContentDisposition,
-                            ContentDisposition.Attachment.withParameter(
-                                ContentDisposition.Parameters.FileName,
-                                "${request.name}.zip"
-                            ).toString()
-                        )
-                        call.response.header(HttpHeaders.ContentType, ContentType.Application.Zip.toString())
-                        call.response.header(HttpHeaders.ContentLength, zipSize.toString())
-                        call.response.header(HttpHeaders.ContentEncoding, "identity")
-                        call.response.status(HttpStatusCode.OK)
-                        
-                        // Stream the file content
-                        call.respondOutputStream(ContentType.Application.Zip) {
-                            Files.newInputStream(zipFile).use { input ->
-                                input.copyTo(this)
-                            }
-                        }
-                    } finally {
-                        // Clean up the temporary zip file
+                    // Set headers
+                    call.response.header(
+                        HttpHeaders.ContentDisposition,
+                        ContentDisposition.Attachment.withParameter(
+                            ContentDisposition.Parameters.FileName,
+                            "${request.name}.zip"
+                        ).toString()
+                    )
+                    call.response.header(HttpHeaders.CacheControl, "no-cache, no-store, must-revalidate, no-transform")
+                    
+                    // Schedule cleanup after response is completely sent
+                    call.response.pipeline.intercept(ApplicationSendPipeline.Engine) {
+                        proceed() // Let the normal response processing continue
+                        // This runs after the response is fully sent
                         Files.deleteIfExists(zipFile)
                     }
+                    
+                    // Stream the file directly
+                    call.respondFile(zipFile.toFile())
+
 
                 } catch (e: Exception) {
                     call.respond(
