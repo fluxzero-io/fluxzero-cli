@@ -54,6 +54,7 @@ class BuildSystemRefactorTest {
     fun `should delete Maven files when Gradle is selected`() {
         // Create template with both build files
         createBothBuildFiles()
+        createMavenWrapperFiles()
         createSimpleRefactorYaml()
 
         val variables = TemplateVariables(
@@ -70,8 +71,11 @@ class BuildSystemRefactorTest {
         assertTrue(Files.exists(tempDir.resolve("build.gradle.kts")))
         assertTrue(Files.exists(tempDir.resolve("settings.gradle.kts")))
         
-        // Maven files should be deleted
+        // Maven files and wrapper should be deleted
         assertFalse(Files.exists(tempDir.resolve("pom.xml")))
+        assertFalse(Files.exists(tempDir.resolve("mvnw")))
+        assertFalse(Files.exists(tempDir.resolve("mvnw.cmd")))
+        assertFalse(Files.exists(tempDir.resolve(".mvn")))
     }
 
     @Test
@@ -194,5 +198,21 @@ class BuildSystemRefactorTest {
             distributionUrl=https://services.gradle.org/distributions/gradle-8.5-bin.zip
         """.trimIndent())
         Files.writeString(wrapperDir.resolve("gradle-wrapper.jar"), "dummy jar content")
+    }
+
+    private fun createMavenWrapperFiles() {
+        // Create Maven wrapper files
+        Files.writeString(tempDir.resolve("mvnw"), "#!/bin/sh\n# Maven wrapper script")
+        Files.writeString(tempDir.resolve("mvnw.cmd"), "@REM Maven wrapper batch script")
+        
+        // Create .mvn directory with wrapper
+        val mvnDir = tempDir.resolve(".mvn")
+        Files.createDirectories(mvnDir)
+        val wrapperDir = mvnDir.resolve("wrapper")
+        Files.createDirectories(wrapperDir)
+        Files.writeString(wrapperDir.resolve("maven-wrapper.properties"), """
+            distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.4/apache-maven-3.9.4-bin.zip
+        """.trimIndent())
+        Files.writeString(wrapperDir.resolve("maven-wrapper.jar"), "dummy jar content")
     }
 }

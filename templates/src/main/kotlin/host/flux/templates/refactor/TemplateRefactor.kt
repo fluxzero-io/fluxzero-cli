@@ -121,8 +121,12 @@ class TemplateRefactor {
             BuildSystem.GRADLE -> {
                 // Delete Maven files when Gradle is chosen
                 listOf(
-                    DeleteOperation(listOf("pom.xml")),
-                    DeleteOperation(listOf(".mvn"))
+                    DeleteOperation(listOf(
+                        "pom.xml",
+                        "mvnw",
+                        "mvnw.cmd",
+                        ".mvn"
+                    ))
                 )
             }
             null -> {
