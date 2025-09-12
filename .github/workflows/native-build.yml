@@ -107,9 +107,9 @@ jobs:
           
           # Run the CLI to generate an example project
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            ../cli/build/native/nativeCompile/flux.exe init --template=flux-java-single --name=example-project --package=com.example.project --group-id=com.example --artifact-id=example-project --description="Example project for CI testing" --build=maven --git
+            ../cli/build/native/nativeCompile/flux.exe init --template=flux-basic-java --name=example-project --package=com.example.project --group-id=com.example --artifact-id=example-project --description="Example project for CI testing" --build=maven --git
           else
-            ../cli/build/native/nativeCompile/flux init --template=flux-java-single --name=example-project --package=com.example.project --group-id=com.example --artifact-id=example-project --description="Example project for CI testing" --build=maven --git
+            ../cli/build/native/nativeCompile/flux init --template=flux-basic-java --name=example-project --package=com.example.project --group-id=com.example --artifact-id=example-project --description="Example project for CI testing" --build=maven --git
           fi
           
           # Verify the project was created
