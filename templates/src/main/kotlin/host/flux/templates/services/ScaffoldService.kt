@@ -10,7 +10,7 @@ import java.nio.file.Paths
 import kotlin.io.path.absolute
 
 class ScaffoldService(
-    private val templateService: TemplateService = TemplateService(),
+    private val templateService: TemplateService = ClasspathTemplateService(),
     private val templateRefactor: TemplateRefactor = TemplateRefactor()
 ) {
     

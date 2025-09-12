@@ -5,7 +5,7 @@ import host.flux.api.models.InitRequest
 import host.flux.api.models.TemplateResponse
 import host.flux.api.models.VersionResponse
 import host.flux.api.services.ApiScaffoldService
-import host.flux.templates.services.TemplateService
+import host.flux.templates.services.ClasspathTemplateService
 import host.flux.templates.services.VersionUtils
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -39,10 +39,10 @@ fun Application.configureRoutes() {
 
             // List templates
             get("/templates") {
-                val templateService = TemplateService()
+                val templateService = ClasspathTemplateService()
                 val templates = templateService.listTemplates()
-                call.respond(templates.map {
-                    TemplateResponse(name = it.name, description = it.description)
+                call.respond(templates.map { template ->
+                    TemplateResponse(name = template.name, description = template.description)
                 })
             }
 
