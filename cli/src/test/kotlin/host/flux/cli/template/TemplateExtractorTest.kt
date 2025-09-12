@@ -12,7 +12,7 @@ class TemplateExtractorTest {
         val extractor = TemplateExtractor()
         val tempDir: Path = Files.createTempDirectory("template-test")
 
-        extractor.extract("flux-kotlin-single", tempDir)
+        extractor.extract("flux-basic-java", tempDir)
 
         // Adjust based on your ZIP content
         val expectedFile: Path = tempDir.resolve("README.md")
@@ -29,6 +29,6 @@ class TemplateExtractorTest {
         val templates = extractor.listTemplates()
 
         assertTrue(templates.isNotEmpty(), "Template list should not be empty")
-        assertTrue("flux-kotlin-single" in templates, "Expected 'flux-kotlin-single' to be listed")
+        assertTrue("flux-basic-java" in templates, "Expected 'flux-basic-java' to be listed")
     }
 }

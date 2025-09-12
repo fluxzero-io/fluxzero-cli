@@ -2,6 +2,7 @@ package host.flux.cli.commands.templates
 
 import com.github.ajalt.clikt.testing.test
 import host.flux.templates.services.TemplateService
+import host.flux.templates.services.ClasspathTemplateService
 import host.flux.templates.models.TemplateInfo
 import io.mockk.every
 import io.mockk.mockk

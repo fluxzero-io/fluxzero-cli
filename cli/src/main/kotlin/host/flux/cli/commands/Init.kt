@@ -11,18 +11,23 @@ import com.github.ajalt.clikt.parameters.types.path
 import host.flux.cli.prompt.JLinePrompt
 import host.flux.cli.prompt.Prompt
 import host.flux.templates.services.ScaffoldService
+import host.flux.templates.services.ClasspathTemplateService
+import host.flux.templates.services.FileSystemTemplateService
 import host.flux.templates.models.ScaffoldProject
 import host.flux.templates.models.BuildSystem
 import java.nio.file.Paths
 
 class Init(
-    private val scaffoldService: ScaffoldService = ScaffoldService(),
-    private val prompt: Prompt = JLinePrompt()
+    private val prompt: Prompt = JLinePrompt(),
+    private val scaffoldService: ScaffoldService? = null
 ) : CliktCommand() {
 
     override fun help(context: Context): String = "Initialize a new Flux application"
 
     val template by option("--template", help = "Name of the template to generate your application with")
+
+    val templatePath by option("--template-path", help = "Path to a directory containing templates or a ZIP file template")
+        .path(mustExist = true, canBeDir = true, canBeFile = true)
 
     val dir by option(
         "--dir",
@@ -65,7 +70,16 @@ class Init(
 //    ).default("unspecified")
 
     override fun run() {
-        val finalTemplate = getTemplateName()
+        val actualScaffoldService = scaffoldService ?: run {
+            val templateService = if (templatePath != null) {
+                FileSystemTemplateService(templatePath!!)
+            } else {
+                ClasspathTemplateService()
+            }
+            ScaffoldService(templateService = templateService)
+        }
+        
+        val finalTemplate = getTemplateName(actualScaffoldService)
         val finalName = name ?: promptForName()
         val finalPackage = packageName ?: promptForPackage()
         val finalBuildSystem = buildSystem?.let { 
@@ -84,7 +98,7 @@ class Init(
             buildSystem = finalBuildSystem
         )
         
-        val result = scaffoldService.scaffoldProject(request)
+        val result = actualScaffoldService.scaffoldProject(request)
         
         if (result.success) {
             echo(result.message)
@@ -135,7 +149,7 @@ class Init(
         }
     }
 
-    private fun getTemplateName(): String {
+    private fun getTemplateName(scaffoldService: ScaffoldService): String {
         val templates = scaffoldService.listAvailableTemplates()
 
         fun promptForTemplate(): String {

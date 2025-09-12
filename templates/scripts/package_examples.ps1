@@ -28,7 +28,18 @@ try {
     if (-not $zipUrl) { $zipUrl = Derive-ZipUrl $repoUrl $branch }
     if (-not $zipUrl) { throw "Could not determine ZIP URL for examples." }
 
-    if (Test-Path $cacheDir -PathType Container -and (Get-ChildItem -LiteralPath $cacheDir -Force | Measure-Object).Count -gt 0 -and -not $refresh) {
+    # Determine cache state without throwing when the directory doesn't exist
+    $cacheExists = Test-Path -LiteralPath $cacheDir -PathType Container
+    $hasContent = $false
+    if ($cacheExists) {
+        try {
+            $hasContent = ((Get-ChildItem -LiteralPath $cacheDir -Force | Select-Object -First 1).Count -gt 0)
+        } catch {
+            $hasContent = $false
+        }
+    }
+
+    if ($cacheExists -and $hasContent -and -not $refresh) {
         Write-Host "Using cached examples at $cacheDir (set REFRESH_EXAMPLES=true to refresh)"
     } else {
         if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
@@ -46,6 +57,7 @@ try {
         Expand-Archive -Path $tmp -DestinationPath $cacheDir -Force
         Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 
+        if (-not (Test-Path $cacheDir -PathType Container)) { throw "Examples cache directory missing after unpack: $cacheDir" }
         $entries = Get-ChildItem -LiteralPath $cacheDir -Force
         if ($entries.Count -eq 1 -and $entries[0].PSIsContainer) {
             $top = $entries[0]
@@ -60,6 +72,7 @@ try {
     if (Test-Path $outputDir) { Remove-Item -LiteralPath $outputDir -Recurse -Force }
     New-Item -ItemType Directory -Path $outputDir | Out-Null
 
+    if (-not (Test-Path $cacheDir -PathType Container)) { throw "Examples cache directory not found: $cacheDir" }
     $dirs = Get-ChildItem -LiteralPath $cacheDir -Directory -Force | Sort-Object Name
     if ($dirs.Count -eq 0) { throw "No templates found in $cacheDir" }
 
@@ -81,4 +94,3 @@ try {
     Write-Error $_.Exception.Message
     exit 1
 }
-

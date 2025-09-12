@@ -94,7 +94,101 @@ fz version
 fz upgrade
 ```
 
-See `fz --help` for more information on available commands.
+### CLI Commands & Parameters
+
+#### `fz init` - Initialize a new project
+
+**Basic usage:**
+```bash
+fz init [OPTIONS]
+```
+
+**Options:**
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `--template` | Name of the template to use | `--template flux-kotlin-single` |
+| `--template-path` | Path to custom template directory or ZIP file | `--template-path ./my-templates` |
+| `--name` | Project name (1-50 chars: 0-9, a-z, -, _) | `--name my-app` |
+| `--dir` | Directory to create project in | `--dir ./projects` |
+| `--package` | Java package name | `--package com.example.myapp` |
+| `--group-id` | Maven/Gradle group ID | `--group-id com.example` |
+| `--artifact-id` | Maven/Gradle artifact ID | `--artifact-id my-app` |
+| `--description` | Project description | `--description "My application"` |
+| `--build` | Build system (`maven` or `gradle`) | `--build gradle` |
+| `--git` | Initialize Git repository | `--git` |
+
+**Examples:**
+
+```bash
+# Interactive mode (prompts for all options)
+fz init
+
+# With built-in template
+fz init --template flux-kotlin-single --name my-app --package com.example.myapp --build gradle
+
+# Using custom template directory
+fz init --template-path ./my-templates --template custom-template --name my-project
+
+# Using custom template ZIP file
+fz init --template-path ./templates/my-template.zip --template my-template --name my-project
+
+# Full example with all options
+fz init \
+  --template flux-java-single \
+  --name awesome-app \
+  --dir ./workspace \
+  --package com.company.awesome \
+  --group-id com.company \
+  --artifact-id awesome-app \
+  --description "An awesome application" \
+  --build maven \
+  --git
+```
+
+#### Custom Templates
+
+The `--template-path` parameter allows you to use templates from:
+
+1. **Local directory containing multiple templates:**
+   ```bash
+   # Directory structure:
+   # my-templates/
+   # ├── web-template/
+   # ├── api-template/
+   # └── cli-template/
+   fz init --template-path ./my-templates --template web-template
+   ```
+
+2. **Single ZIP file template:**
+   ```bash
+   fz init --template-path ./my-template.zip --template my-template
+   ```
+
+Templates should follow the same structure as built-in templates with optional `refactor.yaml` for customization.
+
+#### `fz templates list` - List available templates
+
+```bash
+# List built-in templates
+fz templates list
+
+# List templates from custom directory (not currently supported - use fz init with --template-path)
+```
+
+#### `fz version` - Show version information
+
+```bash
+fz version
+```
+
+#### `fz upgrade` - Upgrade CLI to latest version
+
+```bash
+fz upgrade
+```
+
+See `fz --help` or `fz <command> --help` for detailed help on any command.
 
 ## Installation Location
 
