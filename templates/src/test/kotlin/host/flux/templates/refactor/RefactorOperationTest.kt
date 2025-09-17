@@ -215,7 +215,7 @@ class RefactorOperationTest {
         mockkObject(FileOperationHelper)
         val templateRoot = Paths.get("/tmp/template")
         val testFiles = listOf(Paths.get("/tmp/template/test.txt"))
-        
+
         every { FileOperationHelper.findMatchingFiles(any(), any()) } returns testFiles
         every { FileOperationHelper.replaceInFile(any(), any(), any(), any(), any()) } just Runs
 
@@ -228,16 +228,63 @@ class RefactorOperationTest {
 
         operation.execute(templateRoot, testVariables)
 
-        verify { 
+        verify {
             FileOperationHelper.replaceInFile(
-                any(), 
-                any(), 
-                "com.test.demo-com/test/demo-test-project-org.test-test-project", 
-                false, 
+                any(),
+                any(),
+                "com.test.demo-com/test/demo-test-project-org.test-test-project",
+                false,
                 any()
             )
         }
-        
+
+        unmockkObject(FileOperationHelper)
+    }
+
+    @Test
+    fun `ChmodOperation should call FileOperationHelper with correct parameters`() {
+        mockkObject(FileOperationHelper)
+        val templateRoot = Paths.get("/tmp/template")
+        val testFiles = listOf(
+            Paths.get("/tmp/template/gradlew"),
+            Paths.get("/tmp/template/scripts/run.sh")
+        )
+
+        every { FileOperationHelper.findMatchingFiles(any(), any()) } returns testFiles
+        every { FileOperationHelper.chmodFiles(any(), any(), any()) } just Runs
+
+        val operation = ChmodOperation(
+            files = listOf("gradlew", "scripts/*.sh"),
+            mode = "755"
+        )
+
+        val result = operation.execute(templateRoot, testVariables)
+
+        verify { FileOperationHelper.findMatchingFiles(templateRoot, listOf("gradlew", "scripts/*.sh")) }
+        verify { FileOperationHelper.chmodFiles(testFiles, "755", any()) }
+        assertTrue(result.warnings.isEmpty())
+
+        unmockkObject(FileOperationHelper)
+    }
+
+    @Test
+    fun `ChmodOperation should handle symbolic mode notation`() {
+        mockkObject(FileOperationHelper)
+        val templateRoot = Paths.get("/tmp/template")
+        val testFiles = listOf(Paths.get("/tmp/template/script.sh"))
+
+        every { FileOperationHelper.findMatchingFiles(any(), any()) } returns testFiles
+        every { FileOperationHelper.chmodFiles(any(), any(), any()) } just Runs
+
+        val operation = ChmodOperation(
+            files = listOf("script.sh"),
+            mode = "rwxr-xr-x"
+        )
+
+        operation.execute(templateRoot, testVariables)
+
+        verify { FileOperationHelper.chmodFiles(testFiles, "rwxr-xr-x", any()) }
+
         unmockkObject(FileOperationHelper)
     }
 }

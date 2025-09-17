@@ -46,3 +46,11 @@ data class CleanupEmptyDirectoriesConfig(
 ) : OperationConfig() {
     override fun toOperation(): RefactorOperation = CleanupEmptyDirectoriesOperation(paths)
 }
+
+data class ChmodConfig(
+    val type: String = "chmod",
+    val files: List<String>,
+    val mode: String
+) : OperationConfig() {
+    override fun toOperation(): RefactorOperation = ChmodOperation(files, mode)
+}

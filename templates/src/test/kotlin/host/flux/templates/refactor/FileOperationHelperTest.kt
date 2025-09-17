@@ -2,6 +2,7 @@ package host.flux.templates.refactor
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 import kotlin.test.*
 
 class FileOperationHelperTest {
@@ -254,17 +255,125 @@ class FileOperationHelperTest {
         // Test with read-only file (simulate permission error)
         val testFile = tempDir.resolve("readonly.txt")
         Files.writeString(testFile, "content")
-        
+
         // Note: Setting read-only might not work on all filesystems, so this test
         // might need to be adapted based on the actual error conditions
         val messages = OperationMessages()
-        
+
         // These should not throw exceptions but might add warnings
         FileOperationHelper.replaceInFile(tempDir, "find", "replace", false, messages) // tempDir is a directory, not file
         FileOperationHelper.deleteFile(tempDir.resolve("nonexistent.txt"), messages)
         FileOperationHelper.moveFile(tempDir.resolve("nonexistent.txt"), tempDir.resolve("target.txt"), messages)
-        
+
         // Some of these operations might generate warnings, but we can't guarantee it
         // The important thing is that no exceptions are thrown
+    }
+
+    @Test
+    fun `chmodFiles should set permissions on existing files using octal notation`() {
+        if (!isPosixSupported()) return
+
+        val testFile1 = tempDir.resolve("script1.sh")
+        val testFile2 = tempDir.resolve("script2.sh")
+        Files.writeString(testFile1, "#!/bin/bash\necho 'hello'")
+        Files.writeString(testFile2, "#!/bin/bash\necho 'world'")
+
+        val messages = OperationMessages()
+        FileOperationHelper.chmodFiles(listOf(testFile1, testFile2), "755", messages)
+
+        val perms1 = Files.getPosixFilePermissions(testFile1)
+        val perms2 = Files.getPosixFilePermissions(testFile2)
+
+        // Verify 755 permissions (rwxr-xr-x)
+        assertTrue(perms1.contains(PosixFilePermission.OWNER_READ))
+        assertTrue(perms1.contains(PosixFilePermission.OWNER_WRITE))
+        assertTrue(perms1.contains(PosixFilePermission.OWNER_EXECUTE))
+        assertTrue(perms1.contains(PosixFilePermission.GROUP_READ))
+        assertFalse(perms1.contains(PosixFilePermission.GROUP_WRITE))
+        assertTrue(perms1.contains(PosixFilePermission.GROUP_EXECUTE))
+        assertTrue(perms1.contains(PosixFilePermission.OTHERS_READ))
+        assertFalse(perms1.contains(PosixFilePermission.OTHERS_WRITE))
+        assertTrue(perms1.contains(PosixFilePermission.OTHERS_EXECUTE))
+
+        assertEquals(perms1, perms2)
+        assertTrue(messages.warnings.isEmpty())
+        assertEquals(2, messages.info.size)
+        assertTrue(messages.info.all { it.contains("Set permissions 755") })
+    }
+
+    @Test
+    fun `chmodFiles should set permissions using symbolic notation`() {
+        if (!isPosixSupported()) return
+
+        val testFile = tempDir.resolve("test.txt")
+        Files.writeString(testFile, "test content")
+
+        val messages = OperationMessages()
+        FileOperationHelper.chmodFiles(listOf(testFile), "rw-r--r--", messages)
+
+        val perms = Files.getPosixFilePermissions(testFile)
+
+        // Verify 644 permissions (rw-r--r--)
+        assertTrue(perms.contains(PosixFilePermission.OWNER_READ))
+        assertTrue(perms.contains(PosixFilePermission.OWNER_WRITE))
+        assertFalse(perms.contains(PosixFilePermission.OWNER_EXECUTE))
+        assertTrue(perms.contains(PosixFilePermission.GROUP_READ))
+        assertFalse(perms.contains(PosixFilePermission.GROUP_WRITE))
+        assertFalse(perms.contains(PosixFilePermission.GROUP_EXECUTE))
+        assertTrue(perms.contains(PosixFilePermission.OTHERS_READ))
+        assertFalse(perms.contains(PosixFilePermission.OTHERS_WRITE))
+        assertFalse(perms.contains(PosixFilePermission.OTHERS_EXECUTE))
+
+        assertTrue(messages.warnings.isEmpty())
+        assertEquals(1, messages.info.size)
+        assertTrue(messages.info[0].contains("Set permissions rw-r--r--"))
+    }
+
+    @Test
+    fun `chmodFiles should handle non-existent files gracefully`() {
+        val nonExistentFile = tempDir.resolve("nonexistent.txt")
+        assertFalse(Files.exists(nonExistentFile))
+
+        val messages = OperationMessages()
+        FileOperationHelper.chmodFiles(listOf(nonExistentFile), "755", messages)
+
+        // Should not create the file
+        assertFalse(Files.exists(nonExistentFile))
+        // Should not have any messages since file doesn't exist
+        assertTrue(messages.warnings.isEmpty())
+        assertTrue(messages.info.isEmpty())
+    }
+
+    @Test
+    fun `chmodFiles should handle various octal formats`() {
+        if (!isPosixSupported()) return
+
+        val testFile = tempDir.resolve("test.sh")
+        Files.writeString(testFile, "#!/bin/bash")
+
+        val messages = OperationMessages()
+
+        // Test 3-digit octal
+        FileOperationHelper.chmodFiles(listOf(testFile), "644", messages)
+        var perms = Files.getPosixFilePermissions(testFile)
+        assertTrue(perms.contains(PosixFilePermission.OWNER_READ))
+        assertTrue(perms.contains(PosixFilePermission.OWNER_WRITE))
+        assertFalse(perms.contains(PosixFilePermission.OWNER_EXECUTE))
+
+        // Test 4-digit octal (should ignore first digit)
+        FileOperationHelper.chmodFiles(listOf(testFile), "0755", messages)
+        perms = Files.getPosixFilePermissions(testFile)
+        assertTrue(perms.contains(PosixFilePermission.OWNER_EXECUTE))
+
+        assertTrue(messages.warnings.isEmpty())
+    }
+
+    private fun isPosixSupported(): Boolean {
+        return try {
+            Files.getPosixFilePermissions(tempDir)
+            true
+        } catch (e: UnsupportedOperationException) {
+            false
+        }
     }
 }

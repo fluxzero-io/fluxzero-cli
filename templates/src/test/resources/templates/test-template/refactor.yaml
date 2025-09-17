@@ -24,3 +24,6 @@ operations:
     to: "src/test/kotlin/${packagePath}"
   - type: createDirectory
     directory: "logs"
+  - type: chmod
+    files: ["gradlew", "scripts/*.sh"]
+    mode: "755"

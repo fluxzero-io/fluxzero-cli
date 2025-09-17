@@ -93,6 +93,10 @@ class TemplateRefactor {
                 "cleanupEmptyDirectories" -> CleanupEmptyDirectoriesConfig(
                     paths = (operationMap["paths"] as? List<String>) ?: listOf("src/main", "src/test")
                 )
+                "chmod" -> ChmodConfig(
+                    files = (operationMap["files"] as? List<String>) ?: emptyList(),
+                    mode = operationMap["mode"] as? String ?: ""
+                )
                 else -> {
                     println("Unknown operation type: ${operationMap["type"]}")
                     null

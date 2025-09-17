@@ -78,6 +78,18 @@ data class CleanupEmptyDirectoriesOperation(
     }
 }
 
+data class ChmodOperation(
+    val files: List<String>,
+    val mode: String
+) : RefactorOperation() {
+    override fun execute(templateRoot: Path, variables: TemplateVariables): OperationMessages {
+        val messages = OperationMessages()
+        val matchingFiles = FileOperationHelper.findMatchingFiles(templateRoot, files)
+        FileOperationHelper.chmodFiles(matchingFiles, mode, messages)
+        return messages
+    }
+}
+
 private fun expandVariables(template: String, variables: TemplateVariables): String {
     var result = template
     

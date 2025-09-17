@@ -3,6 +3,8 @@ package host.flux.templates.refactor
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.streams.toList
 
 
@@ -130,6 +132,56 @@ object FileOperationHelper {
         }
     }
     
+    fun chmodFiles(files: List<Path>, mode: String, messages: OperationMessages = OperationMessages()) {
+        files.forEach { file ->
+            try {
+                if (Files.exists(file)) {
+                    val permissions = parseFileMode(mode)
+                    Files.setPosixFilePermissions(file, permissions)
+                    messages.info.add("Set permissions $mode on file: $file")
+                }
+            } catch (e: UnsupportedOperationException) {
+                messages.warnings.add("Cannot set POSIX permissions on ${file}: filesystem does not support POSIX attributes")
+            } catch (e: Exception) {
+                messages.warnings.add("Failed to set permissions on ${file}: ${e.message}")
+            }
+        }
+    }
+
+    private fun parseFileMode(mode: String): Set<PosixFilePermission> {
+        return when {
+            mode.matches(Regex("^[0-7]{3,4}$")) -> {
+                // Octal notation (e.g., "755", "644")
+                val octalValue = mode.takeLast(3).toInt(8)
+                val permissions = mutableSetOf<PosixFilePermission>()
+
+                // Owner permissions
+                if ((octalValue and 0x100) != 0) permissions.add(PosixFilePermission.OWNER_READ)   // 0o400
+                if ((octalValue and 0x080) != 0) permissions.add(PosixFilePermission.OWNER_WRITE)  // 0o200
+                if ((octalValue and 0x040) != 0) permissions.add(PosixFilePermission.OWNER_EXECUTE) // 0o100
+
+                // Group permissions
+                if ((octalValue and 0x020) != 0) permissions.add(PosixFilePermission.GROUP_READ)    // 0o040
+                if ((octalValue and 0x010) != 0) permissions.add(PosixFilePermission.GROUP_WRITE)   // 0o020
+                if ((octalValue and 0x008) != 0) permissions.add(PosixFilePermission.GROUP_EXECUTE) // 0o010
+
+                // Others permissions
+                if ((octalValue and 0x004) != 0) permissions.add(PosixFilePermission.OTHERS_READ)    // 0o004
+                if ((octalValue and 0x002) != 0) permissions.add(PosixFilePermission.OTHERS_WRITE)   // 0o002
+                if ((octalValue and 0x001) != 0) permissions.add(PosixFilePermission.OTHERS_EXECUTE) // 0o001
+
+                permissions
+            }
+            mode.matches(Regex("^[rwx-]{9}$")) -> {
+                // Symbolic notation (e.g., "rwxr-xr-x")
+                PosixFilePermissions.fromString(mode)
+            }
+            else -> {
+                throw IllegalArgumentException("Invalid file mode format: $mode. Use octal (e.g., '755') or symbolic (e.g., 'rwxr-xr-x') notation.")
+            }
+        }
+    }
+
     private fun isDirEmpty(directory: Path): Boolean {
         return try {
             Files.newDirectoryStream(directory).use { stream ->

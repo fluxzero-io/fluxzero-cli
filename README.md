@@ -212,12 +212,114 @@ Templates are sourced from the external repository [fluxzero-examples](https://g
 - Package name replacement
 - File removal based on configuration
 - Line-by-line content modification
+- File permission management
 - Interactive customization during project creation
 
 Available templates (see the examples repo for the latest list):
 - `flux-kotlin-single` - Single-module Kotlin project
 - `flux-java-single` - Single-module Java project
 - `gamerental` - Example multi-feature application
+
+### Template Customization with `refactor.yaml`
+
+Templates can include a `refactor.yaml` file to customize the generated project. This file defines operations that are applied during project initialization.
+
+#### Supported Operations
+
+**`replace` - Text replacement**
+```yaml
+- type: replace
+  files: ["**/*.kt", "**/*.java"]     # Glob patterns for files to modify
+  find: "com\\.example\\.template"    # Text or regex to find
+  replace: "${package}"               # Replacement text (supports variables)
+  regex: true                         # Whether to use regex matching (default: false)
+```
+
+**`delete` - File removal**
+```yaml
+- type: delete
+  files: ["**/*.tmp", "build/"]       # Glob patterns for files/directories to delete
+```
+
+**`rename` - File/directory renaming**
+```yaml
+- type: rename
+  from: "src/main/kotlin/com/example/template"
+  to: "src/main/kotlin/${packagePath}"
+```
+
+**`createDirectory` - Directory creation**
+```yaml
+- type: createDirectory
+  directory: "logs"                   # Directory path (supports variables)
+```
+
+**`chmod` - File permission management**
+```yaml
+- type: chmod
+  files: ["gradlew", "scripts/*.sh"]  # Glob patterns for files to modify
+  mode: "755"                         # Standard Unix permissions: 755 (executable), 644 (read-only), 777 (full access)
+```
+
+**`cleanupEmptyDirectories` - Remove empty directories**
+```yaml
+- type: cleanupEmptyDirectories
+  paths: ["src/main", "src/test"]     # Directory paths to clean (default: ["src/main", "src/test"])
+```
+
+#### Variable Substitution
+
+The following variables are available for use in `replace`, `rename`, `createDirectory` operations:
+
+- `${package}` - Java package name (e.g., `com.example.myapp`)
+- `${packagePath}` - Package as file path (e.g., `com/example/myapp`)
+- `${projectName}` - Project name
+- `${groupId}` - Maven/Gradle group ID
+- `${artifactId}` - Maven/Gradle artifact ID
+- `${description}` - Project description
+
+Variables can be used in either `${variable}` or `{{variable}}` format.
+
+#### Example `refactor.yaml`
+
+```yaml
+operations:
+  # Replace package names in source files
+  - type: replace
+    files: ["**/*.kt"]
+    find: "package com\\.example\\.template"
+    replace: "package ${package}"
+    regex: true
+
+  # Update build files
+  - type: replace
+    files: ["pom.xml", "build.gradle.kts"]
+    find: "com.example.template"
+    replace: "${package}"
+
+  # Make scripts executable
+  - type: chmod
+    files: ["gradlew", "scripts/*.sh"]
+    mode: "755"
+
+  # Make config files read-only
+  - type: chmod
+    files: ["config/*.conf"]
+    mode: "644"
+
+  # Rename package directories
+  - type: rename
+    from: "src/main/kotlin/com/example/template"
+    to: "src/main/kotlin/${packagePath}"
+
+  # Clean up temporary files
+  - type: delete
+    files: ["**/*.tmp"]
+
+  # Create log directory
+  - type: createDirectory
+    directory: "logs"
+```
 
 Advanced:
 - Override repo URL: `./gradlew -PexamplesRepoUrl=https://github.com/your-org/your-examples.git build`
