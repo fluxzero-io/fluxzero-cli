@@ -31,3 +31,9 @@ data class VersionResponse(
     val latestVersion: String? = null,
     val hasUpdate: Boolean = false
 )
+
+@Serializable
+data class HealthResponse(
+    val status: String,
+    val availableTemplates: Int
+)

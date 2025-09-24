@@ -1,5 +1,6 @@
 package host.flux.api.routes
 
+import host.flux.api.models.HealthResponse
 import host.flux.api.models.InitFailure
 import host.flux.api.models.InitRequest
 import host.flux.api.models.TemplateResponse
@@ -22,7 +23,23 @@ fun Application.configureRoutes() {
         route("/api") {
             // Health check
             get("/health") {
-                call.respond(mapOf("status" to "healthy"))
+                val templateService = ClasspathTemplateService()
+                val templateCount = templateService.listTemplates().size
+
+                if (templateCount > 0) {
+                    call.respond(HealthResponse(
+                        status = "healthy",
+                        availableTemplates = templateCount
+                    ))
+                } else {
+                    call.respond(
+                        status = HttpStatusCode.ServiceUnavailable,
+                        message = HealthResponse(
+                            status = "unhealthy",
+                            availableTemplates = templateCount
+                        )
+                    )
+                }
             }
 
             // Version info
