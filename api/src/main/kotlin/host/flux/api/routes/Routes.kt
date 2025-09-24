@@ -23,20 +23,33 @@ fun Application.configureRoutes() {
         route("/api") {
             // Health check
             get("/health") {
-                val templateService = ClasspathTemplateService()
-                val templateCount = templateService.listTemplates().size
+                try {
+                    val templateService = ClasspathTemplateService()
+                    val templateCount = templateService.listTemplates().size
 
-                if (templateCount > 0) {
-                    call.respond(HealthResponse(
-                        status = "healthy",
-                        availableTemplates = templateCount
-                    ))
-                } else {
+                    if (templateCount > 0) {
+                        call.respond(HealthResponse(
+                            status = "healthy",
+                            availableTemplates = templateCount
+                        ))
+                    } else {
+                        call.respond(
+                            status = HttpStatusCode.ServiceUnavailable,
+                            message = HealthResponse(
+                                status = "unhealthy",
+                                availableTemplates = templateCount
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Log the error for debugging but don't fail completely
+                    call.application.log.error("Failed to load templates in health check", e)
                     call.respond(
                         status = HttpStatusCode.ServiceUnavailable,
                         message = HealthResponse(
                             status = "unhealthy",
-                            availableTemplates = templateCount
+                            availableTemplates = 0,
+                            error = e.message ?: "Unknown error occurred while loading templates"
                         )
                     )
                 }

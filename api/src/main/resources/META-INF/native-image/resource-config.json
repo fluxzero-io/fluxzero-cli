@@ -20,6 +20,9 @@
         "pattern": "templates/.*"
       },
       {
+        "pattern": ".*\\.csv$"
+      },
+      {
         "pattern": "logback.*\\.xml"
       },
       {

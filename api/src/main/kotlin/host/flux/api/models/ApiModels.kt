@@ -35,5 +35,6 @@ data class VersionResponse(
 @Serializable
 data class HealthResponse(
     val status: String,
-    val availableTemplates: Int
+    val availableTemplates: Int,
+    val error: String? = null
 )
