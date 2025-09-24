@@ -22,7 +22,23 @@ fun Application.configureRoutes() {
         route("/api") {
             // Health check
             get("/health") {
-                call.respond(mapOf("status" to "healthy"))
+                val templateService = ClasspathTemplateService()
+                val templateCount = templateService.listTemplates().size
+
+                if (templateCount > 0) {
+                    call.respond(mapOf(
+                        "status" to "healthy",
+                        "availableTemplates" to templateCount
+                    ))
+                } else {
+                    call.respond(
+                        status = HttpStatusCode.ServiceUnavailable,
+                        message = mapOf(
+                            "status" to "unhealthy",
+                            "availableTemplates" to templateCount
+                        )
+                    )
+                }
             }
 
             // Version info

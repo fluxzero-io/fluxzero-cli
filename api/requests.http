@@ -4,7 +4,7 @@ POST https://fluxzero-cli-api-production.rene7346.workers.dev/api/init
 Content-Type: application/json
 
 {
-    "template": "flux-java-single",
+    "template": "flux-basic-kotlin",
     "name": "some-name",
     "packageName": "some.package",
     "groupId": "com.somegroup",
