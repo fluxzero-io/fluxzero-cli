@@ -1,0 +1,65 @@
+name: Deploy API to Fly.io
+
+on:
+  workflow_run:
+    workflows: ["Auto Release and Version Bump"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  deploy-fly:
+    name: Deploy API to Fly.io
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    env:
+      FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'fluxzero-cli-api' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build shaded JAR
+        run: |
+          ./gradlew :api:shadowJar --info
+          ls -lh api/build/libs/flux-api-*.jar
+
+      - name: Prepare JAR in build context
+        run: |
+          cp api/build/libs/flux-api-*.jar api/flux-api.jar
+          ls -lh api/flux-api.jar
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          cd api
+          # Use provided app name if set; fall back to fly.toml
+          if [ -n "${{ env.FLY_APP_NAME }}" ]; then
+            flyctl deploy --remote-only --now --app "${{ env.FLY_APP_NAME }}"
+          else
+            flyctl deploy --remote-only --now
+          fi
+
+      - name: Force stop all Machines
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          app="${{ env.FLY_APP_NAME }}"
+          # List and stop all machines for the app until a request comes in
+          ids=$(flyctl machines list -a "$app" --json | jq -r '.[].id')
+          for id in $ids; do
+            echo "Stopping $id..."
+            flyctl machine stop -a "$app" "$id" --signal SIGINT --timeout 20
+          done
+
