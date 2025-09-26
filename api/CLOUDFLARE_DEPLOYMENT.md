@@ -32,7 +32,7 @@ Replace `your-subdomain` with your actual Cloudflare subdomain.
 
 The deployment consists of:
 
-1. **Container**: The Kotlin/Ktor API running in a Docker container
+1. **Container**: The Kotlin/Ktor API running as a JVM JAR in a Docker container
 2. **Worker**: JavaScript code that manages the container instances
 3. **Durable Objects**: Provides container instance management
 
@@ -68,7 +68,7 @@ The deployment uses the following key dependencies:
 
 - **wrangler.toml**: Cloudflare Workers configuration
 - **src/worker.js**: Worker code that manages container instances
-- **Dockerfile**: Container definition (unchanged)
+- **Dockerfile**: Container definition (runs the shaded JAR)
 
 ## Monitoring
 
