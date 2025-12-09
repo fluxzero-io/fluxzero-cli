@@ -37,7 +37,7 @@ jobs:
             runner: ubuntu-latest
             artifact-name: flux-linux-amd64
           - os: macos-amd64
-            runner: macos-13
+            runner: macos-14
             artifact-name: flux-macos-amd64
           - os: macos-arm64
             runner: macos-14
