@@ -111,10 +111,13 @@ class TemplateRefactor {
         return when (variables.buildSystem) {
             BuildSystem.MAVEN -> {
                 // Delete Gradle files when Maven is chosen
+                // Note: Need both root-level patterns and ** patterns since **/ requires at least one directory
                 listOf(
                     DeleteOperation(listOf(
-                        "build.gradle.kts",
-                        "settings.gradle.kts", 
+                        "*.gradle",
+                        "*.gradle.kts",
+                        "**/*.gradle",
+                        "**/*.gradle.kts",
                         "gradle.properties",
                         "gradlew",
                         "gradlew.bat",
@@ -124,9 +127,13 @@ class TemplateRefactor {
             }
             BuildSystem.GRADLE -> {
                 // Delete Maven files when Gradle is chosen
+                // Note: Need both root-level patterns and ** patterns since **/ requires at least one directory
                 listOf(
                     DeleteOperation(listOf(
                         "pom.xml",
+                        "**/pom.xml",
+                        "*.maven",
+                        "**/*.maven",
                         "mvnw",
                         "mvnw.cmd",
                         ".mvn"

@@ -28,6 +28,7 @@ class BuildSystemRefactorTest {
         // Create template with both build files
         createBothBuildFiles()
         createGradleDirectory()
+        createNestedGradleFiles()
         createSimpleRefactorYaml()
 
         val variables = TemplateVariables(
@@ -39,13 +40,15 @@ class BuildSystemRefactorTest {
         val result = templateRefactor.refactorTemplate(tempDir, variables)
 
         assertTrue(result.success)
-        
+
         // Maven files should remain
         assertTrue(Files.exists(tempDir.resolve("pom.xml")))
-        
-        // Gradle files should be deleted
+
+        // Gradle files should be deleted (including nested ones)
         assertFalse(Files.exists(tempDir.resolve("build.gradle.kts")))
         assertFalse(Files.exists(tempDir.resolve("settings.gradle.kts")))
+        assertFalse(Files.exists(tempDir.resolve("submodule/build.gradle.kts")))
+        assertFalse(Files.exists(tempDir.resolve("submodule/custom.gradle")))
         // Gradle directory should be deleted
         assertFalse(Files.exists(tempDir.resolve("gradle")))
     }
@@ -55,6 +58,7 @@ class BuildSystemRefactorTest {
         // Create template with both build files
         createBothBuildFiles()
         createMavenWrapperFiles()
+        createNestedMavenFiles()
         createSimpleRefactorYaml()
 
         val variables = TemplateVariables(
@@ -66,13 +70,14 @@ class BuildSystemRefactorTest {
         val result = templateRefactor.refactorTemplate(tempDir, variables)
 
         assertTrue(result.success)
-        
+
         // Gradle files should remain
         assertTrue(Files.exists(tempDir.resolve("build.gradle.kts")))
         assertTrue(Files.exists(tempDir.resolve("settings.gradle.kts")))
-        
-        // Maven files and wrapper should be deleted
+
+        // Maven files and wrapper should be deleted (including nested ones)
         assertFalse(Files.exists(tempDir.resolve("pom.xml")))
+        assertFalse(Files.exists(tempDir.resolve("submodule/pom.xml")))
         assertFalse(Files.exists(tempDir.resolve("mvnw")))
         assertFalse(Files.exists(tempDir.resolve("mvnw.cmd")))
         assertFalse(Files.exists(tempDir.resolve(".mvn")))
@@ -204,7 +209,7 @@ class BuildSystemRefactorTest {
         // Create Maven wrapper files
         Files.writeString(tempDir.resolve("mvnw"), "#!/bin/sh\n# Maven wrapper script")
         Files.writeString(tempDir.resolve("mvnw.cmd"), "@REM Maven wrapper batch script")
-        
+
         // Create .mvn directory with wrapper
         val mvnDir = tempDir.resolve(".mvn")
         Files.createDirectories(mvnDir)
@@ -214,5 +219,38 @@ class BuildSystemRefactorTest {
             distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.4/apache-maven-3.9.4-bin.zip
         """.trimIndent())
         Files.writeString(wrapperDir.resolve("maven-wrapper.jar"), "dummy jar content")
+    }
+
+    private fun createNestedGradleFiles() {
+        // Create submodule directory with gradle files
+        val submoduleDir = tempDir.resolve("submodule")
+        Files.createDirectories(submoduleDir)
+        Files.writeString(submoduleDir.resolve("build.gradle.kts"), """
+            plugins {
+                kotlin("jvm")
+            }
+        """.trimIndent())
+        // Also create a .gradle file (non-kts)
+        Files.writeString(submoduleDir.resolve("custom.gradle"), """
+            // Custom gradle script
+            task hello { println "Hello" }
+        """.trimIndent())
+    }
+
+    private fun createNestedMavenFiles() {
+        // Create submodule directory with pom.xml
+        val submoduleDir = tempDir.resolve("submodule")
+        Files.createDirectories(submoduleDir)
+        Files.writeString(submoduleDir.resolve("pom.xml"), """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project>
+                <parent>
+                    <groupId>com.example.test</groupId>
+                    <artifactId>test-project</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                </parent>
+                <artifactId>submodule</artifactId>
+            </project>
+        """.trimIndent())
     }
 }
