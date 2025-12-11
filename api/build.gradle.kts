@@ -14,19 +14,19 @@ dependencies {
     implementation(project(":templates"))
     
     // Ktor server dependencies
-    implementation("io.ktor:ktor-server-core:2.3.12")
-    implementation("io.ktor:ktor-server-cio:2.3.12")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-    implementation("io.ktor:ktor-server-cors:2.3.12")
-    implementation("io.ktor:ktor-server-status-pages:2.3.12")
+    implementation("io.ktor:ktor-server-core:2.3.13")
+    implementation("io.ktor:ktor-server-cio:2.3.13")
+    implementation("io.ktor:ktor-server-content-negotiation:2.3.13")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.13")
+    implementation("io.ktor:ktor-server-cors:2.3.13")
+    implementation("io.ktor:ktor-server-status-pages:2.3.13")
     
     // Logging implementation
     implementation("ch.qos.logback:logback-classic:1.4.14")
     
     // Testing dependencies
-    testImplementation("io.ktor:ktor-server-test-host:2.3.12")
-    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    testImplementation("io.ktor:ktor-server-test-host:2.3.13")
+    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.13")
 }
 
 application {
