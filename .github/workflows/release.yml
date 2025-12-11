@@ -1,10 +1,13 @@
 name: Auto Release and Version Bump
 
 on:
+  repository_dispatch:
+    types: [ examples-updated ]
   push:
     branches:
       - main
   workflow_dispatch:
+
 
 jobs:
   version:
