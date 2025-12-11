@@ -46,9 +46,9 @@ jobs:
           cd api
           # Use provided app name if set; fall back to fly.toml
           if [ -n "${{ env.FLY_APP_NAME }}" ]; then
-            flyctl deploy --remote-only --now --app "${{ env.FLY_APP_NAME }}"
+            flyctl deploy --remote-only --now --wait --app "${{ env.FLY_APP_NAME }}"
           else
-            flyctl deploy --remote-only --now
+            flyctl deploy --remote-only --now --wait
           fi
 
       - name: Force stop all Machines
