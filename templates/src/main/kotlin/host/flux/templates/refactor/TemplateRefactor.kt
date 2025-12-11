@@ -27,17 +27,17 @@ class TemplateRefactor {
             
             val allWarnings = mutableListOf<String>()
             val allInfo = mutableListOf<String>()
-            
-            config.operations.forEach { operationConfig ->
-                val operation = operationConfig.toOperation()
+
+            // Delete unused build files based on build system selection
+            val buildSystemOperations = getBuildSystemDeleteOperations(variables)
+            buildSystemOperations.forEach { operation ->
                 val messages = operation.execute(templateRoot, variables)
                 allWarnings.addAll(messages.warnings)
                 allInfo.addAll(messages.info)
             }
             
-            // Delete unused build files based on build system selection
-            val buildSystemOperations = getBuildSystemDeleteOperations(variables)
-            buildSystemOperations.forEach { operation ->
+            config.operations.forEach { operationConfig ->
+                val operation = operationConfig.toOperation()
                 val messages = operation.execute(templateRoot, variables)
                 allWarnings.addAll(messages.warnings)
                 allInfo.addAll(messages.info)
