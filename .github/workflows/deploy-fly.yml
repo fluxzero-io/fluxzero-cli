@@ -60,6 +60,8 @@ jobs:
           ids=$(flyctl machines list -a "$app" --json | jq -r '.[].id')
           for id in $ids; do
             echo "Stopping $id..."
-            flyctl machine stop -a "$app" "$id" --signal SIGINT --timeout 20
+            if ! flyctl machine stop -a "$app" "$id" --signal SIGINT --timeout 20; then 
+              echo "Stop failed, possibly already replacing; continuing..."
+            fi
           done
 
