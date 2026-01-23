@@ -9,6 +9,7 @@ import java.io.FilterInputStream
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * Service for handling API-specific scaffolding operations that return zip files
@@ -71,8 +72,11 @@ class ApiScaffoldService(
             }
 
             // Create zip file from the scaffolded project
-            val projectPath = tempDir.resolve(request.name)
-            zipFile = ZipUtils.zipDirectoryToFile(projectPath, request.name)
+            // Use outputPath from result to get the actual directory with normalized name
+            val projectPath = result.outputPath?.let { Paths.get(it) }
+                ?: throw IllegalStateException("Scaffold succeeded but outputPath is null")
+            val projectName = projectPath.fileName.toString()
+            zipFile = ZipUtils.zipDirectoryToFile(projectPath, projectName)
             val zipSize = Files.size(zipFile)
             
             // Clean up scaffolded project directory (but keep the zip file)
