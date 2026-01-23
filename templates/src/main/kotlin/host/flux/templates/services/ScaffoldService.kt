@@ -24,20 +24,20 @@ class ScaffoldService(
                     error = "Template not found"
                 )
             }
-            
-            // Validate project name
-            val nameRegex = Regex("^[0-9a-z-_]{1,50}$")
-            if (!nameRegex.matches(request.name)) {
+
+            // Normalize project name
+            val normalizedName = normalizeName(request.name)
+            if (normalizedName.isEmpty()) {
                 return ScaffoldResult(
                     success = false,
-                    message = "Invalid name format: must be 1-50 chars of digits, lowercase letters, '-' or '_' only",
+                    message = "Invalid project name '${request.name}'. Name must contain at least one letter or number. Special characters and spaces are allowed and will be normalized.",
                     error = "Invalid name format"
                 )
             }
             
             // Determine output directory
             val baseDir = request.outputDir?.let { Paths.get(it) } ?: Paths.get("")
-            val outputDir = baseDir.resolve(request.name)
+            val outputDir = baseDir.resolve(normalizedName)
             
             // Check if directory already exists
             if (Files.exists(outputDir) && Files.list(outputDir).use { it.findFirst().isPresent }) {
@@ -54,7 +54,7 @@ class ScaffoldService(
             // Apply template refactoring
             val variables = TemplateVariables(
                 packageName = request.packageName,
-                projectName = request.name,
+                projectName = normalizedName,
                 groupId = request.groupId,
                 artifactId = request.artifactId,
                 description = request.description,
@@ -131,4 +131,26 @@ class ScaffoldService(
     }
     
     fun listAvailableTemplates() = templateService.listTemplates()
+
+    /**
+     * Normalizes a project name to ensure it follows valid naming conventions.
+     *
+     * Rules:
+     * - Converts to lowercase
+     * - Replaces spaces with hyphens
+     * - Removes special characters (keeps only alphanumeric, hyphens, underscores)
+     * - Collapses consecutive hyphens/underscores into single separator
+     * - Trims leading/trailing separators
+     * - Truncates to 50 characters maximum
+     */
+    private fun normalizeName(name: String): String {
+        return name
+            .lowercase()                                    // Convert to lowercase
+            .replace(' ', '-')                              // Replace spaces with hyphens
+            .replace(Regex("[^a-z0-9_-]"), "")             // Remove special characters
+            .replace(Regex("[-_]{2,}"), "-")               // Collapse consecutive separators
+            .trim('-', '_')                                 // Trim leading/trailing separators
+            .take(50)                                       // Truncate to max 50 chars
+            .trimEnd('-', '_')                             // Trim again in case truncation created trailing separator
+    }
 }

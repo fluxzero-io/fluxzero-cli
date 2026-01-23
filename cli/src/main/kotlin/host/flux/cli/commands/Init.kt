@@ -36,12 +36,7 @@ class Init(
         .path(mustExist = true, canBeFile = false, canBeDir = true, mustBeWritable = true)
         .default(Paths.get(""))
 
-    val nameRegex = Regex("^[0-9a-z-_]{1,50}$")
-    val name by option("--name", help = "Name (max 50 chars, 0-9 a-z - _)").validate {
-        require(nameRegex.matches(it)) {
-            "Invalid name format: must be 1-50 chars of digits, lowercase letters, '-' or '_' only"
-        }
-    }
+    val name by option("--name", help = "Project name (will be normalized to lowercase, alphanumeric, hyphens, underscores)")
 
     val packageRegex = Regex("^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)*$")
     val packageName by option("--package", help = "Java package name (e.g., com.example.myapp)").validate {
@@ -108,16 +103,11 @@ class Init(
     }
 
     private fun promptForName(): String {
-        while (true) {
-            val input = prompt.readLine("Enter name (max 50 chars, 0-9 a-z - _): ")?.trim()
-            if (input == null) {
-                throw RuntimeException("Cannot read input in non-interactive mode. Please specify --name parameter.")
-            }
-            if (nameRegex.matches(input)) {
-                return input
-            }
-            echo("Invalid name format. Please use only digits, lowercase letters, '-' or '_', max length 50.")
+        val input = prompt.readLine("Enter project name (will be normalized): ")?.trim()
+        if (input.isNullOrBlank()) {
+            throw RuntimeException("Cannot read input in non-interactive mode. Please specify --name parameter.")
         }
+        return input
     }
 
     private fun promptForPackage(): String {

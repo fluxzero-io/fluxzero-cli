@@ -1,7 +1,5 @@
 package host.flux.cli.commands
 
-import com.github.ajalt.clikt.core.BadParameterValue
-import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import host.flux.cli.prompt.Prompt
 import host.flux.templates.services.ScaffoldService
@@ -64,7 +62,7 @@ class InitTest {
 
     @Test
     fun `prompts for name when not provided`() {
-        every { mockPrompt.readLine(match { it.contains("Enter name") }) } returns "prompted-name"
+        every { mockPrompt.readLine(match { it.contains("project name") }) } returns "prompted-name"
         every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
         every { mockPrompt.readLine(match { it.contains("Enter choice") }) } returns "1"
 
@@ -75,7 +73,7 @@ class InitTest {
 
         val result = initCommand.test(listOf("--template", "cli"))
 
-        verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter name") }) }
+        verify(exactly = 1) { mockPrompt.readLine(match { it.contains("project name") }) }
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter package") }) }
         verify(exactly = 1) { mockPrompt.readLine(match { it.contains("Enter choice") }) }
         verify { mockInitService.scaffoldProject(any()) }
@@ -101,16 +99,27 @@ class InitTest {
     }
 
     @Test
-    fun `fails with invalid name option`() {
+    fun `accepts any name format and passes to service`() {
         initCommand = Init(
             scaffoldService = mockInitService,
             prompt = mockPrompt
         )
 
-        val exception = Assertions.assertThrows(BadParameterValue::class.java) {
-            initCommand.parse(listOf("--name", "INVALID!"))
+        val result = initCommand.test(
+            listOf(
+                "--template", "webapp",
+                "--name", "MyUpperCase@Name!",
+                "--package", "com.test.myapp",
+                "--build", "maven"
+            )
+        )
+
+        verify(exactly = 1) {
+            mockInitService.scaffoldProject(
+                match { it.name == "MyUpperCase@Name!" }
+            )
         }
-        Assertions.assertTrue(exception.message!!.contains("Invalid name format"))
+        Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
     }
 
 }
