@@ -10,13 +10,8 @@ import org.gradle.kotlin.dsl.withType
 /**
  * Gradle plugin for Fluxzero projects.
  *
- * When applied to a project, this plugin:
- * 1. Creates a `fluxzero` extension for configuration
- * 2. Registers a `syncAgentFiles` task
- * 3. Hooks the task into the build lifecycle (runs before compilation)
- *
- * The plugin uses Gradle's incremental build support to avoid unnecessary downloads.
- * When the SDK version (detected from dependencies) changes, agent files are updated.
+ * Features:
+ * - **Agent Files Sync**: Automatically syncs AI assistant instruction files
  *
  * Usage in build.gradle.kts:
  * ```kotlin
@@ -25,26 +20,35 @@ import org.gradle.kotlin.dsl.withType
  * }
  *
  * fluxzero {
- *     // Optional configuration
- *     language.set("kotlin")  // auto-detected if not specified
- *     enabled.set(true)       // disable with false
+ *     agentFiles {
+ *         enabled.set(true)        // default: true
+ *         language.set("kotlin")   // auto-detected if not specified
+ *         forceUpdate.set(false)   // default: false
+ *     }
  * }
  * ```
  */
 class FluxzeroPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
-        // Create the extension
+        // Create the main extension
         val extension = project.extensions.create<FluxzeroExtension>("fluxzero")
 
-        // Set default values
-        extension.enabled.convention(true)
-        extension.forceUpdate.convention(false)
+        // Set default values for agent files feature
+        extension.agentFiles.enabled.convention(true)
+        extension.agentFiles.forceUpdate.convention(false)
+
+        // Register agent files sync feature
+        registerAgentFilesFeature(project, extension)
+    }
+
+    private fun registerAgentFilesFeature(project: Project, extension: FluxzeroExtension) {
+        val agentFiles = extension.agentFiles
 
         // Register the sync task
         val syncTask = project.tasks.register<SyncAgentFilesTask>("syncAgentFiles") {
-            // Configure task only if enabled
-            onlyIf { extension.enabled.get() }
+            // Configure task only if feature is enabled
+            onlyIf { agentFiles.enabled.get() }
 
             // Set up project directory
             projectDir.set(project.layout.projectDirectory)
@@ -54,18 +58,18 @@ class FluxzeroPlugin : Plugin<Project> {
 
             // Configure version - use extension value or auto-detect
             sdkVersion.set(project.provider {
-                extension.sdkVersion.orNull
+                agentFiles.sdkVersion.orNull
                     ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
             })
 
             // Configure language - use extension value or auto-detect
             language.set(project.provider {
-                extension.language.orNull
+                agentFiles.language.orNull
                     ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
             })
 
             // Configure force update
-            forceUpdate.set(extension.forceUpdate)
+            forceUpdate.set(agentFiles.forceUpdate)
         }
 
         // Hook into the build lifecycle - run before compilation
@@ -84,24 +88,24 @@ class FluxzeroPlugin : Plugin<Project> {
 
         // Log configuration at the end of evaluation
         project.afterEvaluate {
-            if (extension.enabled.get()) {
-                val version = extension.sdkVersion.orNull
+            if (agentFiles.enabled.get()) {
+                val version = agentFiles.sdkVersion.orNull
                     ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
-                val lang = extension.language.orNull
+                val lang = agentFiles.language.orNull
                     ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
 
                 if (version == "unknown") {
                     project.logger.info(
-                        "Fluxzero plugin: No SDK version detected. " +
-                            "Agent files will not be synced unless sdk version is manually configured."
+                        "Fluxzero agent files: No SDK version detected. " +
+                            "Agent files will not be synced unless sdkVersion is manually configured."
                     )
                 } else {
                     project.logger.info(
-                        "Fluxzero plugin configured: version=$version, language=$lang"
+                        "Fluxzero agent files configured: version=$version, language=$lang"
                     )
                 }
             } else {
-                project.logger.info("Fluxzero plugin is disabled")
+                project.logger.info("Fluxzero agent files sync is disabled")
             }
         }
     }

@@ -22,13 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Automatically syncs agent files when SDK version changes
     - Integrates with Gradle's incremental build system (UP-TO-DATE when no changes)
     - Hooks into compilation lifecycle (runs before compileJava/compileKotlin)
-    - Provides `fluxzero` extension for configuration
+    - Provides `fluxzero { agentFiles { ... } }` extension for configuration
     - Supports language override, force update, and disable options
 
   - `maven-plugin` module: Maven plugin (`io.fluxzero.tools:fluxzero-maven-plugin`) that:
-    - Provides `fluxzero:sync-agents` goal for syncing agent files
+    - Provides `fluxzero:sync-agent-files` goal for syncing agent files
     - Runs in INITIALIZE phase by default
-    - Supports same configuration options as Gradle plugin
+    - Properties prefixed with `fluxzero.agentFiles.*` (e.g., `fluxzero.agentFiles.language`)
 
 ### Architecture
 

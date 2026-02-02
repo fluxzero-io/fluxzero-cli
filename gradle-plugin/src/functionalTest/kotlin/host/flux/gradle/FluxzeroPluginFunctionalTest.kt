@@ -43,7 +43,9 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                enabled.set(false) // Disable actual sync for this test
+                agentFiles {
+                    enabled.set(false) // Disable actual sync for this test
+                }
             }
         """.trimIndent())
 
@@ -69,7 +71,9 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                enabled.set(false)
+                agentFiles {
+                    enabled.set(false)
+                }
             }
         """.trimIndent())
 
@@ -96,8 +100,10 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                // Disable to avoid network calls in test
-                enabled.set(false)
+                agentFiles {
+                    // Disable to avoid network calls in test
+                    enabled.set(false)
+                }
             }
         """.trimIndent())
 
@@ -132,9 +138,11 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                enabled.set(false)
-                language.set("java")
-                sdkVersion.set("1.0.0")
+                agentFiles {
+                    enabled.set(false)
+                    language.set("java")
+                    sdkVersion.set("1.0.0")
+                }
             }
         """.trimIndent())
 

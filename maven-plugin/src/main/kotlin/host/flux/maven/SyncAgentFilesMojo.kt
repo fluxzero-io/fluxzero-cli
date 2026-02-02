@@ -23,21 +23,32 @@ import java.io.File
  * Usage in pom.xml:
  * ```xml
  * <plugin>
- *     <groupId>io.fluxzero</groupId>
- *     <artifactId>fluxzero-agents-maven-plugin</artifactId>
+ *     <groupId>io.fluxzero.tools</groupId>
+ *     <artifactId>fluxzero-maven-plugin</artifactId>
  *     <version>1.0.0</version>
  *     <executions>
  *         <execution>
  *             <goals>
- *                 <goal>sync-agents</goal>
+ *                 <goal>sync-agent-files</goal>
  *             </goals>
  *         </execution>
  *     </executions>
+ *     <configuration>
+ *         <!-- Optional: override language detection -->
+ *         <language>kotlin</language>
+ *         <!-- Optional: override SDK version detection -->
+ *         <sdkVersion>1.0.0</sdkVersion>
+ *     </configuration>
  * </plugin>
+ * ```
+ *
+ * Properties can also be set via command line:
+ * ```
+ * mvn fluxzero:sync-agent-files -Dfluxzero.agentFiles.language=kotlin
  * ```
  */
 @Mojo(
-    name = "sync-agents",
+    name = "sync-agent-files",
     defaultPhase = LifecyclePhase.INITIALIZE,
     threadSafe = true
 )
@@ -53,31 +64,31 @@ class SyncAgentFilesMojo : AbstractMojo() {
      * The project language ("kotlin" or "java").
      * If not specified, auto-detected based on source files and build configuration.
      */
-    @Parameter(property = "fluxzero.agents.language")
+    @Parameter(property = "fluxzero.agentFiles.language")
     private var language: String? = null
 
     /**
      * Whether to force re-download of agent files even if they exist.
      */
-    @Parameter(property = "fluxzero.agents.force", defaultValue = "false")
+    @Parameter(property = "fluxzero.agentFiles.forceUpdate", defaultValue = "false")
     private var forceUpdate: Boolean = false
 
     /**
      * Override the SDK version to use for fetching agent files.
      * If not specified, detected from project dependencies.
      */
-    @Parameter(property = "fluxzero.agents.version")
+    @Parameter(property = "fluxzero.agentFiles.sdkVersion")
     private var sdkVersion: String? = null
 
     /**
      * Whether to skip execution of this mojo.
      */
-    @Parameter(property = "fluxzero.agents.skip", defaultValue = "false")
+    @Parameter(property = "fluxzero.agentFiles.skip", defaultValue = "false")
     private var skip: Boolean = false
 
     override fun execute() {
         if (skip) {
-            log.info("Skipping agent files sync (fluxzero.agents.skip=true)")
+            log.info("Skipping agent files sync (fluxzero.agentFiles.skip=true)")
             return
         }
 

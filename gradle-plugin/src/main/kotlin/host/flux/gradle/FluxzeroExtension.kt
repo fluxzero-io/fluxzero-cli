@@ -1,6 +1,8 @@
 package host.flux.gradle
 
-import org.gradle.api.provider.Property
+import org.gradle.api.Action
+import org.gradle.api.model.ObjectFactory
+import javax.inject.Inject
 
 /**
  * Extension for configuring the Fluxzero Gradle plugin.
@@ -8,34 +10,28 @@ import org.gradle.api.provider.Property
  * Example usage in build.gradle.kts:
  * ```kotlin
  * fluxzero {
- *     language.set("kotlin")  // or "java", or leave empty for auto-detection
- *     enabled.set(true)       // can be set to false to disable the plugin
- *     forceUpdate.set(false)  // set to true to force re-download
+ *     agentFiles {
+ *         enabled.set(true)
+ *         language.set("kotlin")  // or "java", or leave empty for auto-detection
+ *         sdkVersion.set("1.0.0") // optional, auto-detected from dependencies
+ *         forceUpdate.set(false)  // set to true to force re-download
+ *     }
+ *
+ *     // Future features can be added here
  * }
  * ```
  */
-abstract class FluxzeroExtension {
-    /**
-     * The language of the project ("kotlin" or "java").
-     * If not specified, the plugin will auto-detect based on source files and build configuration.
-     */
-    abstract val language: Property<String>
+abstract class FluxzeroExtension @Inject constructor(objects: ObjectFactory) {
 
     /**
-     * Whether the plugin is enabled.
-     * Defaults to true. Set to false to disable agent file syncing.
+     * Configuration for the agent files sync feature.
      */
-    abstract val enabled: Property<Boolean>
+    val agentFiles: AgentFilesExtension = objects.newInstance(AgentFilesExtension::class.java)
 
     /**
-     * Whether to force re-download of agent files even if they already exist.
-     * Defaults to false. Set to true to always fetch the latest files.
+     * Configures the agent files sync feature.
      */
-    abstract val forceUpdate: Property<Boolean>
-
-    /**
-     * Override the SDK version to use for fetching agent files.
-     * If not specified, the plugin will detect the version from project dependencies.
-     */
-    abstract val sdkVersion: Property<String>
+    fun agentFiles(action: Action<AgentFilesExtension>) {
+        action.execute(agentFiles)
+    }
 }
