@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Maven and Gradle plugins now only run `sync-agent-files` on the root project in multi-module builds by default, reducing redundant executions and confusing output. Configurable via `rootProjectOnly` parameter (`fluxzero.agentFiles.rootProjectOnly` property in Maven).
 - SDK version detection now recognizes `fluxzero-bom` BOM dependencies in Maven `dependencyManagement` section.
+- Maven plugin now bundles all dependencies (shadow JAR) to avoid classpath issues at runtime.
 
 ### Changed
 

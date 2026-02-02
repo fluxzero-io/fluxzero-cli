@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     `maven-publish`
+    id("com.gradleup.shadow") version "8.3.6"
 }
 
 group = "io.fluxzero.tools"
@@ -39,23 +40,46 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
     outputs.dir(file("target/classes/META-INF/maven"))
 }
 
-// Custom JAR task that includes the plugin descriptor
-tasks.jar {
+// Configure shadow JAR to include all dependencies
+tasks.shadowJar {
     dependsOn(generatePluginDescriptor)
 
-    // Include the generated plugin.xml (only the maven directory)
+    // Include the generated plugin.xml
     from(file("target/classes/META-INF/maven")) {
         into("META-INF/maven")
     }
 
     archiveBaseName.set("fluxzero-maven-plugin")
+    archiveClassifier.set("") // No classifier - this is the main artifact
+
+    // Relocate dependencies to avoid classpath conflicts with project dependencies
+    relocate("io.ktor", "host.flux.maven.shadow.io.ktor")
+    relocate("kotlinx.coroutines", "host.flux.maven.shadow.kotlinx.coroutines")
+    relocate("kotlinx.serialization", "host.flux.maven.shadow.kotlinx.serialization")
+    relocate("kotlinx.io", "host.flux.maven.shadow.kotlinx.io")
+    relocate("io.github.microutils", "host.flux.maven.shadow.io.github.microutils")
+
+    // Merge service files for Ktor
+    mergeServiceFiles()
+}
+
+// Disable the regular JAR task since we're using shadow
+tasks.jar {
+    enabled = false
+}
+
+// Make assemble depend on shadowJar
+tasks.assemble {
+    dependsOn(tasks.shadowJar)
 }
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             artifactId = "fluxzero-maven-plugin"
-            from(components["java"])
+
+            // Use shadow JAR as the main artifact
+            artifact(tasks.shadowJar)
 
             pom {
                 packaging = "maven-plugin"
