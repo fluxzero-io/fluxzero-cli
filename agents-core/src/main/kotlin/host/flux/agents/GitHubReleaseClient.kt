@@ -26,7 +26,7 @@ class GitHubReleaseClient(
     private val httpClient: HttpClient = createDefaultHttpClient()
 ) {
     companion object {
-        const val DEFAULT_REPO = "flux-capacitor/fluxzero-sdk"
+        const val DEFAULT_REPO = "fluxzero-io/fluxzero-sdk"
         private const val GITHUB_API_BASE = "https://api.github.com"
 
         private fun createDefaultHttpClient(): HttpClient {

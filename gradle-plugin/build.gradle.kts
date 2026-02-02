@@ -27,7 +27,7 @@ group = "io.fluxzero.tools"
 
 gradlePlugin {
     website.set("https://fluxzero.io")
-    vcsUrl.set("https://github.com/flux-capacitor/fluxzero-cli")
+    vcsUrl.set("https://github.com/fluxzero-io/fluxzero-cli")
 
     plugins {
         create("fluxzero") {
