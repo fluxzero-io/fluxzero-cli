@@ -23,16 +23,18 @@ dependencies {
     testImplementation(gradleTestKit())
 }
 
+group = "io.fluxzero.tools"
+
 gradlePlugin {
     website.set("https://fluxzero.io")
     vcsUrl.set("https://github.com/flux-capacitor/fluxzero-cli")
 
     plugins {
-        create("fluxAgents") {
-            id = "io.fluxzero.agents"
-            implementationClass = "host.flux.gradle.FluxAgentsPlugin"
-            displayName = "Fluxzero Agents Plugin"
-            description = "Automatically sync AI agent files for Fluxzero projects"
+        create("fluxzero") {
+            id = "io.fluxzero.tools.gradle"
+            implementationClass = "host.flux.gradle.FluxzeroPlugin"
+            displayName = "Fluxzero Gradle Plugin"
+            description = "Gradle plugin for Fluxzero projects - syncs AI agent files and more"
             tags.set(listOf("fluxzero", "ai", "agents", "code-generation"))
         }
     }

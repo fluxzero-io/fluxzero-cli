@@ -10,9 +10,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Functional tests for the FluxAgentsPlugin using Gradle TestKit.
+ * Functional tests for the FluxzeroPlugin using Gradle TestKit.
  */
-class FluxAgentsPluginFunctionalTest {
+class FluxzeroPluginFunctionalTest {
 
     @TempDir
     lateinit var testProjectDir: File
@@ -35,14 +35,14 @@ class FluxAgentsPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.agents")
+                id("io.fluxzero.tools.gradle")
             }
 
             repositories {
                 mavenCentral()
             }
 
-            fluxAgents {
+            fluxzero {
                 enabled.set(false) // Disable actual sync for this test
             }
         """.trimIndent())
@@ -61,14 +61,14 @@ class FluxAgentsPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.agents")
+                id("io.fluxzero.tools.gradle")
             }
 
             repositories {
                 mavenCentral()
             }
 
-            fluxAgents {
+            fluxzero {
                 enabled.set(false)
             }
         """.trimIndent())
@@ -88,14 +88,14 @@ class FluxAgentsPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.agents")
+                id("io.fluxzero.tools.gradle")
             }
 
             repositories {
                 mavenCentral()
             }
 
-            fluxAgents {
+            fluxzero {
                 // Disable to avoid network calls in test
                 enabled.set(false)
             }
@@ -124,14 +124,14 @@ class FluxAgentsPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.agents")
+                id("io.fluxzero.tools.gradle")
             }
 
             repositories {
                 mavenCentral()
             }
 
-            fluxAgents {
+            fluxzero {
                 enabled.set(false)
                 language.set("java")
                 sdkVersion.set("1.0.0")

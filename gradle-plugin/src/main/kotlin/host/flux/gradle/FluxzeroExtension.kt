@@ -3,18 +3,18 @@ package host.flux.gradle
 import org.gradle.api.provider.Property
 
 /**
- * Extension for configuring the Fluxzero Agents plugin.
+ * Extension for configuring the Fluxzero Gradle plugin.
  *
  * Example usage in build.gradle.kts:
  * ```kotlin
- * fluxAgents {
+ * fluxzero {
  *     language.set("kotlin")  // or "java", or leave empty for auto-detection
  *     enabled.set(true)       // can be set to false to disable the plugin
  *     forceUpdate.set(false)  // set to true to force re-download
  * }
  * ```
  */
-abstract class FluxAgentsExtension {
+abstract class FluxzeroExtension {
     /**
      * The language of the project ("kotlin" or "java").
      * If not specified, the plugin will auto-detect based on source files and build configuration.

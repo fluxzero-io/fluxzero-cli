@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.fluxzero</groupId>
-    <artifactId>fluxzero-agents-maven-plugin</artifactId>
+    <groupId>io.fluxzero.tools</groupId>
+    <artifactId>fluxzero-maven-plugin</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
-    <name>Fluxzero Agents Maven Plugin</name>
-    <description>Maven plugin to automatically sync AI agent files for Fluxzero projects</description>
+    <name>Fluxzero Maven Plugin</name>
+    <description>Maven plugin for Fluxzero projects - syncs AI agent files and more</description>
     <url>https://fluxzero.io</url>
 
     <properties>
@@ -165,7 +165,7 @@
                 <artifactId>maven-plugin-plugin</artifactId>
                 <version>${maven.plugin.tools.version}</version>
                 <configuration>
-                    <goalPrefix>fluxzero-agents</goalPrefix>
+                    <goalPrefix>fluxzero</goalPrefix>
                 </configuration>
                 <executions>
                     <execution>
