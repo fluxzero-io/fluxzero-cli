@@ -9,8 +9,11 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/agents-core" />
             <option value="$PROJECT_DIR$/api" />
             <option value="$PROJECT_DIR$/cli" />
+            <option value="$PROJECT_DIR$/gradle-plugin" />
+            <option value="$PROJECT_DIR$/maven-plugin" />
             <option value="$PROJECT_DIR$/templates" />
           </set>
         </option>
