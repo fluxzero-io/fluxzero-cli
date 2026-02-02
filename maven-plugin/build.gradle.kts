@@ -31,9 +31,11 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
 
     workingDir = projectDir
 
-    commandLine("mvn", "plugin:descriptor", "-q")
+    // Pass version via -Drevision (CI-friendly versions)
+    commandLine("mvn", "plugin:descriptor", "-Drevision=${project.version}", "-q")
 
     inputs.dir(file("target/classes"))
+    inputs.property("version", project.version)
     outputs.dir(file("target/classes/META-INF/maven"))
 }
 

@@ -10,7 +10,8 @@
 
     <groupId>io.fluxzero.tools</groupId>
     <artifactId>fluxzero-maven-plugin</artifactId>
-    <version>0.0.0</version>
+    <!-- Version passed via -Drevision=X from Gradle -->
+    <version>${revision}</version>
     <packaging>maven-plugin</packaging>
 
     <name>Fluxzero Maven Plugin</name>
