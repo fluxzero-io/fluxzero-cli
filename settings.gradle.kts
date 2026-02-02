@@ -7,3 +7,5 @@ rootProject.name = "fluxzero-cli"
 include("templates")
 include("cli")
 include("api")
+include("agents-core")
+include("gradle-plugin")
