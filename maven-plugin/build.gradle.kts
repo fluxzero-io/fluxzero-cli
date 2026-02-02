@@ -1,43 +1,67 @@
-// Maven plugin is built using Maven (for proper Kotlin mojo support)
-// but version is managed by Gradle for consistency
-
 plugins {
-    base
+    kotlin("jvm")
+    `maven-publish`
 }
 
 group = "io.fluxzero.tools"
 
-// Task to build the Maven plugin using Maven
-val buildMavenPlugin by tasks.registering(Exec::class) {
-    description = "Builds the Maven plugin using Maven"
+dependencies {
+    // Reuse shared core library
+    implementation(project(":agents-core"))
+
+    // Maven Plugin API (compile only - provided at runtime by Maven)
+    compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
+    compileOnly("org.apache.maven:maven-core:3.9.6")
+    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
+}
+
+// Copy compiled classes to Maven's expected location (target/classes)
+val copyClassesForMaven by tasks.registering(Sync::class) {
+    from(tasks.compileKotlin.map { it.destinationDirectory })
+    into(file("target/classes"))
+    dependsOn(tasks.compileKotlin)
+}
+
+// Generate Maven plugin descriptor using Maven's plugin:descriptor goal
+val generatePluginDescriptor by tasks.registering(Exec::class) {
+    description = "Generates Maven plugin descriptor (plugin.xml)"
     group = "build"
 
-    // Ensure agents-core is published first (Maven depends on it)
-    dependsOn(":agents-core:publishToMavenLocal")
+    dependsOn(copyClassesForMaven)
 
     workingDir = projectDir
 
-    // Set version and build
-    commandLine(
-        "bash", "-c",
-        "mvn versions:set -DnewVersion=${project.version} -DgenerateBackupPoms=false -q && mvn clean install -DskipTests"
-    )
+    commandLine("mvn", "plugin:descriptor", "-q")
 
-    inputs.files(fileTree("src"))
-    inputs.file("pom.xml")
-    inputs.property("version", project.version)
-    outputs.dir("target")
+    inputs.dir(file("target/classes"))
+    outputs.dir(file("target/classes/META-INF/maven"))
 }
 
-// Task to publish to local Maven repository
-val publishToMavenLocal by tasks.registering {
-    description = "Publishes the Maven plugin to the local Maven repository"
-    group = "publishing"
-    dependsOn(buildMavenPlugin)
+// Custom JAR task that includes the plugin descriptor
+tasks.jar {
+    dependsOn(generatePluginDescriptor)
+
+    // Include the generated plugin.xml (only the maven directory)
+    from(file("target/classes/META-INF/maven")) {
+        into("META-INF/maven")
+    }
+
+    archiveBaseName.set("fluxzero-maven-plugin")
 }
 
-tasks.named("build") {
-    dependsOn(buildMavenPlugin)
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            artifactId = "fluxzero-maven-plugin"
+            from(components["java"])
+
+            pom {
+                packaging = "maven-plugin"
+                name.set("Fluxzero Maven Plugin")
+                description.set("Maven plugin for Fluxzero projects - syncs AI agent files")
+            }
+        }
+    }
 }
 
 tasks.named("clean") {

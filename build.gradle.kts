@@ -15,20 +15,17 @@ allprojects {
 }
 
 subprojects {
+    apply(plugin = "kotlin")
+
     group = rootProject.group
     version = rootProject.version
 
-    // Apply Kotlin to all subprojects except maven-plugin (which uses Maven build)
-    if (name != "maven-plugin") {
-        apply(plugin = "kotlin")
+    tasks.withType<Test> {
+        useJUnitPlatform()
+    }
 
-        tasks.withType<Test> {
-            useJUnitPlatform()
-        }
-
-        dependencies {
-            "testImplementation"(kotlin("test"))
-            "testImplementation"("io.mockk:mockk:1.14.2")
-        }
+    dependencies {
+        "testImplementation"(kotlin("test"))
+        "testImplementation"("io.mockk:mockk:1.14.2")
     }
 }
