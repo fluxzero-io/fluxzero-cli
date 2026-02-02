@@ -16,7 +16,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "kotlin")
-    
+
     group = rootProject.group
     version = rootProject.version
 

@@ -1,8 +1,8 @@
 package host.flux.maven
 
-import host.flux.maven.core.AgentFilesService
-import host.flux.maven.core.Language
-import host.flux.maven.core.SyncResult
+import host.flux.agents.DefaultAgentFilesService
+import host.flux.agents.Language
+import host.flux.agents.SyncResult
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugin.MojoFailureException
@@ -101,7 +101,7 @@ class SyncAgentFilesMojo : AbstractMojo() {
 
         log.info("Syncing Fluxzero agent files...")
 
-        val service = AgentFilesService()
+        val service = DefaultAgentFilesService()
         val result = service.syncAgentFiles(
             projectDir = projectDir.toPath(),
             forceUpdate = forceUpdate,

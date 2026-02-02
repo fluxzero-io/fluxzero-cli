@@ -1,6 +1,17 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    `maven-publish`
+}
+
+group = "io.fluxzero.tools"
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
 }
 
 kotlin {
