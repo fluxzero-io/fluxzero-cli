@@ -54,9 +54,11 @@ class DefaultAgentFilesService(
             // Detect or use provided version
             val sdkVersion = version ?: SdkVersionDetector.detect(projectDir)
             if (sdkVersion == null) {
-                logger.info { "No SDK version found, skipping sync" }
-                return@runBlocking SyncResult.Skipped(
-                    "No Fluxzero SDK dependency found in project"
+                logger.error { "No SDK version found - cannot sync agent files" }
+                return@runBlocking SyncResult.Failed(
+                    error = "No Fluxzero SDK dependency found in project. " +
+                        "Add fluxzero-sdk or fluxzero-bom dependency, or set overrideSdkVersion.",
+                    cause = null
                 )
             }
 

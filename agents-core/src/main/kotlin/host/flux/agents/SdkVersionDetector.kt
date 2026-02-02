@@ -17,6 +17,7 @@ private val logger = KotlinLogging.logger {}
 object SdkVersionDetector {
 
     private val SDK_ARTIFACT_ID = "fluxzero-sdk"
+    private val BOM_ARTIFACT_ID = "fluxzero-bom"
     private val SDK_GROUP_ID = "io.fluxzero"
 
     // Patterns for different build systems
@@ -26,6 +27,10 @@ object SdkVersionDetector {
     )
     private val POM_VERSION_PATTERN = Regex(
         """<groupId>$SDK_GROUP_ID</groupId>\s*<artifactId>$SDK_ARTIFACT_ID</artifactId>\s*<version>([^<]+)</version>""",
+        RegexOption.DOT_MATCHES_ALL
+    )
+    private val POM_BOM_VERSION_PATTERN = Regex(
+        """<groupId>$SDK_GROUP_ID</groupId>\s*<artifactId>$BOM_ARTIFACT_ID</artifactId>\s*<version>([^<]+)</version>""",
         RegexOption.DOT_MATCHES_ALL
     )
     private val POM_PROPERTY_VERSION_PATTERN = Regex(
@@ -109,7 +114,12 @@ object SdkVersionDetector {
             return it.groupValues[1]
         }
 
-        // Try direct version in dependency
-        return POM_VERSION_PATTERN.find(content)?.groupValues?.get(1)
+        // Try direct version in SDK dependency
+        POM_VERSION_PATTERN.find(content)?.let {
+            return it.groupValues[1]
+        }
+
+        // Try BOM dependency (commonly used in dependencyManagement)
+        return POM_BOM_VERSION_PATTERN.find(content)?.groupValues?.get(1)
     }
 }

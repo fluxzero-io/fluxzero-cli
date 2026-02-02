@@ -193,4 +193,67 @@ class SdkVersionDetectorTest {
 
         assertEquals("1.5.0", result)
     }
+
+    @Test
+    fun `detects version from pom xml with BOM dependency`() {
+        Files.writeString(
+            tempDir.resolve("pom.xml"),
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.fluxzero</groupId>
+                            <artifactId>fluxzero-bom</artifactId>
+                            <version>1.73.0</version>
+                            <scope>import</scope>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent()
+        )
+
+        val result = SdkVersionDetector.detect(tempDir)
+
+        assertEquals("1.73.0", result)
+    }
+
+    @Test
+    fun `property version takes precedence over BOM dependency`() {
+        Files.writeString(
+            tempDir.resolve("pom.xml"),
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <properties>
+                    <fluxzero.version>2.0.0</fluxzero.version>
+                </properties>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.fluxzero</groupId>
+                            <artifactId>fluxzero-bom</artifactId>
+                            <version>1.73.0</version>
+                            <scope>import</scope>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent()
+        )
+
+        val result = SdkVersionDetector.detect(tempDir)
+
+        // Property should take precedence
+        assertEquals("2.0.0", result)
+    }
 }
