@@ -1,33 +1,47 @@
+// Maven plugin is built using Maven (for proper Kotlin mojo support)
+// but version is managed by Gradle for consistency
+
 plugins {
-    kotlin("jvm")
-    id("org.gradlex.maven-plugin-development") version "1.0.3"
-    `maven-publish`
+    base
 }
 
 group = "io.fluxzero.tools"
 
-dependencies {
-    // Reuse shared core library
-    implementation(project(":agents-core"))
+// Task to build the Maven plugin using Maven
+val buildMavenPlugin by tasks.registering(Exec::class) {
+    description = "Builds the Maven plugin using Maven"
+    group = "build"
 
-    // Maven Plugin API
-    compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
-    compileOnly("org.apache.maven:maven-core:3.9.6")
-    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.13.1")
+    // Ensure agents-core is published first (Maven depends on it)
+    dependsOn(":agents-core:publishToMavenLocal")
 
-    // Testing
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    workingDir = projectDir
+
+    // Set version and build
+    commandLine(
+        "bash", "-c",
+        "mvn versions:set -DnewVersion=${project.version} -DgenerateBackupPoms=false -q && mvn clean install -DskipTests"
+    )
+
+    inputs.files(fileTree("src"))
+    inputs.file("pom.xml")
+    inputs.property("version", project.version)
+    outputs.dir("target")
 }
 
-mavenPlugin {
-    goalPrefix.set("fluxzero")
+// Task to publish to local Maven repository
+val publishToMavenLocal by tasks.registering {
+    description = "Publishes the Maven plugin to the local Maven repository"
+    group = "publishing"
+    dependsOn(buildMavenPlugin)
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            artifactId = "fluxzero-maven-plugin"
-            from(components["java"])
-        }
+tasks.named("build") {
+    dependsOn(buildMavenPlugin)
+}
+
+tasks.named("clean") {
+    doLast {
+        delete("target")
     }
 }
