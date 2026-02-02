@@ -44,6 +44,7 @@ class FluxzeroPlugin : Plugin<Project> {
         // Set default values for agent files feature
         extension.agentFiles.enabled.convention(true)
         extension.agentFiles.forceUpdate.convention(false)
+        extension.agentFiles.rootProjectOnly.convention(true)
 
         // Register agent files sync feature
         registerAgentFilesFeature(project, extension)
@@ -54,8 +55,11 @@ class FluxzeroPlugin : Plugin<Project> {
 
         // Register the sync task
         val syncTask = project.tasks.register<SyncAgentFilesTask>("syncAgentFiles") {
-            // Configure task only if feature is enabled
-            onlyIf { agentFiles.enabled.get() }
+            // Configure task only if feature is enabled and (not rootProjectOnly or this is root project)
+            onlyIf {
+                agentFiles.enabled.get() &&
+                    (!agentFiles.rootProjectOnly.get() || project == project.rootProject)
+            }
 
             // Set up project directory
             projectDir.set(project.layout.projectDirectory)

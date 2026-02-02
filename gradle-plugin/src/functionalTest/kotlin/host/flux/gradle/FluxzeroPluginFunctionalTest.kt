@@ -155,4 +155,103 @@ class FluxzeroPluginFunctionalTest {
         // Just verify build succeeds with configuration
         assertTrue(result.output.contains("syncAgentFiles"))
     }
+
+    @Test
+    fun `sync task is skipped on subprojects when rootProjectOnly is true`() {
+        // Create multi-module project structure
+        settingsFile.writeText("""
+            rootProject.name = "test-project"
+            include("submodule")
+        """.trimIndent())
+
+        // Root project build file - no plugins
+        buildFile.writeText("""
+            plugins {
+                kotlin("jvm") version "2.1.20" apply false
+            }
+        """.trimIndent())
+
+        // Create submodule with plugin applied
+        val submoduleDir = File(testProjectDir, "submodule")
+        submoduleDir.mkdirs()
+        File(submoduleDir, "build.gradle.kts").writeText("""
+            plugins {
+                kotlin("jvm")
+                id("io.fluxzero.tools.gradle")
+            }
+
+            repositories {
+                mavenCentral()
+            }
+
+            fluxzero {
+                agentFiles {
+                    enabled.set(true)
+                    rootProjectOnly.set(true) // default, but explicit for test clarity
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments(":submodule:syncAgentFiles", "--info")
+            .withPluginClasspath()
+            .build()
+
+        // Submodule task should be skipped because rootProjectOnly is true
+        assertEquals(TaskOutcome.SKIPPED, result.task(":submodule:syncAgentFiles")?.outcome)
+    }
+
+    @Test
+    fun `sync task runs on subprojects when rootProjectOnly is false`() {
+        // Create multi-module project structure
+        settingsFile.writeText("""
+            rootProject.name = "test-project"
+            include("submodule")
+        """.trimIndent())
+
+        // Root project build file - no plugins
+        buildFile.writeText("""
+            plugins {
+                kotlin("jvm") version "2.1.20" apply false
+            }
+        """.trimIndent())
+
+        // Create submodule with plugin applied
+        val submoduleDir = File(testProjectDir, "submodule")
+        submoduleDir.mkdirs()
+        File(submoduleDir, "build.gradle.kts").writeText("""
+            plugins {
+                kotlin("jvm")
+                id("io.fluxzero.tools.gradle")
+            }
+
+            repositories {
+                mavenCentral()
+            }
+
+            fluxzero {
+                agentFiles {
+                    enabled.set(true)
+                    rootProjectOnly.set(false) // allow running on subprojects
+                }
+            }
+        """.trimIndent())
+
+        // Use buildAndFail() because the task will try to run but fail due to no SDK version
+        // The important thing is that it runs (FAILED) rather than being skipped
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments(":submodule:syncAgentFiles", "--info")
+            .withPluginClasspath()
+            .buildAndFail()
+
+        // Submodule task should NOT be skipped because rootProjectOnly is false
+        // It will fail because there's no SDK version, but the key is it wasn't SKIPPED
+        val outcome = result.task(":submodule:syncAgentFiles")?.outcome
+        assertTrue(
+            outcome == TaskOutcome.FAILED,
+            "Expected task to run (FAILED, not SKIPPED) when rootProjectOnly=false, but was $outcome"
+        )
+    }
 }

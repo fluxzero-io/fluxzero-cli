@@ -3,6 +3,7 @@ package host.flux.maven
 import host.flux.agents.DefaultAgentFilesService
 import host.flux.agents.Language
 import host.flux.agents.SyncResult
+import org.apache.maven.execution.MavenSession
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugin.MojoFailureException
@@ -63,6 +64,20 @@ class SyncAgentFilesMojo : AbstractMojo() {
     private lateinit var projectDir: File
 
     /**
+     * The Maven session, used to determine the execution root directory.
+     */
+    @Parameter(defaultValue = "\${session}", readonly = true)
+    private lateinit var session: MavenSession
+
+    /**
+     * Whether to only run on the root project in a multi-module build.
+     * When true (default), submodules will skip agent files sync.
+     * Set to false to run on every module.
+     */
+    @Parameter(property = "fluxzero.agentFiles.rootProjectOnly", defaultValue = "true")
+    private var rootProjectOnly: Boolean = true
+
+    /**
      * Override the auto-detected language ("kotlin" or "java").
      * Only set this if auto-detection fails or returns the wrong language.
      */
@@ -91,6 +106,11 @@ class SyncAgentFilesMojo : AbstractMojo() {
     override fun execute() {
         if (skip) {
             log.info("Skipping agent files sync (fluxzero.agentFiles.skip=true)")
+            return
+        }
+
+        if (rootProjectOnly && !isRootProject()) {
+            log.debug("Skipping agent files sync for non-root module: ${projectDir.name}")
             return
         }
 
@@ -124,5 +144,13 @@ class SyncAgentFilesMojo : AbstractMojo() {
                 throw MojoFailureException("Failed to sync agent files: ${result.error}", result.cause)
             }
         }
+    }
+
+    /**
+     * Checks if the current project is the root project (execution root) in a multi-module build.
+     */
+    private fun isRootProject(): Boolean {
+        val executionRootDir = File(session.executionRootDirectory)
+        return projectDir.canonicalPath == executionRootDir.canonicalPath
     }
 }

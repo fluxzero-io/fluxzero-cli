@@ -35,4 +35,11 @@ abstract class AgentFilesExtension {
      * Defaults to false.
      */
     abstract val forceUpdate: Property<Boolean>
+
+    /**
+     * Whether to only run on the root project in a multi-module build.
+     * When true (default), subprojects will skip agent files sync.
+     * Set to false to run on every project.
+     */
+    abstract val rootProjectOnly: Property<Boolean>
 }

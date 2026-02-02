@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Maven and Gradle plugins now only run `sync-agent-files` on the root project in multi-module builds by default, reducing redundant executions and confusing output. Configurable via `rootProjectOnly` parameter (`fluxzero.agentFiles.rootProjectOnly` property in Maven).
+
 ### Added
 
 - **Agent Files Auto-Update System**: New modules for automatically syncing AI assistant files (AGENTS.md, CLAUDE.md, .aiassistant/, .junie/) in Fluxzero projects.
