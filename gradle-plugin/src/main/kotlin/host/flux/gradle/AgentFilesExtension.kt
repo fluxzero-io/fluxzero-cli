@@ -7,6 +7,9 @@ import org.gradle.api.provider.Property
  *
  * This feature automatically syncs AI assistant instruction files
  * (AGENTS.md, CLAUDE.md, .aiassistant/, .junie/) from GitHub releases.
+ *
+ * By default, the SDK version and language are auto-detected from your project.
+ * Use the override properties only when auto-detection doesn't work correctly.
  */
 abstract class AgentFilesExtension {
     /**
@@ -16,16 +19,16 @@ abstract class AgentFilesExtension {
     abstract val enabled: Property<Boolean>
 
     /**
-     * The language of the project ("kotlin" or "java").
-     * If not specified, auto-detected based on source files and build configuration.
+     * Override the auto-detected language ("kotlin" or "java").
+     * Only set this if auto-detection fails or returns the wrong language.
      */
-    abstract val language: Property<String>
+    abstract val overrideLanguage: Property<String>
 
     /**
-     * Override the SDK version to use for fetching agent files.
-     * If not specified, detected from project dependencies.
+     * Override the auto-detected SDK version.
+     * Only set this if auto-detection fails or you need a specific version.
      */
-    abstract val sdkVersion: Property<String>
+    abstract val overrideSdkVersion: Property<String>
 
     /**
      * Whether to force re-download of agent files even if they already exist.

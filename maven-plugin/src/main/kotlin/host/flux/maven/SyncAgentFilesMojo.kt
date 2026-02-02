@@ -14,13 +14,13 @@ import java.io.File
 /**
  * Maven Mojo that synchronizes AI agent files for Fluxzero projects.
  *
- * This mojo:
+ * This mojo automatically:
  * - Detects the SDK version from project dependencies
  * - Detects the project language (Kotlin or Java)
  * - Downloads the appropriate agent files from GitHub releases
  * - Extracts them to the project directory
  *
- * Usage in pom.xml:
+ * Usage in pom.xml (minimal - everything auto-detected):
  * ```xml
  * <plugin>
  *     <groupId>io.fluxzero.tools</groupId>
@@ -33,18 +33,20 @@ import java.io.File
  *             </goals>
  *         </execution>
  *     </executions>
- *     <configuration>
- *         <!-- Optional: override language detection -->
- *         <language>kotlin</language>
- *         <!-- Optional: override SDK version detection -->
- *         <sdkVersion>1.0.0</sdkVersion>
- *     </configuration>
  * </plugin>
+ * ```
+ *
+ * With overrides (only if auto-detection fails):
+ * ```xml
+ * <configuration>
+ *     <overrideLanguage>kotlin</overrideLanguage>
+ *     <overrideSdkVersion>1.0.0</overrideSdkVersion>
+ * </configuration>
  * ```
  *
  * Properties can also be set via command line:
  * ```
- * mvn fluxzero:sync-agent-files -Dfluxzero.agentFiles.language=kotlin
+ * mvn fluxzero:sync-agent-files -Dfluxzero.agentFiles.overrideLanguage=kotlin
  * ```
  */
 @Mojo(
@@ -61,11 +63,11 @@ class SyncAgentFilesMojo : AbstractMojo() {
     private lateinit var projectDir: File
 
     /**
-     * The project language ("kotlin" or "java").
-     * If not specified, auto-detected based on source files and build configuration.
+     * Override the auto-detected language ("kotlin" or "java").
+     * Only set this if auto-detection fails or returns the wrong language.
      */
-    @Parameter(property = "fluxzero.agentFiles.language")
-    private var language: String? = null
+    @Parameter(property = "fluxzero.agentFiles.overrideLanguage")
+    private var overrideLanguage: String? = null
 
     /**
      * Whether to force re-download of agent files even if they exist.
@@ -74,11 +76,11 @@ class SyncAgentFilesMojo : AbstractMojo() {
     private var forceUpdate: Boolean = false
 
     /**
-     * Override the SDK version to use for fetching agent files.
-     * If not specified, detected from project dependencies.
+     * Override the auto-detected SDK version.
+     * Only set this if auto-detection fails or you need a specific version.
      */
-    @Parameter(property = "fluxzero.agentFiles.sdkVersion")
-    private var sdkVersion: String? = null
+    @Parameter(property = "fluxzero.agentFiles.overrideSdkVersion")
+    private var overrideSdkVersion: String? = null
 
     /**
      * Whether to skip execution of this mojo.
@@ -92,7 +94,7 @@ class SyncAgentFilesMojo : AbstractMojo() {
             return
         }
 
-        val lang = language?.let {
+        val lang = overrideLanguage?.let {
             Language.fromString(it)
                 ?: throw MojoExecutionException("Invalid language: $it. Must be 'kotlin' or 'java'.")
         }
@@ -104,7 +106,7 @@ class SyncAgentFilesMojo : AbstractMojo() {
             projectDir = projectDir.toPath(),
             forceUpdate = forceUpdate,
             language = lang,
-            version = sdkVersion
+            version = overrideSdkVersion
         )
 
         when (result) {

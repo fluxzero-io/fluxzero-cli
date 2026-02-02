@@ -19,11 +19,18 @@ import org.gradle.kotlin.dsl.withType
  *     id("io.fluxzero.tools.gradle") version "1.0.0"
  * }
  *
+ * // Minimal config - everything is auto-detected:
  * fluxzero {
  *     agentFiles {
- *         enabled.set(true)        // default: true
- *         language.set("kotlin")   // auto-detected if not specified
- *         forceUpdate.set(false)   // default: false
+ *         enabled.set(true)  // default
+ *     }
+ * }
+ *
+ * // Or with overrides if auto-detection fails:
+ * fluxzero {
+ *     agentFiles {
+ *         overrideLanguage.set("kotlin")
+ *         overrideSdkVersion.set("1.0.0")
  *     }
  * }
  * ```
@@ -56,15 +63,15 @@ class FluxzeroPlugin : Plugin<Project> {
             // Set up output directory for tracking changes
             agentFilesDir.set(project.layout.projectDirectory.dir(".aiassistant"))
 
-            // Configure version - use extension value or auto-detect
+            // Configure version - use override value or auto-detect
             sdkVersion.set(project.provider {
-                agentFiles.sdkVersion.orNull
+                agentFiles.overrideSdkVersion.orNull
                     ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
             })
 
-            // Configure language - use extension value or auto-detect
+            // Configure language - use override value or auto-detect
             language.set(project.provider {
-                agentFiles.language.orNull
+                agentFiles.overrideLanguage.orNull
                     ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
             })
 
@@ -89,15 +96,15 @@ class FluxzeroPlugin : Plugin<Project> {
         // Log configuration at the end of evaluation
         project.afterEvaluate {
             if (agentFiles.enabled.get()) {
-                val version = agentFiles.sdkVersion.orNull
+                val version = agentFiles.overrideSdkVersion.orNull
                     ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
-                val lang = agentFiles.language.orNull
+                val lang = agentFiles.overrideLanguage.orNull
                     ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
 
                 if (version == "unknown") {
                     project.logger.info(
                         "Fluxzero agent files: No SDK version detected. " +
-                            "Agent files will not be synced unless sdkVersion is manually configured."
+                            "Agent files will not be synced unless overrideSdkVersion is set."
                     )
                 } else {
                     project.logger.info(

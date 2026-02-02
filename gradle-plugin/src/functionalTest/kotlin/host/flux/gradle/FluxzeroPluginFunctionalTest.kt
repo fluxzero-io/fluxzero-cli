@@ -126,7 +126,7 @@ class FluxzeroPluginFunctionalTest {
     }
 
     @Test
-    fun `extension can be configured`() {
+    fun `extension can be configured with overrides`() {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
@@ -140,8 +140,8 @@ class FluxzeroPluginFunctionalTest {
             fluxzero {
                 agentFiles {
                     enabled.set(false)
-                    language.set("java")
-                    sdkVersion.set("1.0.0")
+                    overrideLanguage.set("java")
+                    overrideSdkVersion.set("1.0.0")
                 }
             }
         """.trimIndent())
