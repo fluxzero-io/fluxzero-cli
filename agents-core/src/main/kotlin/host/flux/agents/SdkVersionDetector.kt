@@ -48,48 +48,66 @@ object SdkVersionDetector {
      */
     fun detect(projectDir: Path): String? {
         logger.debug { "Detecting SDK version for project at: $projectDir" }
+        val checkedFiles = mutableListOf<String>()
 
         // Try version catalog first (most explicit)
         val versionCatalog = projectDir.resolve("gradle/libs.versions.toml")
         if (Files.exists(versionCatalog)) {
+            checkedFiles.add("gradle/libs.versions.toml")
             val version = extractFromVersionCatalog(versionCatalog)
             if (version != null) {
                 logger.info { "Found SDK version $version in version catalog" }
                 return version
             }
+            logger.debug { "No fluxzero version found in gradle/libs.versions.toml" }
         }
 
         // Try Gradle Kotlin DSL
         val buildGradleKts = projectDir.resolve("build.gradle.kts")
         if (Files.exists(buildGradleKts)) {
+            checkedFiles.add("build.gradle.kts")
             val version = extractFromGradleFile(buildGradleKts)
             if (version != null) {
                 logger.info { "Found SDK version $version in build.gradle.kts" }
                 return version
             }
+            logger.debug { "No io.fluxzero:fluxzero-sdk dependency found in build.gradle.kts" }
         }
 
         // Try Gradle Groovy DSL
         val buildGradle = projectDir.resolve("build.gradle")
         if (Files.exists(buildGradle)) {
+            checkedFiles.add("build.gradle")
             val version = extractFromGradleFile(buildGradle)
             if (version != null) {
                 logger.info { "Found SDK version $version in build.gradle" }
                 return version
             }
+            logger.debug { "No io.fluxzero:fluxzero-sdk dependency found in build.gradle" }
         }
 
         // Try Maven
         val pomXml = projectDir.resolve("pom.xml")
         if (Files.exists(pomXml)) {
+            checkedFiles.add("pom.xml")
             val version = extractFromPom(pomXml)
             if (version != null) {
                 logger.info { "Found SDK version $version in pom.xml" }
                 return version
             }
+            logger.debug { "No io.fluxzero:fluxzero-sdk or fluxzero-bom dependency found in pom.xml" }
         }
 
-        logger.warn { "Could not detect SDK version" }
+        logger.warn {
+            buildString {
+                append("Could not detect SDK version. ")
+                if (checkedFiles.isNotEmpty()) {
+                    append("Checked files: ${checkedFiles.joinToString(", ")}")
+                } else {
+                    append("No build files (build.gradle.kts, build.gradle, pom.xml) found in project directory.")
+                }
+            }
+        }
         return null
     }
 

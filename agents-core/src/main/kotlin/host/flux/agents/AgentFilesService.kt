@@ -63,8 +63,34 @@ class DefaultAgentFilesService(
             if (sdkVersion == null) {
                 logger.error { "No SDK version found - cannot sync agent files" }
                 return SyncResult.Failed(
-                    error = "No Fluxzero SDK dependency found in project. " +
-                        "Add fluxzero-sdk or fluxzero-bom dependency, or set overrideSdkVersion.",
+                    error = buildString {
+                        appendLine("No Fluxzero SDK dependency found in project.")
+                        appendLine()
+                        appendLine("To fix this, add the Fluxzero SDK dependency to your project:")
+                        appendLine()
+                        appendLine("For Gradle (build.gradle.kts):")
+                        appendLine("  dependencies {")
+                        appendLine("      implementation(\"io.fluxzero:fluxzero-sdk:1.75.1\")")
+                        appendLine("  }")
+                        appendLine()
+                        appendLine("For Gradle with version catalog (gradle/libs.versions.toml):")
+                        appendLine("  [versions]")
+                        appendLine("  fluxzero = \"1.75.1\"")
+                        appendLine()
+                        appendLine("  [libraries]")
+                        appendLine("  fluxzero-sdk = { module = \"io.fluxzero:fluxzero-sdk\", version.ref = \"fluxzero\" }")
+                        appendLine()
+                        appendLine("For Maven (pom.xml):")
+                        appendLine("  <dependency>")
+                        appendLine("      <groupId>io.fluxzero</groupId>")
+                        appendLine("      <artifactId>fluxzero-sdk</artifactId>")
+                        appendLine("      <version>1.75.1</version>")
+                        appendLine("  </dependency>")
+                        appendLine()
+                        appendLine("Alternatively, you can bypass auto-detection by setting overrideSdkVersion:")
+                        appendLine("  • Gradle: fluxzero { agentFiles { overrideSdkVersion.set(\"1.75.1\") } }")
+                        appendLine("  • Maven: <overrideSdkVersion>1.75.1</overrideSdkVersion>")
+                    },
                     cause = null
                 )
             }
