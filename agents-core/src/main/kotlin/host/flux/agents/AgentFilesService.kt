@@ -42,6 +42,14 @@ class DefaultAgentFilesService(
     private val gitHubClient: GitHubReleaseClient = GitHubReleaseClient()
 ) : AgentFilesService {
 
+    companion object {
+        /**
+         * Minimum SDK version that includes agent files in releases.
+         * Versions before this do not have agent files available.
+         */
+        val MIN_SUPPORTED_VERSION = SemanticVersion(1, 75, 1)
+    }
+
     override fun syncAgentFiles(
         projectDir: Path,
         forceUpdate: Boolean,
@@ -59,6 +67,16 @@ class DefaultAgentFilesService(
                     error = "No Fluxzero SDK dependency found in project. " +
                         "Add fluxzero-sdk or fluxzero-bom dependency, or set overrideSdkVersion.",
                     cause = null
+                )
+            }
+
+            // Check minimum version requirement
+            val parsedVersion = SemanticVersion.parse(sdkVersion)
+            if (parsedVersion != null && parsedVersion < MIN_SUPPORTED_VERSION) {
+                logger.info { "SDK version $sdkVersion is below minimum supported version $MIN_SUPPORTED_VERSION" }
+                return@runBlocking SyncResult.Skipped(
+                    "Agent files are only available for SDK version $MIN_SUPPORTED_VERSION and later. " +
+                        "Current version: $sdkVersion"
                 )
             }
 
@@ -106,5 +124,49 @@ class DefaultAgentFilesService(
             latestVersion = latestRelease.tagName,
             updateAvailable = currentVersion != null && currentVersion != latestRelease.tagName
         )
+    }
+}
+
+/**
+ * Represents a semantic version (major.minor.patch).
+ */
+data class SemanticVersion(
+    val major: Int,
+    val minor: Int,
+    val patch: Int
+) : Comparable<SemanticVersion> {
+
+    override fun compareTo(other: SemanticVersion): Int {
+        val majorCmp = major.compareTo(other.major)
+        if (majorCmp != 0) return majorCmp
+
+        val minorCmp = minor.compareTo(other.minor)
+        if (minorCmp != 0) return minorCmp
+
+        return patch.compareTo(other.patch)
+    }
+
+    override fun toString(): String = "$major.$minor.$patch"
+
+    companion object {
+        private val VERSION_PATTERN = Regex("""^v?(\d+)\.(\d+)\.(\d+)""")
+
+        /**
+         * Parses a version string into a SemanticVersion.
+         * Accepts formats like "1.75.1", "v1.75.1", "1.75.1-SNAPSHOT".
+         * Returns null if the version string cannot be parsed.
+         */
+        fun parse(version: String): SemanticVersion? {
+            val match = VERSION_PATTERN.find(version) ?: return null
+            return try {
+                SemanticVersion(
+                    major = match.groupValues[1].toInt(),
+                    minor = match.groupValues[2].toInt(),
+                    patch = match.groupValues[3].toInt()
+                )
+            } catch (e: NumberFormatException) {
+                null
+            }
+        }
     }
 }
