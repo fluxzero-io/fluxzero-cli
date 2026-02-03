@@ -1,6 +1,5 @@
 package host.flux.agents
 
-import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.nio.file.Path
 
@@ -55,15 +54,15 @@ class DefaultAgentFilesService(
         forceUpdate: Boolean,
         language: Language?,
         version: String?
-    ): SyncResult = runBlocking {
-        try {
+    ): SyncResult {
+        return try {
             logger.info { "Starting agent files sync for $projectDir" }
 
             // Detect or use provided version
             val sdkVersion = version ?: SdkVersionDetector.detect(projectDir)
             if (sdkVersion == null) {
                 logger.error { "No SDK version found - cannot sync agent files" }
-                return@runBlocking SyncResult.Failed(
+                return SyncResult.Failed(
                     error = "No Fluxzero SDK dependency found in project. " +
                         "Add fluxzero-sdk or fluxzero-bom dependency, or set overrideSdkVersion.",
                     cause = null
@@ -74,7 +73,7 @@ class DefaultAgentFilesService(
             val parsedVersion = SemanticVersion.parse(sdkVersion)
             if (parsedVersion != null && parsedVersion < MIN_SUPPORTED_VERSION) {
                 logger.info { "SDK version $sdkVersion is below minimum supported version $MIN_SUPPORTED_VERSION" }
-                return@runBlocking SyncResult.Skipped(
+                return SyncResult.Skipped(
                     "Agent files are only available for SDK version $MIN_SUPPORTED_VERSION and later. " +
                         "Current version: $sdkVersion"
                 )
@@ -115,11 +114,11 @@ class DefaultAgentFilesService(
         }
     }
 
-    override fun checkForUpdates(projectDir: Path): UpdateCheckResult = runBlocking {
+    override fun checkForUpdates(projectDir: Path): UpdateCheckResult {
         val currentVersion = SdkVersionDetector.detect(projectDir)
         val latestRelease = gitHubClient.getLatestRelease()
 
-        UpdateCheckResult(
+        return UpdateCheckResult(
             currentVersion = currentVersion,
             latestVersion = latestRelease.tagName,
             updateAvailable = currentVersion != null && currentVersion != latestRelease.tagName

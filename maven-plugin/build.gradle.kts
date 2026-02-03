@@ -53,14 +53,8 @@ tasks.shadowJar {
     archiveClassifier.set("") // No classifier - this is the main artifact
 
     // Relocate dependencies to avoid classpath conflicts with project dependencies
-    relocate("io.ktor", "host.flux.maven.shadow.io.ktor")
-    relocate("kotlinx.coroutines", "host.flux.maven.shadow.kotlinx.coroutines")
     relocate("kotlinx.serialization", "host.flux.maven.shadow.kotlinx.serialization")
-    relocate("kotlinx.io", "host.flux.maven.shadow.kotlinx.io")
     relocate("io.github.microutils", "host.flux.maven.shadow.io.github.microutils")
-
-    // Merge service files for Ktor
-    mergeServiceFiles()
 }
 
 // Disable the regular JAR task since we're using shadow
