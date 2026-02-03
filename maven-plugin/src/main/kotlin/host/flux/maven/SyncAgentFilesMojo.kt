@@ -45,8 +45,16 @@ import java.io.File
  * </configuration>
  * ```
  *
+ * To disable the plugin:
+ * ```xml
+ * <configuration>
+ *     <enabled>false</enabled>
+ * </configuration>
+ * ```
+ *
  * Properties can also be set via command line:
  * ```
+ * mvn fluxzero:sync-agent-files -Dfluxzero.agentFiles.enabled=false
  * mvn fluxzero:sync-agent-files -Dfluxzero.agentFiles.overrideLanguage=kotlin
  * ```
  */
@@ -98,14 +106,22 @@ class SyncAgentFilesMojo : AbstractMojo() {
     private var overrideSdkVersion: String? = null
 
     /**
+     * Whether to enable execution of this mojo.
+     * When false, the mojo will not execute. This is the recommended way to disable the plugin.
+     */
+    @Parameter(property = "fluxzero.agentFiles.enabled", defaultValue = "true")
+    private var enabled: Boolean = true
+
+    /**
      * Whether to skip execution of this mojo.
+     * @deprecated Use 'enabled' instead for consistency with Gradle plugin. Kept for backward compatibility.
      */
     @Parameter(property = "fluxzero.agentFiles.skip", defaultValue = "false")
     private var skip: Boolean = false
 
     override fun execute() {
-        if (skip) {
-            log.info("Skipping agent files sync (fluxzero.agentFiles.skip=true)")
+        if (!enabled || skip) {
+            log.info("Skipping agent files sync (enabled=$enabled, skip=$skip)")
             return
         }
 
