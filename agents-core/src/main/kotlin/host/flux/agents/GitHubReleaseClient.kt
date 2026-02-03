@@ -83,7 +83,7 @@ class GitHubReleaseClient(
      * Gets the download URL for agent files for the given language and version.
      */
     suspend fun getAgentFilesDownloadUrl(language: Language, version: String): String {
-        val assetName = "agent-files-${language.assetSuffix}.zip"
+        val assetName = "agents-${language.assetSuffix}.zip"
         logger.debug { "Looking for asset $assetName in version $version" }
 
         val release = getReleaseByTag(version)
