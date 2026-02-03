@@ -16,6 +16,16 @@ private val logger = KotlinLogging.logger {}
 object AgentFilesExtractor {
 
     /**
+     * Target directory for agent files within the project.
+     */
+    const val AGENT_FILES_DIR = ".fluxzero"
+
+    /**
+     * Prefixes to strip from ZIP entries (language-specific folders).
+     */
+    private val LANGUAGE_PREFIXES = listOf("java/", "kotlin/")
+
+    /**
      * Files/directories that are expected in agent files archives.
      */
     val EXPECTED_FILES = setOf(
@@ -38,22 +48,36 @@ object AgentFilesExtractor {
 
     /**
      * Extracts agent files from a ZIP input stream to the project directory.
+     * Files are extracted to the .fluxzero/ subdirectory, with language prefixes stripped.
      *
      * @param zipStream The ZIP input stream
      * @param projectDir The target project directory
-     * @return List of files that were extracted
+     * @return List of files that were extracted (relative to .fluxzero/)
      */
     fun extract(zipStream: InputStream, projectDir: Path): List<String> {
         val extractedFiles = mutableListOf<String>()
-        logger.debug { "Extracting agent files to $projectDir" }
+        val targetDir = projectDir.resolve(AGENT_FILES_DIR)
+        logger.debug { "Extracting agent files to $targetDir" }
+
+        // Ensure target directory exists
+        Files.createDirectories(targetDir)
 
         ZipInputStream(zipStream).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
-                val entryPath = projectDir.resolve(entry.name).normalize()
+                // Strip language prefix (java/ or kotlin/) from entry name
+                val strippedName = stripLanguagePrefix(entry.name)
 
-                // Security check: ensure we don't extract outside the project directory
-                if (!entryPath.startsWith(projectDir)) {
+                // Skip if entry is just the language folder itself
+                if (strippedName.isEmpty()) {
+                    entry = zis.nextEntry
+                    continue
+                }
+
+                val entryPath = targetDir.resolve(strippedName).normalize()
+
+                // Security check: ensure we don't extract outside the target directory
+                if (!entryPath.startsWith(targetDir)) {
                     logger.warn { "Skipping potentially malicious entry: ${entry.name}" }
                     entry = zis.nextEntry
                     continue
@@ -61,15 +85,15 @@ object AgentFilesExtractor {
 
                 if (entry.isDirectory) {
                     Files.createDirectories(entryPath)
-                    logger.debug { "Created directory: ${entry.name}" }
+                    logger.debug { "Created directory: $strippedName" }
                 } else {
                     // Ensure parent directories exist
                     Files.createDirectories(entryPath.parent)
 
                     // Extract file
                     Files.copy(zis, entryPath, StandardCopyOption.REPLACE_EXISTING)
-                    extractedFiles.add(entry.name)
-                    logger.debug { "Extracted: ${entry.name}" }
+                    extractedFiles.add(strippedName)
+                    logger.debug { "Extracted: $strippedName" }
                 }
 
                 zis.closeEntry()
@@ -77,53 +101,42 @@ object AgentFilesExtractor {
             }
         }
 
-        logger.info { "Extracted ${extractedFiles.size} files to $projectDir" }
+        logger.info { "Extracted ${extractedFiles.size} files to $targetDir" }
         return extractedFiles
     }
 
     /**
-     * Cleans existing agent files from the project directory.
+     * Strips language prefix (java/ or kotlin/) from a ZIP entry name.
+     */
+    private fun stripLanguagePrefix(entryName: String): String {
+        for (prefix in LANGUAGE_PREFIXES) {
+            if (entryName.startsWith(prefix)) {
+                return entryName.removePrefix(prefix)
+            }
+        }
+        return entryName
+    }
+
+    /**
+     * Cleans existing agent files from the .fluxzero directory.
      * This ensures we don't have stale files from previous versions.
      *
-     * @param projectDir The project directory to clean
+     * @param projectDir The project directory containing .fluxzero
      * @return List of files that were removed
      */
     fun cleanExistingFiles(projectDir: Path): List<String> {
         val removedFiles = mutableListOf<String>()
+        val targetDir = projectDir.resolve(AGENT_FILES_DIR)
 
-        val filesToRemove = listOf(
-            "AGENTS.md",
-            "CLAUDE.md"
-        )
-
-        val dirsToRemove = listOf(
-            ".aiassistant",
-            ".junie"
-        )
-
-        // Remove individual files
-        for (file in filesToRemove) {
-            val filePath = projectDir.resolve(file)
-            if (Files.exists(filePath)) {
-                Files.delete(filePath)
-                removedFiles.add(file)
-                logger.debug { "Removed file: $file" }
-            }
+        // If .fluxzero doesn't exist, nothing to clean
+        if (!Files.exists(targetDir)) {
+            return removedFiles
         }
 
-        // Remove directories
-        for (dir in dirsToRemove) {
-            val dirPath = projectDir.resolve(dir)
-            if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
-                deleteRecursively(dirPath)
-                removedFiles.add(dir)
-                logger.debug { "Removed directory: $dir" }
-            }
-        }
-
-        if (removedFiles.isNotEmpty()) {
-            logger.info { "Cleaned ${removedFiles.size} existing agent files/directories" }
-        }
+        // Remove the entire .fluxzero directory and recreate it fresh
+        deleteRecursively(targetDir)
+        removedFiles.add(AGENT_FILES_DIR)
+        logger.info { "Cleaned existing $AGENT_FILES_DIR directory" }
 
         return removedFiles
     }
