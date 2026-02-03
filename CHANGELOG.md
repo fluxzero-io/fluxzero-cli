@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Maven Plugin**: Added `enabled` parameter for consistent API with Gradle plugin. Replaces `skip` as the recommended way to disable the plugin, though `skip` is kept for backward compatibility. Both `enabled=false` and `skip=true` can be used to disable execution.
+- **Maven Plugin**: Added basic test coverage with configuration validation tests to prevent regressions.
+- **Documentation**: Added comprehensive README.md files for both Gradle and Maven plugins with:
+  - Quick start guides
+  - Complete configuration reference
+  - Troubleshooting guides
+  - Real-world examples
+  - Command-line property usage
+
+### Improved
+
+- **Error Messages**: Enhanced error messages in `agents-core` to provide actionable guidance when SDK detection fails:
+  - Now includes specific code examples for Gradle (build.gradle.kts) and Maven (pom.xml)
+  - Shows how to add Fluxzero SDK dependencies correctly
+  - Explains version catalog usage
+  - Provides override options as fallback
+- **Logging**: SDK version detector now logs which files were checked during detection and provides detailed warnings when version is not found, making troubleshooting easier.
+
 ### Fixed
 
 - Maven and Gradle plugins now only run `sync-agent-files` on the root project in multi-module builds by default, reducing redundant executions and confusing output. Configurable via `rootProjectOnly` parameter (`fluxzero.agentFiles.rootProjectOnly` property in Maven).
@@ -16,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `sync-agent-files` task now fails the build when no Fluxzero SDK dependency is found, instead of silently skipping. Use `overrideSdkVersion` to specify the version explicitly if needed.
+- **Maven Plugin**: `skip` parameter is now deprecated in favor of `enabled` for consistency with Gradle plugin. The `skip` parameter will continue to work for backward compatibility.
 
 ### Added
 
