@@ -12,22 +12,17 @@
   ],
   "packageRules": [
     {
-      "description": "Group Kotlin-related updates",
-      "matchPackagePatterns": ["^org.jetbrains.kotlin"],
-      "groupName": "Kotlin"
+      "description": "Group all minor updates",
+      "matchUpdateTypes": ["minor"],
+      "groupName": "all minor dependencies"
     },
     {
-      "description": "Group GraalVM-related updates",
-      "matchPackagePatterns": ["^org.graalvm"],
-      "groupName": "GraalVM"
+      "description": "Group all major updates",
+      "matchUpdateTypes": ["major"],
+      "groupName": "all major dependencies"
     },
     {
-      "description": "Group test dependencies",
-      "matchPackagePatterns": ["^io.mockk", "junit"],
-      "groupName": "test dependencies"
-    },
-    {
-      "description": "Auto-merge patch updates for non-major dependencies",
+      "description": "Auto-merge patch updates",
       "matchUpdateTypes": ["patch"],
       "automerge": true,
       "automergeType": "pr"
