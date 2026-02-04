@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

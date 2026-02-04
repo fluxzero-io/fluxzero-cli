@@ -9,7 +9,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":agents-core"))
+    implementation(project(":project-files"))
     implementation(gradleApi())
     implementation(gradleKotlinDsl())
 
@@ -34,7 +34,7 @@ gradlePlugin {
             id = "io.fluxzero.tools.gradle"
             implementationClass = "host.flux.gradle.FluxzeroPlugin"
             displayName = "Fluxzero Gradle Plugin"
-            description = "Gradle plugin for Fluxzero projects - syncs AI agent files and more"
+            description = "Gradle plugin for Fluxzero projects - syncs project files and more"
             tags.set(listOf("fluxzero", "ai", "agents", "code-generation"))
         }
     }

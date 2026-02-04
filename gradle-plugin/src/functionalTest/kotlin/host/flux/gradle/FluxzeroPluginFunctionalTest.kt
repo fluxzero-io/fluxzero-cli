@@ -43,7 +43,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     enabled.set(false) // Disable actual sync for this test
                 }
             }
@@ -55,7 +55,7 @@ class FluxzeroPluginFunctionalTest {
             .withPluginClasspath()
             .build()
 
-        assertTrue(result.output.contains("syncAgentFiles"))
+        assertTrue(result.output.contains("syncProjectFiles"))
     }
 
     @Test
@@ -71,7 +71,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     enabled.set(false)
                 }
             }
@@ -79,11 +79,11 @@ class FluxzeroPluginFunctionalTest {
 
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments("syncAgentFiles", "--info")
+            .withArguments("syncProjectFiles", "--info")
             .withPluginClasspath()
             .build()
 
-        assertEquals(TaskOutcome.SKIPPED, result.task(":syncAgentFiles")?.outcome)
+        assertEquals(TaskOutcome.SKIPPED, result.task(":syncProjectFiles")?.outcome)
     }
 
     @Test
@@ -100,7 +100,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     // Disable to avoid network calls in test
                     enabled.set(false)
                 }
@@ -113,7 +113,7 @@ class FluxzeroPluginFunctionalTest {
 
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments("syncAgentFiles", "--info")
+            .withArguments("syncProjectFiles", "--info")
             .withPluginClasspath()
             .build()
 
@@ -138,7 +138,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     enabled.set(false)
                     overrideLanguage.set("java")
                     overrideSdkVersion.set("1.0.0")
@@ -153,7 +153,7 @@ class FluxzeroPluginFunctionalTest {
             .build()
 
         // Just verify build succeeds with configuration
-        assertTrue(result.output.contains("syncAgentFiles"))
+        assertTrue(result.output.contains("syncProjectFiles"))
     }
 
     @Test
@@ -185,7 +185,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     enabled.set(true)
                     rootProjectOnly.set(true) // default, but explicit for test clarity
                 }
@@ -194,12 +194,12 @@ class FluxzeroPluginFunctionalTest {
 
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments(":submodule:syncAgentFiles", "--info")
+            .withArguments(":submodule:syncProjectFiles", "--info")
             .withPluginClasspath()
             .build()
 
         // Submodule task should be skipped because rootProjectOnly is true
-        assertEquals(TaskOutcome.SKIPPED, result.task(":submodule:syncAgentFiles")?.outcome)
+        assertEquals(TaskOutcome.SKIPPED, result.task(":submodule:syncProjectFiles")?.outcome)
     }
 
     @Test
@@ -231,7 +231,7 @@ class FluxzeroPluginFunctionalTest {
             }
 
             fluxzero {
-                agentFiles {
+                projectFiles {
                     enabled.set(true)
                     rootProjectOnly.set(false) // allow running on subprojects
                 }
@@ -242,13 +242,13 @@ class FluxzeroPluginFunctionalTest {
         // The important thing is that it runs (FAILED) rather than being skipped
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
-            .withArguments(":submodule:syncAgentFiles", "--info")
+            .withArguments(":submodule:syncProjectFiles", "--info")
             .withPluginClasspath()
             .buildAndFail()
 
         // Submodule task should NOT be skipped because rootProjectOnly is false
         // It will fail because there's no SDK version, but the key is it wasn't SKIPPED
-        val outcome = result.task(":submodule:syncAgentFiles")?.outcome
+        val outcome = result.task(":submodule:syncProjectFiles")?.outcome
         assertTrue(
             outcome == TaskOutcome.FAILED,
             "Expected task to run (FAILED, not SKIPPED) when rootProjectOnly=false, but was $outcome"

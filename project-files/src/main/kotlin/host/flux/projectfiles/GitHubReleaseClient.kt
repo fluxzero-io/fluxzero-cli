@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,7 +16,7 @@ private val logger = KotlinLogging.logger {}
 /**
  * Client for interacting with GitHub Releases API.
  *
- * Fetches agent files from GitHub release assets.
+ * Fetches project files from GitHub release assets.
  * Uses Java's built-in HttpClient to minimize dependencies.
  */
 class GitHubReleaseClient(
@@ -48,7 +48,7 @@ class GitHubReleaseClient(
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$GITHUB_API_BASE/repos/$repo/releases/latest"))
             .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "fluxzero-agents")
+            .header("User-Agent", "fluxzero-project-files")
             .GET()
             .build()
 
@@ -69,7 +69,7 @@ class GitHubReleaseClient(
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$GITHUB_API_BASE/repos/$repo/releases/tags/$tag"))
             .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "fluxzero-agents")
+            .header("User-Agent", "fluxzero-project-files")
             .GET()
             .build()
 
@@ -83,10 +83,10 @@ class GitHubReleaseClient(
     }
 
     /**
-     * Gets the download URL for agent files for the given language and version.
+     * Gets the download URL for project files for the given language and version.
      */
-    fun getAgentFilesDownloadUrl(language: Language, version: String): String {
-        val assetName = "agents-${language.assetSuffix}.zip"
+    fun getProjectFilesDownloadUrl(language: Language, version: String): String {
+        val assetName = "project-${language.assetSuffix}.zip"
         logger.debug { "Looking for asset $assetName in version $version" }
 
         val release = getReleaseByTag(version)
@@ -97,33 +97,33 @@ class GitHubReleaseClient(
     }
 
     /**
-     * Downloads agent files for the given language and version.
+     * Downloads project files for the given language and version.
      */
-    fun downloadAgentFiles(language: Language, version: String): ByteArray {
-        val url = getAgentFilesDownloadUrl(language, version)
-        logger.info { "Downloading agent files from $url" }
+    fun downloadProjectFiles(language: Language, version: String): ByteArray {
+        val url = getProjectFilesDownloadUrl(language, version)
+        logger.info { "Downloading project files from $url" }
 
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Accept", "application/octet-stream")
-            .header("User-Agent", "fluxzero-agents")
+            .header("User-Agent", "fluxzero-project-files")
             .GET()
             .build()
 
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
 
         if (response.statusCode() !in 200..299) {
-            throw GitHubApiException("Failed to download agent files: ${response.statusCode()}")
+            throw GitHubApiException("Failed to download project files: ${response.statusCode()}")
         }
 
         return response.body()
     }
 
     /**
-     * Downloads agent files and returns them as an InputStream.
+     * Downloads project files and returns them as an InputStream.
      */
-    fun downloadAgentFilesAsStream(language: Language, version: String): InputStream {
-        return downloadAgentFiles(language, version).inputStream()
+    fun downloadProjectFilesAsStream(language: Language, version: String): InputStream {
+        return downloadProjectFiles(language, version).inputStream()
     }
 }
 

@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import mu.KotlinLogging
 import java.nio.file.Files

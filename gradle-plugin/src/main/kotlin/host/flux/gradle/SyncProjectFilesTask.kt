@@ -1,10 +1,10 @@
 package host.flux.gradle
 
-import host.flux.agents.DefaultAgentFilesService
-import host.flux.agents.Language
-import host.flux.agents.LanguageDetector
-import host.flux.agents.SdkVersionDetector
-import host.flux.agents.SyncResult
+import host.flux.projectfiles.DefaultProjectFilesService
+import host.flux.projectfiles.Language
+import host.flux.projectfiles.LanguageDetector
+import host.flux.projectfiles.SdkVersionDetector
+import host.flux.projectfiles.SyncResult
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -16,22 +16,22 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 
 /**
- * Gradle task that synchronizes agent files for Fluxzero projects.
+ * Gradle task that synchronizes project files for Fluxzero projects.
  *
  * This task:
  * - Detects the SDK version from project dependencies
  * - Detects the project language (Kotlin or Java)
- * - Downloads the appropriate agent files from GitHub releases
+ * - Downloads the appropriate project files from GitHub releases
  * - Extracts them to the project directory
  *
  * The task uses Gradle's incremental build support:
  * - If the SDK version or language hasn't changed, the task is UP-TO-DATE
  * - No network requests are made unless necessary
  */
-abstract class SyncAgentFilesTask : DefaultTask() {
+abstract class SyncProjectFilesTask : DefaultTask() {
 
     init {
-        description = "Syncs AI agent files for this Fluxzero project"
+        description = "Syncs project files for this Fluxzero project"
         group = "fluxzero"
     }
 
@@ -56,11 +56,11 @@ abstract class SyncAgentFilesTask : DefaultTask() {
     abstract val forceUpdate: Property<Boolean>
 
     /**
-     * The output directory for agent files (.aiassistant/).
+     * The output directory for project files (.fluxzero/).
      * Using this as the output ensures Gradle tracks file changes.
      */
     @get:OutputDirectory
-    abstract val agentFilesDir: DirectoryProperty
+    abstract val projectFilesDir: DirectoryProperty
 
     /**
      * The project directory (not used as input to avoid unnecessary rebuilds).
@@ -69,16 +69,16 @@ abstract class SyncAgentFilesTask : DefaultTask() {
     abstract val projectDir: DirectoryProperty
 
     @TaskAction
-    fun syncAgentFiles() {
+    fun syncProjectFiles() {
         val projectPath = projectDir.get().asFile.toPath()
         val version = sdkVersion.get()
         val lang = Language.fromString(language.get())
             ?: throw GradleException("Invalid language: ${language.get()}. Must be 'kotlin' or 'java'.")
 
-        logger.lifecycle("Syncing agent files for Fluxzero SDK $version ($lang)")
+        logger.lifecycle("Syncing project files for Fluxzero SDK $version ($lang)")
 
-        val service = DefaultAgentFilesService()
-        val result = service.syncAgentFiles(
+        val service = DefaultProjectFilesService()
+        val result = service.syncProjectFiles(
             projectDir = projectPath,
             forceUpdate = forceUpdate.getOrElse(false),
             language = lang,
@@ -87,17 +87,17 @@ abstract class SyncAgentFilesTask : DefaultTask() {
 
         when (result) {
             is SyncResult.Updated -> {
-                logger.lifecycle("Agent files updated to version ${result.version}")
+                logger.lifecycle("Project files updated to version ${result.version}")
                 logger.info("Files written: ${result.filesWritten.joinToString(", ")}")
             }
             is SyncResult.UpToDate -> {
-                logger.lifecycle("Agent files are up to date (version ${result.version})")
+                logger.lifecycle("Project files are up to date (version ${result.version})")
             }
             is SyncResult.Skipped -> {
-                logger.warn("Agent files sync skipped: ${result.reason}")
+                logger.warn("Project files sync skipped: ${result.reason}")
             }
             is SyncResult.Failed -> {
-                throw GradleException("Failed to sync agent files: ${result.error}", result.cause)
+                throw GradleException("Failed to sync project files: ${result.error}", result.cause)
             }
         }
     }

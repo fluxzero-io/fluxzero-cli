@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 /**
  * Represents the programming language of a Fluxzero project.

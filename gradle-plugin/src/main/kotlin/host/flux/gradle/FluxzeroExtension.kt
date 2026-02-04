@@ -10,10 +10,10 @@ import javax.inject.Inject
  * Example usage in build.gradle.kts:
  * ```kotlin
  * fluxzero {
- *     agentFiles {
+ *     projectFiles {
  *         enabled.set(true)
- *         language.set("kotlin")  // or "java", or leave empty for auto-detection
- *         sdkVersion.set("1.0.0") // optional, auto-detected from dependencies
+ *         overrideLanguage.set("kotlin")  // or "java", or leave empty for auto-detection
+ *         overrideSdkVersion.set("1.0.0") // optional, auto-detected from dependencies
  *         forceUpdate.set(false)  // set to true to force re-download
  *     }
  *
@@ -24,14 +24,14 @@ import javax.inject.Inject
 abstract class FluxzeroExtension @Inject constructor(objects: ObjectFactory) {
 
     /**
-     * Configuration for the agent files sync feature.
+     * Configuration for the project files sync feature.
      */
-    val agentFiles: AgentFilesExtension = objects.newInstance(AgentFilesExtension::class.java)
+    val projectFiles: ProjectFilesExtension = objects.newInstance(ProjectFilesExtension::class.java)
 
     /**
-     * Configures the agent files sync feature.
+     * Configures the project files sync feature.
      */
-    fun agentFiles(action: Action<AgentFilesExtension>) {
-        action.execute(agentFiles)
+    fun projectFiles(action: Action<ProjectFilesExtension>) {
+        action.execute(projectFiles)
     }
 }

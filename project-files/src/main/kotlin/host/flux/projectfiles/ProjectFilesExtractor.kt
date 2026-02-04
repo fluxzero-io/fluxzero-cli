@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
@@ -11,14 +11,14 @@ import java.util.zip.ZipInputStream
 private val logger = KotlinLogging.logger {}
 
 /**
- * Extracts agent files from a ZIP archive to a project directory.
+ * Extracts project files from a ZIP archive to a project directory.
  */
-object AgentFilesExtractor {
+object ProjectFilesExtractor {
 
     /**
-     * Target directory for agent files within the project.
+     * Target directory for project files within the project.
      */
-    const val AGENT_FILES_DIR = ".fluxzero"
+    const val PROJECT_FILES_DIR = ".fluxzero"
 
     /**
      * Prefixes to strip from ZIP entries (language-specific folders).
@@ -26,7 +26,7 @@ object AgentFilesExtractor {
     private val LANGUAGE_PREFIXES = listOf("java/", "kotlin/")
 
     /**
-     * Files/directories that are expected in agent files archives.
+     * Files/directories that are expected in project files archives.
      */
     val EXPECTED_FILES = setOf(
         "AGENTS.md",
@@ -36,7 +36,7 @@ object AgentFilesExtractor {
     )
 
     /**
-     * Extracts agent files from a ZIP archive to the project directory.
+     * Extracts project files from a ZIP archive to the project directory.
      *
      * @param zipData The ZIP archive data
      * @param projectDir The target project directory
@@ -47,7 +47,7 @@ object AgentFilesExtractor {
     }
 
     /**
-     * Extracts agent files from a ZIP input stream to the project directory.
+     * Extracts project files from a ZIP input stream to the project directory.
      * Files are extracted to the .fluxzero/ subdirectory, with language prefixes stripped.
      *
      * @param zipStream The ZIP input stream
@@ -56,8 +56,8 @@ object AgentFilesExtractor {
      */
     fun extract(zipStream: InputStream, projectDir: Path): List<String> {
         val extractedFiles = mutableListOf<String>()
-        val targetDir = projectDir.resolve(AGENT_FILES_DIR)
-        logger.debug { "Extracting agent files to $targetDir" }
+        val targetDir = projectDir.resolve(PROJECT_FILES_DIR)
+        logger.debug { "Extracting project files to $targetDir" }
 
         // Ensure target directory exists
         Files.createDirectories(targetDir)
@@ -118,7 +118,7 @@ object AgentFilesExtractor {
     }
 
     /**
-     * Cleans existing agent files from the .fluxzero directory.
+     * Cleans existing project files from the .fluxzero directory.
      * This ensures we don't have stale files from previous versions.
      *
      * @param projectDir The project directory containing .fluxzero
@@ -126,7 +126,7 @@ object AgentFilesExtractor {
      */
     fun cleanExistingFiles(projectDir: Path): List<String> {
         val removedFiles = mutableListOf<String>()
-        val targetDir = projectDir.resolve(AGENT_FILES_DIR)
+        val targetDir = projectDir.resolve(PROJECT_FILES_DIR)
 
         // If .fluxzero doesn't exist, nothing to clean
         if (!Files.exists(targetDir)) {
@@ -135,8 +135,8 @@ object AgentFilesExtractor {
 
         // Remove the entire .fluxzero directory and recreate it fresh
         deleteRecursively(targetDir)
-        removedFiles.add(AGENT_FILES_DIR)
-        logger.info { "Cleaned existing $AGENT_FILES_DIR directory" }
+        removedFiles.add(PROJECT_FILES_DIR)
+        logger.info { "Cleaned existing $PROJECT_FILES_DIR directory" }
 
         return removedFiles
     }

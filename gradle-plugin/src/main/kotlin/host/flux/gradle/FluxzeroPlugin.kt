@@ -11,7 +11,7 @@ import org.gradle.kotlin.dsl.withType
  * Gradle plugin for Fluxzero projects.
  *
  * Features:
- * - **Agent Files Sync**: Automatically syncs AI assistant instruction files
+ * - **Project Files Sync**: Automatically syncs AI assistant instruction files
  *
  * Usage in build.gradle.kts:
  * ```kotlin
@@ -21,14 +21,14 @@ import org.gradle.kotlin.dsl.withType
  *
  * // Minimal config - everything is auto-detected:
  * fluxzero {
- *     agentFiles {
+ *     projectFiles {
  *         enabled.set(true)  // default
  *     }
  * }
  *
  * // Or with overrides if auto-detection fails:
  * fluxzero {
- *     agentFiles {
+ *     projectFiles {
  *         overrideLanguage.set("kotlin")
  *         overrideSdkVersion.set("1.0.0")
  *     }
@@ -41,46 +41,46 @@ class FluxzeroPlugin : Plugin<Project> {
         // Create the main extension
         val extension = project.extensions.create<FluxzeroExtension>("fluxzero")
 
-        // Set default values for agent files feature
-        extension.agentFiles.enabled.convention(true)
-        extension.agentFiles.forceUpdate.convention(false)
-        extension.agentFiles.rootProjectOnly.convention(true)
+        // Set default values for project files feature
+        extension.projectFiles.enabled.convention(true)
+        extension.projectFiles.forceUpdate.convention(false)
+        extension.projectFiles.rootProjectOnly.convention(true)
 
-        // Register agent files sync feature
-        registerAgentFilesFeature(project, extension)
+        // Register project files sync feature
+        registerProjectFilesFeature(project, extension)
     }
 
-    private fun registerAgentFilesFeature(project: Project, extension: FluxzeroExtension) {
-        val agentFiles = extension.agentFiles
+    private fun registerProjectFilesFeature(project: Project, extension: FluxzeroExtension) {
+        val projectFiles = extension.projectFiles
 
         // Register the sync task
-        val syncTask = project.tasks.register<SyncAgentFilesTask>("syncAgentFiles") {
+        val syncTask = project.tasks.register<SyncProjectFilesTask>("syncProjectFiles") {
             // Configure task only if feature is enabled and (not rootProjectOnly or this is root project)
             onlyIf {
-                agentFiles.enabled.get() &&
-                    (!agentFiles.rootProjectOnly.get() || project == project.rootProject)
+                projectFiles.enabled.get() &&
+                    (!projectFiles.rootProjectOnly.get() || project == project.rootProject)
             }
 
             // Set up project directory
             projectDir.set(project.layout.projectDirectory)
 
             // Set up output directory for tracking changes
-            agentFilesDir.set(project.layout.projectDirectory.dir(".fluxzero"))
+            projectFilesDir.set(project.layout.projectDirectory.dir(".fluxzero"))
 
             // Configure version - use override value or auto-detect
             sdkVersion.set(project.provider {
-                agentFiles.overrideSdkVersion.orNull
-                    ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
+                projectFiles.overrideSdkVersion.orNull
+                    ?: SyncProjectFilesTask.detectSdkVersion(project.projectDir)
             })
 
             // Configure language - use override value or auto-detect
             language.set(project.provider {
-                agentFiles.overrideLanguage.orNull
-                    ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
+                projectFiles.overrideLanguage.orNull
+                    ?: SyncProjectFilesTask.detectLanguage(project.projectDir)
             })
 
             // Configure force update
-            forceUpdate.set(agentFiles.forceUpdate)
+            forceUpdate.set(projectFiles.forceUpdate)
         }
 
         // Hook into the build lifecycle - run before compilation
@@ -99,24 +99,24 @@ class FluxzeroPlugin : Plugin<Project> {
 
         // Log configuration at the end of evaluation
         project.afterEvaluate {
-            if (agentFiles.enabled.get()) {
-                val version = agentFiles.overrideSdkVersion.orNull
-                    ?: SyncAgentFilesTask.detectSdkVersion(project.projectDir)
-                val lang = agentFiles.overrideLanguage.orNull
-                    ?: SyncAgentFilesTask.detectLanguage(project.projectDir)
+            if (projectFiles.enabled.get()) {
+                val version = projectFiles.overrideSdkVersion.orNull
+                    ?: SyncProjectFilesTask.detectSdkVersion(project.projectDir)
+                val lang = projectFiles.overrideLanguage.orNull
+                    ?: SyncProjectFilesTask.detectLanguage(project.projectDir)
 
                 if (version == "unknown") {
                     project.logger.info(
-                        "Fluxzero agent files: No SDK version detected. " +
-                            "Agent files will not be synced unless overrideSdkVersion is set."
+                        "Fluxzero project files: No SDK version detected. " +
+                            "Project files will not be synced unless overrideSdkVersion is set."
                     )
                 } else {
                     project.logger.info(
-                        "Fluxzero agent files configured: version=$version, language=$lang"
+                        "Fluxzero project files configured: version=$version, language=$lang"
                     )
                 }
             } else {
-                project.logger.info("Fluxzero agent files sync is disabled")
+                project.logger.info("Fluxzero project files sync is disabled")
             }
         }
     }

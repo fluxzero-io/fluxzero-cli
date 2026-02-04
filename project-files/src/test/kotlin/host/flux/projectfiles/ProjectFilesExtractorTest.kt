@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class AgentFilesExtractorTest {
+class ProjectFilesExtractorTest {
 
     @TempDir
     lateinit var tempDir: Path
@@ -27,7 +27,7 @@ class AgentFilesExtractorTest {
             "java/.aiassistant/rules/guidelines.md" to "Guidelines content"
         )
 
-        val extractedFiles = AgentFilesExtractor.extract(zipData, tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(zipData, tempDir)
 
         assertEquals(3, extractedFiles.size)
         assertTrue(Files.exists(fluxzeroDir.resolve("AGENTS.md")))
@@ -43,7 +43,7 @@ class AgentFilesExtractorTest {
             "kotlin/.aiassistant/instructions.md" to "Instructions"
         )
 
-        val extractedFiles = AgentFilesExtractor.extract(zipData, tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(zipData, tempDir)
 
         assertEquals(2, extractedFiles.size)
         assertTrue(Files.exists(fluxzeroDir.resolve("AGENTS.md")))
@@ -57,7 +57,7 @@ class AgentFilesExtractorTest {
             "java/.aiassistant/rules/nested/deep/file.md" to "Deep content"
         )
 
-        AgentFilesExtractor.extract(zipData, tempDir)
+        ProjectFilesExtractor.extract(zipData, tempDir)
 
         assertTrue(Files.exists(fluxzeroDir.resolve(".aiassistant/rules/nested/deep/file.md")))
         assertEquals("Deep content", Files.readString(fluxzeroDir.resolve(".aiassistant/rules/nested/deep/file.md")))
@@ -73,7 +73,7 @@ class AgentFilesExtractorTest {
             "java/AGENTS.md" to "New content"
         )
 
-        AgentFilesExtractor.extract(zipData, tempDir)
+        ProjectFilesExtractor.extract(zipData, tempDir)
 
         assertEquals("New content", Files.readString(fluxzeroDir.resolve("AGENTS.md")))
     }
@@ -89,7 +89,7 @@ class AgentFilesExtractorTest {
         Files.createDirectories(aiAssistantDir)
         Files.writeString(aiAssistantDir.resolve("guidelines.md"), "Old guidelines")
 
-        val removedFiles = AgentFilesExtractor.cleanExistingFiles(tempDir)
+        val removedFiles = ProjectFilesExtractor.cleanExistingFiles(tempDir)
 
         assertEquals(1, removedFiles.size) // Just the .fluxzero directory
         assertTrue(removedFiles.contains(".fluxzero"))
@@ -100,7 +100,7 @@ class AgentFilesExtractorTest {
     fun `clean handles missing fluxzero directory gracefully`() {
         // No existing .fluxzero directory to clean
 
-        val removedFiles = AgentFilesExtractor.cleanExistingFiles(tempDir)
+        val removedFiles = ProjectFilesExtractor.cleanExistingFiles(tempDir)
 
         assertEquals(0, removedFiles.size)
     }
@@ -112,7 +112,7 @@ class AgentFilesExtractorTest {
             "java/../outside.txt" to "Malicious content"
         )
 
-        val extractedFiles = AgentFilesExtractor.extract(zipData, tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(zipData, tempDir)
 
         // The malicious entry should be skipped
         assertEquals(0, extractedFiles.size)
@@ -133,7 +133,7 @@ class AgentFilesExtractorTest {
             zos.closeEntry()
         }
 
-        val extractedFiles = AgentFilesExtractor.extract(baos.toByteArray(), tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(baos.toByteArray(), tempDir)
 
         assertEquals(1, extractedFiles.size) // Only files, not directories
         assertTrue(Files.exists(fluxzeroDir.resolve(".aiassistant/rules/file.md")))
@@ -153,7 +153,7 @@ class AgentFilesExtractorTest {
             zos.closeEntry()
         }
 
-        val extractedFiles = AgentFilesExtractor.extract(baos.toByteArray(), tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(baos.toByteArray(), tempDir)
 
         assertEquals(1, extractedFiles.size)
         assertTrue(extractedFiles.contains("AGENTS.md"))
@@ -166,7 +166,7 @@ class AgentFilesExtractorTest {
             "AGENTS.md" to "# Direct Agents"
         )
 
-        val extractedFiles = AgentFilesExtractor.extract(zipData, tempDir)
+        val extractedFiles = ProjectFilesExtractor.extract(zipData, tempDir)
 
         assertEquals(1, extractedFiles.size)
         assertTrue(Files.exists(fluxzeroDir.resolve("AGENTS.md")))

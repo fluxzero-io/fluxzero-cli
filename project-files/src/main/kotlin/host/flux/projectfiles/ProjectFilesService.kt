@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 import mu.KotlinLogging
 import java.nio.file.Path
@@ -6,11 +6,11 @@ import java.nio.file.Path
 private val logger = KotlinLogging.logger {}
 
 /**
- * Service for synchronizing agent files in Fluxzero projects.
+ * Service for synchronizing project files in Fluxzero projects.
  */
-interface AgentFilesService {
+interface ProjectFilesService {
     /**
-     * Synchronizes agent files for the project.
+     * Synchronizes project files for the project.
      *
      * @param projectDir The root directory of the project
      * @param forceUpdate If true, forces re-download even if files exist
@@ -18,7 +18,7 @@ interface AgentFilesService {
      * @param version Override version detection (use specific SDK version)
      * @return The result of the sync operation
      */
-    fun syncAgentFiles(
+    fun syncProjectFiles(
         projectDir: Path,
         forceUpdate: Boolean = false,
         language: Language? = null,
@@ -26,7 +26,7 @@ interface AgentFilesService {
     ): SyncResult
 
     /**
-     * Checks if there are updates available for agent files.
+     * Checks if there are updates available for project files.
      *
      * @param projectDir The root directory of the project
      * @return The update check result
@@ -35,33 +35,33 @@ interface AgentFilesService {
 }
 
 /**
- * Default implementation of [AgentFilesService].
+ * Default implementation of [ProjectFilesService].
  */
-class DefaultAgentFilesService(
+class DefaultProjectFilesService(
     private val gitHubClient: GitHubReleaseClient = GitHubReleaseClient()
-) : AgentFilesService {
+) : ProjectFilesService {
 
     companion object {
         /**
-         * Minimum SDK version that includes agent files in releases.
-         * Versions before this do not have agent files available.
+         * Minimum SDK version that includes project files in releases.
+         * Versions before this do not have project files available.
          */
         val MIN_SUPPORTED_VERSION = SemanticVersion(1, 75, 1)
     }
 
-    override fun syncAgentFiles(
+    override fun syncProjectFiles(
         projectDir: Path,
         forceUpdate: Boolean,
         language: Language?,
         version: String?
     ): SyncResult {
         return try {
-            logger.info { "Starting agent files sync for $projectDir" }
+            logger.info { "Starting project files sync for $projectDir" }
 
             // Detect or use provided version
             val sdkVersion = version ?: SdkVersionDetector.detect(projectDir)
             if (sdkVersion == null) {
-                logger.error { "No SDK version found - cannot sync agent files" }
+                logger.error { "No SDK version found - cannot sync project files" }
                 return SyncResult.Failed(
                     error = buildString {
                         appendLine("No Fluxzero SDK dependency found in project.")
@@ -88,7 +88,7 @@ class DefaultAgentFilesService(
                         appendLine("  </dependency>")
                         appendLine()
                         appendLine("Alternatively, you can bypass auto-detection by setting overrideSdkVersion:")
-                        appendLine("  • Gradle: fluxzero { agentFiles { overrideSdkVersion.set(\"1.75.1\") } }")
+                        appendLine("  • Gradle: fluxzero { projectFiles { overrideSdkVersion.set(\"1.75.1\") } }")
                         appendLine("  • Maven: <overrideSdkVersion>1.75.1</overrideSdkVersion>")
                     },
                     cause = null
@@ -109,17 +109,17 @@ class DefaultAgentFilesService(
             val projectLanguage = language ?: LanguageDetector.detect(projectDir)
             logger.info { "Using language: $projectLanguage, version: $sdkVersion" }
 
-            // Download agent files
-            logger.info { "Downloading agent files for $projectLanguage version $sdkVersion" }
-            val zipData = gitHubClient.downloadAgentFiles(projectLanguage, sdkVersion)
+            // Download project files
+            logger.info { "Downloading project files for $projectLanguage version $sdkVersion" }
+            val zipData = gitHubClient.downloadProjectFiles(projectLanguage, sdkVersion)
 
             // Clean existing files
-            AgentFilesExtractor.cleanExistingFiles(projectDir)
+            ProjectFilesExtractor.cleanExistingFiles(projectDir)
 
             // Extract new files
-            val extractedFiles = AgentFilesExtractor.extract(zipData, projectDir)
+            val extractedFiles = ProjectFilesExtractor.extract(zipData, projectDir)
 
-            logger.info { "Successfully synced ${extractedFiles.size} agent files" }
+            logger.info { "Successfully synced ${extractedFiles.size} project files" }
             SyncResult.Updated(
                 version = sdkVersion,
                 filesWritten = extractedFiles,
@@ -128,7 +128,7 @@ class DefaultAgentFilesService(
         } catch (e: GitHubApiException) {
             logger.error(e) { "GitHub API error during sync" }
             SyncResult.Failed(
-                error = "Failed to fetch agent files: ${e.message}",
+                error = "Failed to fetch project files: ${e.message}",
                 cause = e
             )
         } catch (e: Exception) {

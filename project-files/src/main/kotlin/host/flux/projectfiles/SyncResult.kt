@@ -1,4 +1,4 @@
-package host.flux.agents
+package host.flux.projectfiles
 
 /**
  * Result of a sync operation.

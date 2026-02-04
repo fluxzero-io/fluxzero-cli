@@ -8,7 +8,7 @@ group = "io.fluxzero.tools"
 
 dependencies {
     // Reuse shared core library
-    implementation(project(":agents-core"))
+    implementation(project(":project-files"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
@@ -85,7 +85,7 @@ publishing {
             pom {
                 packaging = "maven-plugin"
                 name.set("Fluxzero Maven Plugin")
-                description.set("Maven plugin for Fluxzero projects - syncs AI agent files")
+                description.set("Maven plugin for Fluxzero projects - syncs project files")
             }
         }
     }
