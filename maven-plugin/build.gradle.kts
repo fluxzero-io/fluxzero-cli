@@ -28,7 +28,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0")
     testImplementation("org.apache.maven:maven-core:3.9.6")
-    testImplementation("org.apache.maven:maven-compat:3.9.6")
+    testImplementation("org.apache.maven:maven-compat:3.9.12")
 }
 
 // Copy compiled classes to Maven's expected location (target/classes)
