@@ -1,6 +1,9 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
+    id("com.vanniktech.maven.publish")
     id("com.gradle.plugin-publish")
 }
 
@@ -36,6 +39,41 @@ gradlePlugin {
             displayName = "Fluxzero Gradle Plugin"
             description = "Gradle plugin for Fluxzero projects - syncs project files and more"
             tags.set(listOf("fluxzero", "ai", "agents", "code-generation"))
+        }
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+
+    coordinates("io.fluxzero.tools", "fluxzero-gradle-plugin", version.toString())
+
+    pom {
+        name.set("Fluxzero Gradle Plugin")
+        description.set("Gradle plugin for Fluxzero projects - syncs project files and more")
+        url.set("https://fluxzero.io")
+        inceptionYear.set("2025")
+
+        licenses {
+            license {
+                name.set("EUPL-1.2")
+                url.set("https://eupl.eu/1.2/en/")
+            }
+        }
+
+        developers {
+            developer {
+                id.set("fluxzero")
+                name.set("Fluxzero Team")
+                url.set("https://fluxzero.io")
+            }
+        }
+
+        scm {
+            url.set("https://github.com/fluxzero-io/fluxzero-cli")
+            connection.set("scm:git:git://github.com/fluxzero-io/fluxzero-cli.git")
+            developerConnection.set("scm:git:ssh://git@github.com/fluxzero-io/fluxzero-cli.git")
         }
     }
 }

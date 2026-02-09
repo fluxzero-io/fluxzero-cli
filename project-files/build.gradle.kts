@@ -1,21 +1,50 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-    `maven-publish`
+    id("com.vanniktech.maven.publish")
 }
 
 group = "io.fluxzero.tools"
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
-}
-
 kotlin {
     jvmToolchain(21)
+}
+
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+
+    coordinates("io.fluxzero.tools", "project-files", version.toString())
+
+    pom {
+        name.set("Fluxzero Project Files")
+        description.set("Core library for Fluxzero project file management")
+        url.set("https://fluxzero.io")
+        inceptionYear.set("2025")
+
+        licenses {
+            license {
+                name.set("EUPL-1.2")
+                url.set("https://eupl.eu/1.2/en/")
+            }
+        }
+
+        developers {
+            developer {
+                id.set("fluxzero")
+                name.set("Fluxzero Team")
+                url.set("https://fluxzero.io")
+            }
+        }
+
+        scm {
+            url.set("https://github.com/fluxzero-io/fluxzero-cli")
+            connection.set("scm:git:git://github.com/fluxzero-io/fluxzero-cli.git")
+            developerConnection.set("scm:git:ssh://git@github.com/fluxzero-io/fluxzero-cli.git")
+        }
+    }
 }
 
 dependencies {

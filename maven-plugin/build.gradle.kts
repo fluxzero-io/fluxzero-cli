@@ -1,6 +1,8 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
 plugins {
     kotlin("jvm")
-    `maven-publish`
+    id("com.vanniktech.maven.publish")
     id("com.gradleup.shadow") version "8.3.6"
 }
 
@@ -74,19 +76,48 @@ tasks.assemble {
     dependsOn(tasks.shadowJar)
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            artifactId = "fluxzero-maven-plugin"
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
 
-            // Use shadow JAR as the main artifact
-            artifact(tasks.shadowJar)
+    coordinates("io.fluxzero.tools", "fluxzero-maven-plugin", version.toString())
 
-            pom {
-                packaging = "maven-plugin"
-                name.set("Fluxzero Maven Plugin")
-                description.set("Maven plugin for Fluxzero projects - syncs project files")
+    pom {
+        packaging = "maven-plugin"
+        name.set("Fluxzero Maven Plugin")
+        description.set("Maven plugin for Fluxzero projects - syncs project files")
+        url.set("https://fluxzero.io")
+        inceptionYear.set("2025")
+
+        licenses {
+            license {
+                name.set("EUPL-1.2")
+                url.set("https://eupl.eu/1.2/en/")
             }
+        }
+
+        developers {
+            developer {
+                id.set("fluxzero")
+                name.set("Fluxzero Team")
+                url.set("https://fluxzero.io")
+            }
+        }
+
+        scm {
+            url.set("https://github.com/fluxzero-io/fluxzero-cli")
+            connection.set("scm:git:git://github.com/fluxzero-io/fluxzero-cli.git")
+            developerConnection.set("scm:git:ssh://git@github.com/fluxzero-io/fluxzero-cli.git")
+        }
+    }
+}
+
+// Configure publishing to use shadow JAR instead of regular JAR
+afterEvaluate {
+    publishing {
+        publications.withType<MavenPublication> {
+            // Remove the default JAR artifact and add shadow JAR
+            artifact(tasks.shadowJar)
         }
     }
 }
