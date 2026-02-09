@@ -3,7 +3,7 @@ import com.vanniktech.maven.publish.SonatypeHost
 plugins {
     kotlin("jvm")
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "8.3.6"
+    id("com.gradleup.shadow") version "9.0.0"
 }
 
 group = "io.fluxzero.tools"

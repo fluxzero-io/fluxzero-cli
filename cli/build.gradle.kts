@@ -4,7 +4,7 @@ import org.gradle.jvm.tasks.Jar
 plugins {
     kotlin("jvm")
     application
-    id("com.gradleup.shadow") version "8.3.6"
+    id("com.gradleup.shadow") version "9.0.0"
     id("org.graalvm.buildtools.native")
 }
 
