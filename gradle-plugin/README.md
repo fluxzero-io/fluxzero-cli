@@ -42,7 +42,7 @@ plugins {
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         // Enable or disable the plugin (default: true)
         enabled.set(true)
 
@@ -65,7 +65,7 @@ fluxzero {
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         enabled.set(false)
     }
 }
@@ -74,7 +74,7 @@ fluxzero {
 You can also disable it via command line:
 
 ```bash
-./gradlew build -Pfluxzero.agentFiles.enabled=false
+./gradlew build -Pfluxzero.projectFiles.enabled=false
 ```
 
 ## How It Works
@@ -98,14 +98,14 @@ The plugin automatically:
 
 ### Lifecycle Integration
 
-The `syncAgentFiles` task runs automatically before:
+The `syncProjectFiles` task runs automatically before:
 - `compileJava` (if Java plugin is applied)
 - `compileKotlin` (if Kotlin plugin is applied)
 
 You can also run it manually:
 
 ```bash
-./gradlew syncAgentFiles
+./gradlew syncProjectFiles
 ```
 
 ## Multi-Module Projects
@@ -119,7 +119,7 @@ plugins {
 }
 
 fluxzero {
-    agentFiles {
+    projectFiles {
         rootProjectOnly.set(true) // default behavior
     }
 }
@@ -129,7 +129,7 @@ To sync in every module:
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         rootProjectOnly.set(false)
     }
 }
@@ -164,7 +164,7 @@ dependencies {
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         overrideSdkVersion.set("1.75.1")
     }
 }
@@ -178,7 +178,7 @@ fluxzero {
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         overrideLanguage.set("kotlin") // or "java"
     }
 }
@@ -191,14 +191,14 @@ fluxzero {
 **Solution**: Force an update:
 
 ```bash
-./gradlew syncAgentFiles --rerun-tasks
+./gradlew syncProjectFiles --rerun-tasks
 ```
 
 Or configure force update:
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         forceUpdate.set(true)
     }
 }
@@ -212,7 +212,7 @@ fluxzero {
 
 ```kotlin
 fluxzero {
-    agentFiles {
+    projectFiles {
         rootProjectOnly.set(true)
     }
 }
@@ -220,13 +220,13 @@ fluxzero {
 
 ## Task Reference
 
-### `syncAgentFiles`
+### `syncProjectFiles`
 
 Synchronizes AI agent instruction files for the project.
 
 **Usage**:
 ```bash
-./gradlew syncAgentFiles
+./gradlew syncProjectFiles
 ```
 
 **Inputs**:
@@ -286,7 +286,7 @@ plugins {
 apply(plugin = "io.fluxzero.tools.gradle")
 
 fluxzero {
-    agentFiles {
+    projectFiles {
         rootProjectOnly.set(true) // Sync only in root
     }
 }
@@ -325,7 +325,7 @@ plugins {
 }
 
 fluxzero {
-    agentFiles {
+    projectFiles {
         // Bypass all auto-detection
         overrideLanguage.set("kotlin")
         overrideSdkVersion.set("1.75.1")

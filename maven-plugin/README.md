@@ -26,7 +26,7 @@ Add the plugin to your `pom.xml`:
             <executions>
                 <execution>
                     <goals>
-                        <goal>sync-agent-files</goal>
+                        <goal>sync-project-files</goal>
                     </goals>
                 </execution>
             </executions>
@@ -53,7 +53,7 @@ Everything is auto-detected by default:
             <executions>
                 <execution>
                     <goals>
-                        <goal>sync-agent-files</goal>
+                        <goal>sync-project-files</goal>
                     </goals>
                 </execution>
             </executions>
@@ -88,7 +88,7 @@ Everything is auto-detected by default:
     <executions>
         <execution>
             <goals>
-                <goal>sync-agent-files</goal>
+                <goal>sync-project-files</goal>
             </goals>
         </execution>
     </executions>
@@ -116,13 +116,13 @@ Using `skip` (backward compatibility):
 Via command line:
 
 ```bash
-mvn clean install -Dfluxzero.agentFiles.enabled=false
+mvn clean install -Dfluxzero.projectFiles.enabled=false
 ```
 
 Or:
 
 ```bash
-mvn clean install -Dfluxzero.agentFiles.skip=true
+mvn clean install -Dfluxzero.projectFiles.skip=true
 ```
 
 ## How It Works
@@ -152,7 +152,7 @@ The plugin runs during the `INITIALIZE` phase, which means it executes before co
 You can also run it manually:
 
 ```bash
-mvn fluxzero:sync-agent-files
+mvn fluxzero:sync-project-files
 ```
 
 ## Multi-Module Projects
@@ -182,7 +182,7 @@ By default, agent files are only synced in the root project to avoid duplication
                 <executions>
                     <execution>
                         <goals>
-                            <goal>sync-agent-files</goal>
+                            <goal>sync-project-files</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -206,19 +206,19 @@ All configuration options can be set via command line properties:
 
 ```bash
 # Disable the plugin
-mvn clean install -Dfluxzero.agentFiles.enabled=false
+mvn clean install -Dfluxzero.projectFiles.enabled=false
 
 # Override language
-mvn clean install -Dfluxzero.agentFiles.overrideLanguage=kotlin
+mvn clean install -Dfluxzero.projectFiles.overrideLanguage=kotlin
 
 # Override SDK version
-mvn clean install -Dfluxzero.agentFiles.overrideSdkVersion=1.75.1
+mvn clean install -Dfluxzero.projectFiles.overrideSdkVersion=1.75.1
 
 # Force update
-mvn clean install -Dfluxzero.agentFiles.forceUpdate=true
+mvn clean install -Dfluxzero.projectFiles.forceUpdate=true
 
 # Run in all modules (not just root)
-mvn clean install -Dfluxzero.agentFiles.rootProjectOnly=false
+mvn clean install -Dfluxzero.projectFiles.rootProjectOnly=false
 ```
 
 ## Troubleshooting
@@ -308,7 +308,7 @@ mvn clean install -Dfluxzero.agentFiles.rootProjectOnly=false
 Or via command line:
 
 ```bash
-mvn clean install -Dfluxzero.agentFiles.overrideLanguage=kotlin
+mvn clean install -Dfluxzero.projectFiles.overrideLanguage=kotlin
 ```
 
 ### Files Not Updating
@@ -318,7 +318,7 @@ mvn clean install -Dfluxzero.agentFiles.overrideLanguage=kotlin
 **Solution**: Force an update:
 
 ```bash
-mvn clean install -Dfluxzero.agentFiles.forceUpdate=true
+mvn clean install -Dfluxzero.projectFiles.forceUpdate=true
 ```
 
 Or configure force update:
@@ -343,13 +343,13 @@ Or configure force update:
 
 ## Goal Reference
 
-### `sync-agent-files`
+### `sync-project-files`
 
 Synchronizes AI agent instruction files for the project.
 
 **Usage**:
 ```bash
-mvn fluxzero:sync-agent-files
+mvn fluxzero:sync-project-files
 ```
 
 **Phase**: INITIALIZE (runs automatically before compilation)
@@ -368,12 +368,12 @@ mvn fluxzero:sync-agent-files
 **Properties**:
 
 All parameters can be set via properties:
-- `fluxzero.agentFiles.enabled`
-- `fluxzero.agentFiles.skip`
-- `fluxzero.agentFiles.rootProjectOnly`
-- `fluxzero.agentFiles.forceUpdate`
-- `fluxzero.agentFiles.overrideLanguage`
-- `fluxzero.agentFiles.overrideSdkVersion`
+- `fluxzero.projectFiles.enabled`
+- `fluxzero.projectFiles.skip`
+- `fluxzero.projectFiles.rootProjectOnly`
+- `fluxzero.projectFiles.forceUpdate`
+- `fluxzero.projectFiles.overrideLanguage`
+- `fluxzero.projectFiles.overrideSdkVersion`
 
 ## Examples
 
@@ -404,7 +404,7 @@ All parameters can be set via properties:
                 <executions>
                     <execution>
                         <goals>
-                            <goal>sync-agent-files</goal>
+                            <goal>sync-project-files</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -435,7 +435,7 @@ All parameters can be set via properties:
                 <executions>
                     <execution>
                         <goals>
-                            <goal>sync-agent-files</goal>
+                            <goal>sync-project-files</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -478,7 +478,7 @@ All parameters can be set via properties:
                 <executions>
                     <execution>
                         <goals>
-                            <goal>sync-agent-files</goal>
+                            <goal>sync-project-files</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -523,7 +523,7 @@ All parameters can be set via properties:
     <executions>
         <execution>
             <goals>
-                <goal>sync-agent-files</goal>
+                <goal>sync-project-files</goal>
             </goals>
         </execution>
     </executions>

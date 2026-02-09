@@ -381,7 +381,7 @@ pluginManagement {
             <executions>
                 <execution>
                     <goals>
-                        <goal>sync-agent-files</goal>
+                        <goal>sync-project-files</goal>
                     </goals>
                 </execution>
             </executions>
@@ -406,7 +406,7 @@ pluginManagement {
     <executions>
         <execution>
             <goals>
-                <goal>sync-agent-files</goal>
+                <goal>sync-project-files</goal>
             </goals>
         </execution>
     </executions>
@@ -415,9 +415,9 @@ pluginManagement {
 
 **Command line properties:**
 ```bash
-mvn clean install -Dfluxzero.agentFiles.enabled=false
-mvn clean install -Dfluxzero.agentFiles.overrideLanguage=kotlin
-mvn clean install -Dfluxzero.agentFiles.forceUpdate=true
+mvn clean install -Dfluxzero.projectFiles.enabled=false
+mvn clean install -Dfluxzero.projectFiles.overrideLanguage=kotlin
+mvn clean install -Dfluxzero.projectFiles.forceUpdate=true
 ```
 
 ### Plugin Documentation
