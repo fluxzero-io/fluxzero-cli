@@ -327,6 +327,105 @@ Advanced:
 - Pin an explicit ZIP: `./gradlew -PexamplesZipUrl=https://github.com/your-org/your-examples/archive/refs/tags/v1.2.3.zip build`
 - Force refresh the cache: `./gradlew -PrefreshExamples=true build`
 
+## Build Plugins
+
+Fluxzero provides Gradle and Maven plugins that automatically sync AI agent instruction files (AGENTS.md, CLAUDE.md, etc.) from GitHub releases matching your Fluxzero SDK version.
+
+### Gradle Plugin
+
+**build.gradle.kts**
+```kotlin
+plugins {
+    id("io.fluxzero.tools.gradle") version "1.0.0"
+}
+
+// Minimal setup - everything is auto-detected
+fluxzero {
+    projectFiles {
+        enabled.set(true)
+    }
+}
+
+// Or with explicit configuration
+fluxzero {
+    projectFiles {
+        enabled.set(true)                      // Enable/disable the plugin (default: true)
+        overrideLanguage.set("kotlin")         // "kotlin" or "java" (auto-detected by default)
+        overrideSdkVersion.set("1.2.0")        // Override SDK version (auto-detected from dependencies)
+        forceUpdate.set(false)                 // Force re-download even if files exist
+        rootProjectOnly.set(true)              // Only run on root project in multi-module builds
+    }
+}
+```
+
+**settings.gradle.kts**
+```kotlin
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+```
+
+### Maven Plugin
+
+**pom.xml**
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>io.fluxzero.tools</groupId>
+            <artifactId>fluxzero-maven-plugin</artifactId>
+            <version>1.0.0</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>sync-agent-files</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+**With explicit configuration:**
+```xml
+<plugin>
+    <groupId>io.fluxzero.tools</groupId>
+    <artifactId>fluxzero-maven-plugin</artifactId>
+    <version>1.0.0</version>
+    <configuration>
+        <enabled>true</enabled>                         <!-- Enable/disable (default: true) -->
+        <rootProjectOnly>true</rootProjectOnly>         <!-- Only run on root project (default: true) -->
+        <forceUpdate>false</forceUpdate>                <!-- Force re-download (default: false) -->
+        <overrideLanguage>kotlin</overrideLanguage>     <!-- Override language detection -->
+        <overrideSdkVersion>1.75.1</overrideSdkVersion> <!-- Override SDK version -->
+    </configuration>
+    <executions>
+        <execution>
+            <goals>
+                <goal>sync-agent-files</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+**Command line properties:**
+```bash
+mvn clean install -Dfluxzero.agentFiles.enabled=false
+mvn clean install -Dfluxzero.agentFiles.overrideLanguage=kotlin
+mvn clean install -Dfluxzero.agentFiles.forceUpdate=true
+```
+
+### Plugin Documentation
+
+For detailed documentation, troubleshooting, and advanced examples:
+- [Gradle Plugin README](gradle-plugin/README.md)
+- [Maven Plugin README](maven-plugin/README.md)
+
 ## Development
 
 ### Building the CLI
