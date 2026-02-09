@@ -14,7 +14,11 @@ kotlin {
 
 mavenPublishing {
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+
+    // Only sign if GPG key is available (CI has it, local dev may not)
+    if (project.findProperty("signingInMemoryKey") != null) {
+        signAllPublications()
+    }
 
     coordinates("io.fluxzero.tools", "project-files", version.toString())
 
