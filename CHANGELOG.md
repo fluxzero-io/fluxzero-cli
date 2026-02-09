@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Maven Central Publishing**: Automated publishing of Fluxzero plugins to Maven Central via GitHub Actions workflow using the Vanniktech Maven Publish Plugin:
-  - `io.fluxzero.tools:project-files` - Core library for project file management
   - `io.fluxzero.tools:fluxzero-maven-plugin` - Maven plugin
   - `io.fluxzero.tools:fluxzero-gradle-plugin` - Gradle plugin (also published to Gradle Plugin Portal)
 - **Maven Plugin**: Added `enabled` parameter for consistent API with Gradle plugin. Replaces `skip` as the recommended way to disable the plugin, though `skip` is kept for backward compatibility. Both `enabled=false` and `skip=true` can be used to disable execution.

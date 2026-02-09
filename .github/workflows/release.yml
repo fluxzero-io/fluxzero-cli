@@ -103,8 +103,7 @@ jobs:
 
       - name: Publish to Maven Central
         run: |
-          ./gradlew :project-files:publishAndReleaseToMavenCentral \
-                    :maven-plugin:publishAndReleaseToMavenCentral \
+          ./gradlew :maven-plugin:publishAndReleaseToMavenCentral \
                     :gradle-plugin:publishAndReleaseToMavenCentral \
                     -PappVersion=${{ needs.version.outputs.version }}
         env:
