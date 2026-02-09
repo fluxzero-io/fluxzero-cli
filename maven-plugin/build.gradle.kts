@@ -20,14 +20,14 @@ dependencies {
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
-    compileOnly("org.apache.maven:maven-core:3.9.6")
+    compileOnly("org.apache.maven:maven-core:3.9.12")
     compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
 
     // Test dependencies
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0")
-    testImplementation("org.apache.maven:maven-core:3.9.6")
+    testImplementation("org.apache.maven:maven-core:3.9.12")
     testImplementation("org.apache.maven:maven-compat:3.9.6")
 }
 
