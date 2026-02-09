@@ -1,3 +1,5 @@
+import com.vanniktech.maven.publish.JavaLibrary
+import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
@@ -88,6 +90,9 @@ mavenPublishing {
         signAllPublications()
     }
 
+    // Use shadow component for publishing the fat JAR
+    configure(JavaLibrary(JavadocJar.Empty(), false))
+
     coordinates("io.fluxzero.tools", "fluxzero-maven-plugin", version.toString())
 
     pom {
@@ -120,11 +125,12 @@ mavenPublishing {
     }
 }
 
-// Configure publishing to use shadow JAR instead of regular JAR
+// Replace the default JAR with the shadow JAR in publications
 afterEvaluate {
     publishing {
         publications.withType<MavenPublication> {
-            // Remove the default JAR artifact and add shadow JAR
+            // Replace the main artifact with shadow JAR
+            artifacts.removeIf { it.classifier == null || it.classifier == "" }
             artifact(tasks.shadowJar)
         }
     }
