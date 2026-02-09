@@ -8,6 +8,10 @@ plugins {
 
 group = "io.fluxzero.tools"
 
+kotlin {
+    jvmToolchain(21)
+}
+
 dependencies {
     // Reuse shared core library
     implementation(project(":project-files"))
