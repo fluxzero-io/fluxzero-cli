@@ -1,0 +1,4 @@
+java temurin-25.0.2+10.0.LTS
+maven 3.9.12
+gradle 9.3.1
+wrangler 4.63.0

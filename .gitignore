@@ -45,3 +45,4 @@ bin/
 
 ### Mac OS ###
 .DS_Storeapi/node_modules/
+maven-plugin/target/

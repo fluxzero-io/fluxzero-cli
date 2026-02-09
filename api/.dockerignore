@@ -1,0 +1,12 @@
+# Reduce build context size
+.git
+.gitignore
+.gradle
+build/
+node_modules/
+*.iml
+.idea/
+.DS_Store
+
+# keep only the shaded jar we copy into the image
+!flux-api.jar
