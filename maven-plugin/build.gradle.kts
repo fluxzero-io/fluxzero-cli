@@ -19,7 +19,7 @@ dependencies {
     implementation(project(":project-files"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
-    compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
+    compileOnly("org.apache.maven:maven-plugin-api:3.9.12")
     compileOnly("org.apache.maven:maven-core:3.9.6")
     compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
 
