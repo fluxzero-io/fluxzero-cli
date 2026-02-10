@@ -22,7 +22,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("io.mockk:mockk:1.14.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.5.6")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.5.29")
 }
 
 tasks.test {
