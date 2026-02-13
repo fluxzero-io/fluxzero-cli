@@ -84,7 +84,7 @@ jobs:
 
   publish-plugins:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test]
+    needs: [version, build-and-test, native-build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
