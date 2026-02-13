@@ -82,6 +82,12 @@ jobs:
             cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
             api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
             cli/build/release-scripts/
+
+      - name: Upload templates cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: templates-cache
+          path: templates/build/examples-snapshot/
           retention-days: 1
 
   publish-plugins:

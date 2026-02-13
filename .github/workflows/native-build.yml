@@ -56,6 +56,13 @@ jobs:
           name: jar-artifact
           path: build/
 
+      - name: Download templates cache
+        uses: actions/download-artifact@v4
+        with:
+          name: templates-cache
+          path: templates/build/examples-snapshot/
+        continue-on-error: true
+
       - name: Read Java version from .tool-versions
         id: tools
         shell: bash
@@ -87,6 +94,8 @@ jobs:
           # Native compilation needs to compile classes but can reuse cached artifacts
           # Skip tests since we already ran them, but allow compilation for native-image
           ./gradlew :cli:nativeCompile -x test --info -PappVersion=${{ inputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify native image
         shell: bash
