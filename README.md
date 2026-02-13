@@ -336,7 +336,7 @@ Fluxzero provides Gradle and Maven plugins that automatically sync AI agent inst
 **build.gradle.kts**
 ```kotlin
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 // Minimal setup - everything is auto-detected
@@ -362,7 +362,6 @@ fluxzero {
 ```kotlin
 pluginManagement {
     repositories {
-        gradlePluginPortal()
         mavenCentral()
     }
 }

@@ -16,7 +16,7 @@ import org.gradle.kotlin.dsl.withType
  * Usage in build.gradle.kts:
  * ```kotlin
  * plugins {
- *     id("io.fluxzero.tools.gradle") version "1.0.0"
+ *     id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
  * }
  *
  * // Minimal config - everything is auto-detected:

@@ -35,7 +35,7 @@ class FluxzeroPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {
@@ -63,7 +63,7 @@ class FluxzeroPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {
@@ -92,7 +92,7 @@ class FluxzeroPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {
@@ -130,7 +130,7 @@ class FluxzeroPluginFunctionalTest {
         buildFile.writeText("""
             plugins {
                 kotlin("jvm") version "2.1.20"
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {
@@ -177,7 +177,7 @@ class FluxzeroPluginFunctionalTest {
         File(submoduleDir, "build.gradle.kts").writeText("""
             plugins {
                 kotlin("jvm")
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {
@@ -223,7 +223,7 @@ class FluxzeroPluginFunctionalTest {
         File(submoduleDir, "build.gradle.kts").writeText("""
             plugins {
                 kotlin("jvm")
-                id("io.fluxzero.tools.gradle")
+                id("io.fluxzero.tools.gradle.plugin")
             }
 
             repositories {

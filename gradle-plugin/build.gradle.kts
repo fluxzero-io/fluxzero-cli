@@ -28,11 +28,9 @@ dependencies {
 group = "io.fluxzero.tools"
 
 gradlePlugin {
-    isAutomatedPublishing = false
-
     plugins {
         create("fluxzero") {
-            id = "io.fluxzero.tools.gradle"
+            id = "io.fluxzero.tools.gradle.plugin"
             implementationClass = "host.flux.gradle.FluxzeroPlugin"
             displayName = "Fluxzero Gradle Plugin"
             description = "Gradle plugin for Fluxzero projects - syncs project files and more"

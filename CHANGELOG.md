@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
-- **Gradle Plugin Artifact**: Fixed Maven Central artifact coordinates — removed the auto-generated marker artifact (`io.fluxzero.tools.gradle:io.fluxzero.tools.gradle.gradle.plugin`). The correct coordinates are `io.fluxzero.tools:fluxzero-gradle-plugin`.
+- **Gradle Plugin ID**: Changed plugin ID from `io.fluxzero.tools.gradle` to `io.fluxzero.tools.gradle.plugin`. The main artifact coordinates remain `io.fluxzero.tools:fluxzero-gradle-plugin`.
 
 ### Added
 
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `ProjectFilesExtractor` - Safely extracts ZIP archives to project directories
     - `ProjectFilesService` - Main orchestration service for syncing project files
 
-  - `gradle-plugin` module: Gradle plugin (`io.fluxzero.tools.gradle`) that:
+  - `gradle-plugin` module: Gradle plugin (`io.fluxzero.tools.gradle.plugin`) that:
     - Automatically syncs project files when SDK version changes
     - Integrates with Gradle's incremental build system (UP-TO-DATE when no changes)
     - Hooks into compilation lifecycle (runs before compileJava/compileKotlin)

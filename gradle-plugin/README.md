@@ -18,7 +18,7 @@ Add the plugin to your `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 ```
 
@@ -32,7 +32,7 @@ Everything is auto-detected by default:
 
 ```kotlin
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 // No additional configuration needed!
@@ -115,7 +115,7 @@ By default, agent files are only synced in the root project to avoid duplication
 ```kotlin
 // Root build.gradle.kts
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 fluxzero {
@@ -251,7 +251,7 @@ Synchronizes AI agent instruction files for the project.
 ```kotlin
 plugins {
     kotlin("jvm") version "1.9.0"
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 dependencies {
@@ -266,7 +266,7 @@ dependencies {
 ```kotlin
 plugins {
     java
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 dependencies {
@@ -279,11 +279,11 @@ dependencies {
 ```kotlin
 // Root build.gradle.kts
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0" apply false
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0" apply false
 }
 
 // In root project only
-apply(plugin = "io.fluxzero.tools.gradle")
+apply(plugin = "io.fluxzero.tools.gradle.plugin")
 
 fluxzero {
     projectFiles {
@@ -303,7 +303,7 @@ fluxzero = "1.75.1"
 fluxzero-sdk = { module = "io.fluxzero:fluxzero-sdk", version.ref = "fluxzero" }
 
 [plugins]
-fluxzero-tools = { id = "io.fluxzero.tools.gradle", version = "1.0.0" }
+fluxzero-tools = { id = "io.fluxzero.tools.gradle.plugin", version = "1.0.0" }
 ```
 
 ```kotlin
@@ -321,7 +321,7 @@ dependencies {
 
 ```kotlin
 plugins {
-    id("io.fluxzero.tools.gradle") version "1.0.0"
+    id("io.fluxzero.tools.gradle.plugin") version "1.0.0"
 }
 
 fluxzero {
