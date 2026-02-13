@@ -9,10 +9,6 @@ plugins {
     id("com.gradleup.shadow") version "9.0.0"
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 // Configuration for dependencies that should be embedded into the shadow JAR
 val shade by configurations.creating {
     isTransitive = true

@@ -2,10 +2,6 @@ plugins {
     kotlin("jvm")
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
     // YAML parsing for refactor.yaml files
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.0")

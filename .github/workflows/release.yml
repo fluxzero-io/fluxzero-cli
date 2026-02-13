@@ -36,11 +36,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
+      - name: Setup tools from .tool-versions
+        uses: jdx/mise-action@v3
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -92,11 +89,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
+      - name: Setup tools from .tool-versions
+        uses: jdx/mise-action@v3
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -129,11 +123,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
+      - name: Setup tools from .tool-versions
+        uses: jdx/mise-action@v3
 
       - name: Download JAR artifact
         uses: actions/download-artifact@v4

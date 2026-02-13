@@ -56,10 +56,14 @@ jobs:
           name: jar-artifact
           path: build/
 
+      - name: Read Java version from .tool-versions
+        id: tools
+        run: echo "java-version=$(grep '^java ' .tool-versions | sed 's/java [^-]*-\([0-9]*\).*/\1/')" >> $GITHUB_OUTPUT
+
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '21'
+          java-version: ${{ steps.tools.outputs.java-version }}
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

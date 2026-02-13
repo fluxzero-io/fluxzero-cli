@@ -20,6 +20,10 @@ subprojects {
     group = rootProject.group
     version = rootProject.version
 
+    configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+        jvmToolchain(21)
+    }
+
     tasks.withType<Test> {
         useJUnitPlatform()
     }

@@ -6,10 +6,6 @@ plugins {
     id("org.graalvm.buildtools.native")
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
     implementation(project(":templates"))
     
