@@ -10,9 +10,15 @@ plugins {
 
 group = "io.fluxzero.tools"
 
+// Configuration for dependencies that should be embedded into the shadow JAR
+val shade by configurations.creating {
+    isTransitive = true
+}
+
 dependencies {
-    // Reuse shared core library
-    implementation(project(":project-files"))
+    // Reuse shared core library (shade into fat JAR, compileOnly to keep out of published POM)
+    shade(project(":project-files"))
+    compileOnly(project(":project-files"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
@@ -54,6 +60,12 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
 // Configure shadow JAR to include all dependencies
 tasks.shadowJar {
     dependsOn(generatePluginDescriptor)
+
+    // Include shade configuration so project-files gets bundled into the fat JAR
+    configurations = listOf(
+        project.configurations.runtimeClasspath.get(),
+        shade
+    )
 
     // Include the generated plugin.xml
     from(file("target/classes/META-INF/maven")) {

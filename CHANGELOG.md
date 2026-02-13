@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Maven Plugin**: Published POM no longer declares `project-files` as a compile dependency. The internal `project-files` module is now shaded into the fat JAR and marked `compileOnly`, matching the pattern used by the Gradle plugin. This fixes `Could not find artifact io.fluxzero.tools:project-files` errors for users of the published plugin.
+
 ### Changed
 
 - **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
