@@ -58,6 +58,7 @@ jobs:
 
       - name: Read Java version from .tool-versions
         id: tools
+        shell: bash
         run: echo "java-version=$(grep '^java ' .tool-versions | sed 's/java [^-]*-\([0-9]*\).*/\1/')" >> $GITHUB_OUTPUT
 
       - name: Set up GraalVM
