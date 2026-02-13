@@ -44,6 +44,8 @@ jobs:
 
       - name: Build and test
         run: ./gradlew build shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test JAR functionality
         run: |

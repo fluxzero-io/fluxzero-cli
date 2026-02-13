@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Templates**: Templates are now downloaded from GitHub release artifacts (`templates.zip`) instead of source archives, ensuring consistent template packaging. The `EXAMPLES_BRANCH` configuration has been replaced with `EXAMPLES_RELEASE_TAG` (default: `latest`).
 - **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
 - **Gradle Plugin ID**: Changed plugin ID from `io.fluxzero.tools.gradle` to `io.fluxzero.tools.gradle.plugin`. The main artifact coordinates remain `io.fluxzero.tools:fluxzero-gradle-plugin`.
 - **Gradle Plugin**: Embedded `project-files` module and its dependencies (kotlinx-serialization, kotlin-logging, slf4j) into the plugin JAR using shadow. The plugin is now self-contained with no transitive dependencies on internal modules.

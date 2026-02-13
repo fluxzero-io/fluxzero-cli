@@ -14,24 +14,70 @@ trap 'code=$?; echo "ERROR: Script failed at line $LINENO (cmd: $BASH_COMMAND) w
 # Inputs (env vars); Gradle passes these when invoking this script
 EXAMPLES_ZIP_URL=${EXAMPLES_ZIP_URL:-}
 EXAMPLES_REPO_URL=${EXAMPLES_REPO_URL:-"https://github.com/fluxzero-io/fluxzero-examples.git"}
-EXAMPLES_BRANCH=${EXAMPLES_BRANCH:-"main"}
+EXAMPLES_RELEASE_TAG=${EXAMPLES_RELEASE_TAG:-"latest"}
+GITHUB_TOKEN=${GITHUB_TOKEN:-}
 CACHE_DIR=${CACHE_DIR:-"./build/examples-snapshot"}
 OUTPUT_DIR=${OUTPUT_DIR:-"./build/generated/resources/templates"}
 REFRESH_EXAMPLES=${REFRESH_EXAMPLES:-"false"}
 
-derive_zip_url() {
-  local repo_url=$1 branch=$2
+# Extract owner/repo from the repo URL
+extract_owner_repo() {
+  local repo_url=$1
   if [[ $repo_url == https://github.com/* ]]; then
     local path=${repo_url#https://github.com/}
     path=${path%.git}
-    echo "https://github.com/${path}/archive/refs/heads/${branch}.zip"
+    echo "$path"
   elif [[ $repo_url == git@github.com:* ]]; then
     local path=${repo_url#git@github.com:}
     path=${path%.git}
-    echo "https://github.com/${path}/archive/refs/heads/${branch}.zip"
+    echo "$path"
   else
-    echo ""  # unknown
+    echo ""
   fi
+}
+
+# Fetch the templates.zip download URL from GitHub Releases API
+fetch_release_asset_url() {
+  local repo_url=$1 tag=$2
+  local owner_repo
+  owner_repo=$(extract_owner_repo "$repo_url")
+  [[ -n "$owner_repo" ]] || { echo "ERROR: Could not extract owner/repo from: $repo_url" >&2; return 1; }
+
+  local api_url
+  if [[ "$tag" == "latest" ]]; then
+    api_url="https://api.github.com/repos/${owner_repo}/releases/latest"
+  else
+    api_url="https://api.github.com/repos/${owner_repo}/releases/tags/${tag}"
+  fi
+
+  echo "Querying GitHub Releases API: $api_url" >&2
+
+  local curl_args=(-fsSL -H "Accept: application/vnd.github+json")
+  if [[ -n "$GITHUB_TOKEN" ]]; then
+    curl_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  fi
+
+  local response
+  if ! response=$(curl "${curl_args[@]}" "$api_url" 2>&1); then
+    echo "ERROR: Failed to query GitHub Releases API at $api_url" >&2
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+      echo "HINT: Set GITHUB_TOKEN to avoid rate limits (unauthenticated: 60 req/hr, authenticated: 5000 req/hr)" >&2
+    fi
+    return 1
+  fi
+
+  # Parse browser_download_url for templates.zip from JSON using grep/sed (no jq dependency)
+  local download_url
+  download_url=$(echo "$response" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*templates\.zip"' | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)"/\1/')
+
+  if [[ -z "$download_url" ]]; then
+    echo "ERROR: No templates.zip asset found in release" >&2
+    echo "Available assets:" >&2
+    echo "$response" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/"browser_download_url"[[:space:]]*:[[:space:]]*//; s/"//g' >&2
+    return 1
+  fi
+
+  echo "$download_url"
 }
 
 require_cmd() {
@@ -49,18 +95,28 @@ else
   rm -rf "$CACHE_DIR"
   mkdir -p "$CACHE_DIR"
 
-  ZIP_URL=${EXAMPLES_ZIP_URL:-$(derive_zip_url "$EXAMPLES_REPO_URL" "$EXAMPLES_BRANCH")}
-  [[ -n "$ZIP_URL" ]] || { echo "ERROR: Could not derive examples ZIP URL" >&2; exit 1; }
+  if [[ -n "$EXAMPLES_ZIP_URL" ]]; then
+    ZIP_URL="$EXAMPLES_ZIP_URL"
+  else
+    ZIP_URL=$(fetch_release_asset_url "$EXAMPLES_REPO_URL" "$EXAMPLES_RELEASE_TAG")
+  fi
+  [[ -n "$ZIP_URL" ]] || { echo "ERROR: Could not determine examples ZIP URL" >&2; exit 1; }
 
   echo "Downloading examples ZIP from: $ZIP_URL"
   tmpzip=$(mktemp -t examples.XXXXXX.zip)
   trap 'rm -f "$tmpzip"' EXIT
-  curl -fsSL "$ZIP_URL" -o "$tmpzip"
+
+  # Use token for download if available (release assets may need auth)
+  download_args=(-fsSL)
+  if [[ -n "$GITHUB_TOKEN" ]]; then
+    download_args+=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  fi
+  curl "${download_args[@]}" "$ZIP_URL" -o "$tmpzip"
 
   echo "Unpacking examples..."
   unzip -q "$tmpzip" -d "$CACHE_DIR"
 
-  # Flatten if a single top-level directory exists
+  # Flatten if a single top-level directory exists (safety net for source archives)
   shopt -s nullglob
   entries=("$CACHE_DIR"/*)
   if [[ ${#entries[@]} -eq 1 && -d "${entries[0]}" ]]; then
@@ -100,7 +156,7 @@ fi
 tmpnames=$(mktemp -t templates.XXXX)
 printf '%s\n' "${names[@]}" | sort > "$tmpnames"
 
-> "$INDEX_FILE"
+true > "$INDEX_FILE"
 while IFS= read -r name; do
   [[ -z "$name" ]] && continue
   echo "Zipping template: $name"

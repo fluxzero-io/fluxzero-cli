@@ -323,8 +323,8 @@ operations:
 
 Advanced:
 - Override repo URL: `./gradlew -PexamplesRepoUrl=https://github.com/your-org/your-examples.git build`
-- Override branch: `./gradlew -PexamplesBranch=my-branch build`
-- Pin an explicit ZIP: `./gradlew -PexamplesZipUrl=https://github.com/your-org/your-examples/archive/refs/tags/v1.2.3.zip build`
+- Override release tag: `./gradlew -PexamplesReleaseTag=v1.2.3 build`
+- Pin an explicit ZIP: `./gradlew -PexamplesZipUrl=https://example.com/templates.zip build`
 - Force refresh the cache: `./gradlew -PrefreshExamples=true build`
 
 ## Build Plugins

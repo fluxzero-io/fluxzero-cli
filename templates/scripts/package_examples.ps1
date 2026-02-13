@@ -1,32 +1,64 @@
 #!/usr/bin/env pwsh
 $ErrorActionPreference = 'Stop'
 
-function Derive-ZipUrl($repoUrl, $branch) {
+function Extract-OwnerRepo($repoUrl) {
     if ($repoUrl.StartsWith('https://github.com/')) {
-        $path = $repoUrl.Substring('https://github.com/'.Length).TrimEnd('.git')
-        return "https://github.com/$path/archive/refs/heads/$branch.zip"
+        return $repoUrl.Substring('https://github.com/'.Length).TrimEnd('.git')
     } elseif ($repoUrl.StartsWith('git@github.com:')) {
-        $path = $repoUrl.Substring('git@github.com:'.Length).TrimEnd('.git')
-        return "https://github.com/$path/archive/refs/heads/$branch.zip"
+        return $repoUrl.Substring('git@github.com:'.Length).TrimEnd('.git')
     } else {
         return $null
     }
 }
 
+function Get-ReleaseAssetUrl($repoUrl, $tag, $token) {
+    $ownerRepo = Extract-OwnerRepo $repoUrl
+    if (-not $ownerRepo) { throw "Could not extract owner/repo from: $repoUrl" }
+
+    if ($tag -eq 'latest') {
+        $apiUrl = "https://api.github.com/repos/$ownerRepo/releases/latest"
+    } else {
+        $apiUrl = "https://api.github.com/repos/$ownerRepo/releases/tags/$tag"
+    }
+
+    Write-Host "Querying GitHub Releases API: $apiUrl"
+
+    $headers = @{ 'Accept' = 'application/vnd.github+json' }
+    if ($token) {
+        $headers['Authorization'] = "Bearer $token"
+    }
+
+    try {
+        $release = Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing
+    } catch {
+        $hint = ''
+        if (-not $token) {
+            $hint = "`nHINT: Set GITHUB_TOKEN to avoid rate limits (unauthenticated: 60 req/hr, authenticated: 5000 req/hr)"
+        }
+        throw "Failed to query GitHub Releases API at ${apiUrl}: $($_.Exception.Message)$hint"
+    }
+
+    $asset = $release.assets | Where-Object { $_.name -eq 'templates.zip' } | Select-Object -First 1
+    if (-not $asset) {
+        $available = ($release.assets | ForEach-Object { $_.name }) -join ', '
+        throw "No templates.zip asset found in release. Available assets: $available"
+    }
+
+    return $asset.browser_download_url
+}
+
 try {
     $zipUrl = $env:EXAMPLES_ZIP_URL
     $repoUrl = if ($env:EXAMPLES_REPO_URL) { $env:EXAMPLES_REPO_URL } else { 'https://github.com/fluxzero-io/fluxzero-examples.git' }
-    $branch = if ($env:EXAMPLES_BRANCH) { $env:EXAMPLES_BRANCH } else { 'main' }
+    $releaseTag = if ($env:EXAMPLES_RELEASE_TAG) { $env:EXAMPLES_RELEASE_TAG } else { 'latest' }
+    $githubToken = $env:GITHUB_TOKEN
     $cacheDir = if ($env:CACHE_DIR) { $env:CACHE_DIR } else { './build/examples-snapshot' }
     $outputDir = if ($env:OUTPUT_DIR) { $env:OUTPUT_DIR } else { './build/generated/resources/templates' }
     $refresh = ($env:REFRESH_EXAMPLES -eq 'true')
 
     if ($env:DEBUG_TEMPLATES -eq 'true') {
-        Write-Host "DEBUG: Using PowerShell script with:`n  zipUrl=$zipUrl`n  repoUrl=$repoUrl`n  branch=$branch`n  cacheDir=$cacheDir`n  outputDir=$outputDir`n  refresh=$refresh"
+        Write-Host "DEBUG: Using PowerShell script with:`n  zipUrl=$zipUrl`n  repoUrl=$repoUrl`n  releaseTag=$releaseTag`n  cacheDir=$cacheDir`n  outputDir=$outputDir`n  refresh=$refresh"
     }
-
-    if (-not $zipUrl) { $zipUrl = Derive-ZipUrl $repoUrl $branch }
-    if (-not $zipUrl) { throw "Could not determine ZIP URL for examples." }
 
     # Determine cache state without throwing when the directory doesn't exist
     $cacheExists = Test-Path -LiteralPath $cacheDir -PathType Container
@@ -45,10 +77,19 @@ try {
         if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
         New-Item -ItemType Directory -Path $cacheDir | Out-Null
 
+        if (-not $zipUrl) {
+            $zipUrl = Get-ReleaseAssetUrl $repoUrl $releaseTag $githubToken
+        }
+        if (-not $zipUrl) { throw "Could not determine ZIP URL for examples." }
+
         Write-Host "Downloading examples ZIP from: $zipUrl"
         $tmp = New-TemporaryFile
         try {
-            Invoke-WebRequest -Uri $zipUrl -OutFile $tmp -UseBasicParsing | Out-Null
+            $downloadHeaders = @{}
+            if ($githubToken) {
+                $downloadHeaders['Authorization'] = "Bearer $githubToken"
+            }
+            Invoke-WebRequest -Uri $zipUrl -OutFile $tmp -Headers $downloadHeaders -UseBasicParsing | Out-Null
         } catch {
             throw "Failed to download examples ZIP: $($_.Exception.Message)"
         }

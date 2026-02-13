@@ -6,7 +6,7 @@ dependencies {
     // YAML parsing for refactor.yaml files
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
-    
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
@@ -17,11 +17,13 @@ dependencies {
 val examplesRepoUrl: String = (findProperty("examplesRepoUrl") as String?)
     ?: System.getenv("EXAMPLES_REPO_URL")
     ?: "https://github.com/fluxzero-io/fluxzero-examples.git"
-val examplesBranch: String = (findProperty("examplesBranch") as String?)
-    ?: System.getenv("EXAMPLES_BRANCH")
-    ?: "main"
+val examplesReleaseTag: String = (findProperty("examplesReleaseTag") as String?)
+    ?: System.getenv("EXAMPLES_RELEASE_TAG")
+    ?: "latest"
 val examplesZipUrl: String? = (findProperty("examplesZipUrl") as String?)
     ?: System.getenv("EXAMPLES_ZIP_URL")
+val githubToken: String? = (findProperty("githubToken") as String?)
+    ?: System.getenv("GITHUB_TOKEN")
 val refreshExamples: Boolean = ((findProperty("refreshExamples") as String?)
     ?: System.getenv("REFRESH_EXAMPLES"))
     ?.toBoolean() ?: false
@@ -47,8 +49,9 @@ val packageTemplates by tasks.registering(Exec::class) {
 
     // Provide environment variables for the script
     environment("EXAMPLES_REPO_URL", examplesRepoUrl)
-    environment("EXAMPLES_BRANCH", examplesBranch)
+    environment("EXAMPLES_RELEASE_TAG", examplesReleaseTag)
     if (examplesZipUrl != null) environment("EXAMPLES_ZIP_URL", examplesZipUrl)
+    if (githubToken != null) environment("GITHUB_TOKEN", githubToken)
     if (refreshExamples) environment("REFRESH_EXAMPLES", "true")
     environment("CACHE_DIR", examplesWorkDir.get().asFile.absolutePath)
     environment("OUTPUT_DIR", generatedTemplatesDir.get().asFile.absolutePath)
@@ -61,7 +64,7 @@ val packageTemplates by tasks.registering(Exec::class) {
 
     // Inputs/outputs for task tracking
     inputs.property("examplesRepoUrl", examplesRepoUrl)
-    inputs.property("examplesBranch", examplesBranch)
+    inputs.property("examplesReleaseTag", examplesReleaseTag)
     inputs.property("examplesZipUrl", examplesZipUrl ?: "")
     inputs.property("refreshExamples", refreshExamples)
     outputs.dir(generatedTemplatesDir)
