@@ -4,7 +4,6 @@ plugins {
     kotlin("jvm")
     `java-gradle-plugin`
     id("com.vanniktech.maven.publish")
-    id("com.gradle.plugin-publish")
 }
 
 kotlin {
@@ -29,8 +28,7 @@ dependencies {
 group = "io.fluxzero.tools"
 
 gradlePlugin {
-    website.set("https://fluxzero.io")
-    vcsUrl.set("https://github.com/fluxzero-io/fluxzero-cli")
+    isAutomatedPublishing = false
 
     plugins {
         create("fluxzero") {
@@ -38,7 +36,6 @@ gradlePlugin {
             implementationClass = "host.flux.gradle.FluxzeroPlugin"
             displayName = "Fluxzero Gradle Plugin"
             description = "Gradle plugin for Fluxzero projects - syncs project files and more"
-            tags.set(listOf("fluxzero", "ai", "agents", "code-generation"))
         }
     }
 }

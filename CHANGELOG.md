@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
+- **Gradle Plugin Artifact**: Fixed Maven Central artifact coordinates — removed the auto-generated marker artifact (`io.fluxzero.tools.gradle:io.fluxzero.tools.gradle.gradle.plugin`). The correct coordinates are `io.fluxzero.tools:fluxzero-gradle-plugin`.
+
 ### Added
 
 - **Maven Central Publishing**: Automated publishing of Fluxzero plugins to Maven Central via GitHub Actions workflow using the Vanniktech Maven Publish Plugin:
   - `io.fluxzero.tools:fluxzero-maven-plugin` - Maven plugin
-  - `io.fluxzero.tools:fluxzero-gradle-plugin` - Gradle plugin (also published to Gradle Plugin Portal)
+  - `io.fluxzero.tools:fluxzero-gradle-plugin` - Gradle plugin
 - **Maven Plugin**: Added `enabled` parameter for consistent API with Gradle plugin. Replaces `skip` as the recommended way to disable the plugin, though `skip` is kept for backward compatibility. Both `enabled=false` and `skip=true` can be used to disable execution.
 - **Maven Plugin**: Added basic test coverage with configuration validation tests to prevent regressions.
 - **Documentation**: Added comprehensive README.md files for both Gradle and Maven plugins with:
