@@ -5,10 +5,6 @@ plugins {
 
 group = "io.fluxzero.tools"
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
     // JSON serialization (for GitHub API responses)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

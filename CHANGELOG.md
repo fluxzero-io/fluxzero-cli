@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
+- **Gradle Plugin ID**: Changed plugin ID from `io.fluxzero.tools.gradle` to `io.fluxzero.tools.gradle.plugin`. The main artifact coordinates remain `io.fluxzero.tools:fluxzero-gradle-plugin`.
+- **Gradle Plugin**: Embedded `project-files` module and its dependencies (kotlinx-serialization, kotlin-logging, slf4j) into the plugin JAR using shadow. The plugin is now self-contained with no transitive dependencies on internal modules.
+
 ### Added
 
 - **Maven Central Publishing**: Automated publishing of Fluxzero plugins to Maven Central via GitHub Actions workflow using the Vanniktech Maven Publish Plugin:
   - `io.fluxzero.tools:fluxzero-maven-plugin` - Maven plugin
-  - `io.fluxzero.tools:fluxzero-gradle-plugin` - Gradle plugin (also published to Gradle Plugin Portal)
+  - `io.fluxzero.tools:fluxzero-gradle-plugin` - Gradle plugin
 - **Maven Plugin**: Added `enabled` parameter for consistent API with Gradle plugin. Replaces `skip` as the recommended way to disable the plugin, though `skip` is kept for backward compatibility. Both `enabled=false` and `skip=true` can be used to disable execution.
 - **Maven Plugin**: Added basic test coverage with configuration validation tests to prevent regressions.
 - **Documentation**: Added comprehensive README.md files for both Gradle and Maven plugins with:
@@ -52,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `ProjectFilesExtractor` - Safely extracts ZIP archives to project directories
     - `ProjectFilesService` - Main orchestration service for syncing project files
 
-  - `gradle-plugin` module: Gradle plugin (`io.fluxzero.tools.gradle`) that:
+  - `gradle-plugin` module: Gradle plugin (`io.fluxzero.tools.gradle.plugin`) that:
     - Automatically syncs project files when SDK version changes
     - Integrates with Gradle's incremental build system (UP-TO-DATE when no changes)
     - Hooks into compilation lifecycle (runs before compileJava/compileKotlin)

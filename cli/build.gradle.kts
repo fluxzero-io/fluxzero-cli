@@ -8,10 +8,6 @@ plugins {
     id("org.graalvm.buildtools.native")
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
 dependencies {
     implementation(project(":templates"))
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
