@@ -1,5 +1,5 @@
 # Java runtime image for running the shaded JAR
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21.0.10_7-jre-jammy
 
 WORKDIR /app
 
