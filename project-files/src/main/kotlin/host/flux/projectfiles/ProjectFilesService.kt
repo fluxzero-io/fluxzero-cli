@@ -1,6 +1,8 @@
 package host.flux.projectfiles
 
 import mu.KotlinLogging
+import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 
 private val logger = KotlinLogging.logger {}
@@ -109,6 +111,19 @@ class DefaultProjectFilesService(
             val projectLanguage = language ?: LanguageDetector.detect(projectDir)
             logger.info { "Using language: $projectLanguage, version: $sdkVersion" }
 
+            // Check if already up-to-date
+            if (!forceUpdate) {
+                val syncVersionFile = projectDir.resolve(ProjectFilesExtractor.PROJECT_FILES_DIR).resolve(".sync-version")
+                if (Files.exists(syncVersionFile)) {
+                    val savedState = Files.readString(syncVersionFile).trim()
+                    val currentState = "$sdkVersion:${projectLanguage.name.lowercase()}"
+                    if (savedState == currentState) {
+                        logger.info { "Project files already up-to-date for $projectLanguage version $sdkVersion" }
+                        return SyncResult.UpToDate(version = sdkVersion)
+                    }
+                }
+            }
+
             // Download project files
             logger.info { "Downloading project files for $projectLanguage version $sdkVersion" }
             val zipData = gitHubClient.downloadProjectFiles(projectLanguage, sdkVersion)
@@ -118,6 +133,10 @@ class DefaultProjectFilesService(
 
             // Extract new files
             val extractedFiles = ProjectFilesExtractor.extract(zipData, projectDir)
+
+            // Record synced version for up-to-date checking
+            val syncVersionFile = projectDir.resolve(ProjectFilesExtractor.PROJECT_FILES_DIR).resolve(".sync-version")
+            Files.writeString(syncVersionFile, "$sdkVersion:${projectLanguage.name.lowercase()}")
 
             logger.info { "Successfully synced ${extractedFiles.size} project files" }
             SyncResult.Updated(
@@ -130,6 +149,12 @@ class DefaultProjectFilesService(
             SyncResult.Failed(
                 error = "Failed to fetch project files: ${e.message}",
                 cause = e
+            )
+        } catch (e: IOException) {
+            logger.warn(e) { "Network error during project files sync - continuing without sync" }
+            SyncResult.Skipped(
+                "Could not reach GitHub to download project files (${e.javaClass.simpleName}: ${e.message}). " +
+                    "Build will continue without syncing. Check your internet connection if this persists."
             )
         } catch (e: Exception) {
             logger.error(e) { "Unexpected error during sync" }
