@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improved
+
+- **Maven & Gradle Plugins**: Project files are now only downloaded when the SDK version or language changes. A `.fluxzero/.sync-version` metadata file tracks the last synced state, eliminating redundant GitHub API calls on every build.
+
 ### Fixed
 
 - **Maven & Gradle Plugins**: Builds no longer fail when there is no internet connection during project files sync. Network errors now result in a warning instead of a build failure.
