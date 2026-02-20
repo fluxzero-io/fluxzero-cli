@@ -1,6 +1,7 @@
 package host.flux.projectfiles
 
 import mu.KotlinLogging
+import java.io.IOException
 import java.nio.file.Path
 
 private val logger = KotlinLogging.logger {}
@@ -130,6 +131,12 @@ class DefaultProjectFilesService(
             SyncResult.Failed(
                 error = "Failed to fetch project files: ${e.message}",
                 cause = e
+            )
+        } catch (e: IOException) {
+            logger.warn(e) { "Network error during project files sync - continuing without sync" }
+            SyncResult.Skipped(
+                "Could not reach GitHub to download project files (${e.javaClass.simpleName}: ${e.message}). " +
+                    "Build will continue without syncing. Check your internet connection if this persists."
             )
         } catch (e: Exception) {
             logger.error(e) { "Unexpected error during sync" }
