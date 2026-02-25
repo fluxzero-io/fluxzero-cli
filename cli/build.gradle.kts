@@ -4,14 +4,14 @@ import org.gradle.jvm.tasks.Jar
 plugins {
     kotlin("jvm")
     application
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.3.1"
     id("org.graalvm.buildtools.native")
 }
 
 dependencies {
     implementation(project(":templates"))
-    implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation("org.jline:jline:3.30.4")
+    implementation("com.github.ajalt.clikt:clikt:5.1.0")
+    implementation("org.jline:jline:3.30.6")
 }
 
 application {
