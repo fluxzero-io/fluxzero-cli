@@ -63,15 +63,13 @@ jobs:
           path: templates/build/examples-snapshot/
         continue-on-error: true
 
-      - name: Read Java version from .tool-versions
-        id: tools
-        shell: bash
-        run: echo "java-version=$(grep '^java ' .tool-versions | sed 's/java [^-]*-\([0-9]*\).*/\1/')" >> $GITHUB_OUTPUT
-
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: ${{ steps.tools.outputs.java-version }}
+          # Use Java 21 LTS for native builds: JLine's native terminal code
+          # segfaults under GraalVM + Java 25 due to restricted method enforcement.
+          # Development can use Java 25 via .tool-versions; only native images need 21.
+          java-version: '21'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
