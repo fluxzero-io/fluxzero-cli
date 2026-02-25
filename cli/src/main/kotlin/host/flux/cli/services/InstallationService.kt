@@ -119,12 +119,20 @@ open class DefaultInstallationService(
         val binaryResponse = downloadBinary(tag, binaryName)
             ?: throw IllegalStateException("Failed to download native binary: $binaryName from both repositories")
 
-        // Install as 'fz' in the bin directory
+        // Download to a temp file first, then atomically move into place.
+        // This prevents a corrupted binary if the process crashes mid-download.
         val binaryPath = binDir.resolve("fz")
-        binaryResponse.body().use { input: InputStream ->
-            Files.copy(input, binaryPath, StandardCopyOption.REPLACE_EXISTING)
+        val tempPath = binDir.resolve("fz.tmp")
+        try {
+            binaryResponse.body().use { input: InputStream ->
+                Files.copy(input, tempPath, StandardCopyOption.REPLACE_EXISTING)
+            }
+            tempPath.toFile().setExecutable(true)
+            Files.move(tempPath, binaryPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: Exception) {
+            Files.deleteIfExists(tempPath)
+            throw e
         }
-        binaryPath.toFile().setExecutable(true)
 
         System.err.println("Installation complete!")
 

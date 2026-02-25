@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Native Build**: Fixed hidden directories (`.fluxzero/`, `.run/`, `.gitignore`, etc.) being silently stripped from templates in native image builds. The `upload-artifact@v4` action excludes hidden files by default since September 2024; the templates cache artifact now opts in with `include-hidden-files: true`. This caused the CLI native binary to produce scaffolded projects missing dotfiles, while the JAR and REST API worked correctly.
+- **Upgrade**: The `fz upgrade` command now downloads to a temporary file and atomically moves it into place. Previously, a crash mid-download would leave a corrupted binary, bricking the CLI.
 
 ### Improved
 
