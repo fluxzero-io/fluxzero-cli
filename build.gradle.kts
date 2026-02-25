@@ -1,8 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.1.20" apply false
-    kotlin("plugin.serialization") version "2.1.20" apply false
-    id("org.graalvm.buildtools.native") version "0.10.6" apply false
-    id("com.vanniktech.maven.publish") version "0.30.0" apply false
+    kotlin("jvm") version "2.3.10" apply false
+    kotlin("plugin.serialization") version "2.3.10" apply false
+    id("org.graalvm.buildtools.native") version "0.11.4" apply false
+    id("com.vanniktech.maven.publish") version "0.36.0" apply false
 }
 
 group = "host.flux"
@@ -30,6 +30,6 @@ subprojects {
 
     dependencies {
         "testImplementation"(kotlin("test"))
-        "testImplementation"("io.mockk:mockk:1.14.2")
+        "testImplementation"("io.mockk:mockk:1.14.9")
     }
 }

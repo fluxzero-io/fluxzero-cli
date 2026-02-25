@@ -6,7 +6,7 @@ plugins {
     kotlin("jvm")
     `java-gradle-plugin`
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.3.1"
 }
 
 // Configuration for dependencies that should be embedded into the shadow JAR
@@ -23,8 +23,8 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
-    testImplementation("io.mockk:mockk:1.14.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.3")
+    testImplementation("io.mockk:mockk:1.14.9")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // Functional testing
