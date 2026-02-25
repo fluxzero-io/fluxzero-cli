@@ -1,6 +1,7 @@
 package host.flux.templates.refactor
 
 import java.io.IOException
+import java.nio.charset.MalformedInputException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
@@ -40,7 +41,7 @@ object FileOperationHelper {
     
     fun replaceInFile(file: Path, find: String, replace: String, regex: Boolean, messages: OperationMessages = OperationMessages()) {
         if (!Files.exists(file) || !Files.isRegularFile(file)) return
-        
+
         try {
             val content = Files.readString(file)
             val newContent = if (regex) {
@@ -48,10 +49,12 @@ object FileOperationHelper {
             } else {
                 content.replace(find, replace)
             }
-            
+
             if (content != newContent) {
                 Files.writeString(file, newContent)
             }
+        } catch (_: MalformedInputException) {
+            // Binary file — silently skip, no text patterns to replace
         } catch (e: Exception) {
             messages.warnings.add("Failed to replace in file ${file}: ${e.message}")
         }

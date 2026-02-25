@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Native Build**: Fixed hidden directories (`.fluxzero/`, `.run/`, `.gitignore`, etc.) being silently stripped from templates in native image builds. The `upload-artifact@v4` action excludes hidden files by default since September 2024; the templates cache artifact now opts in with `include-hidden-files: true`. This caused the CLI native binary to produce scaffolded projects missing dotfiles, while the JAR and REST API worked correctly.
 - **Upgrade**: The `fz upgrade` command now downloads to a temporary file and atomically moves it into place. Previously, a crash mid-download would leave a corrupted binary, bricking the CLI.
 - **Native Build**: Fixed segfault in JLine's native terminal code by building native images with GraalVM for Java 21 LTS instead of Java 25. Java 24+ enforces restricted method access for `System.load()`, which JLine uses for native terminal initialization, causing crashes in GraalVM native images.
+- **Templates**: Template refactoring no longer warns about binary files (e.g. `favicon.ico`) when glob patterns like `src/main/resources/**/*` match them.
 
 ### Improved
 

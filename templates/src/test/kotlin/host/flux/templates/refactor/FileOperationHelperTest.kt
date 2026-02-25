@@ -108,12 +108,27 @@ class FileOperationHelperTest {
     fun `replaceInFile should handle non-existent file gracefully`() {
         val nonExistentFile = tempDir.resolve("nonexistent.txt")
         val messages = OperationMessages()
-        
+
         // Should not throw exception
         FileOperationHelper.replaceInFile(nonExistentFile, "old", "new", false, messages)
-        
+
         // File should still not exist
         assertFalse(Files.exists(nonExistentFile))
+    }
+
+    @Test
+    fun `replaceInFile should silently skip binary files`() {
+        val binaryFile = tempDir.resolve("favicon.ico")
+        val binaryContent = byteArrayOf(0x00, 0x00, 0x01, 0x00, 0xFF.toByte(), 0xFE.toByte(), 0x80.toByte())
+        Files.write(binaryFile, binaryContent)
+
+        val messages = OperationMessages()
+        FileOperationHelper.replaceInFile(binaryFile, "com\\.example\\.app", "com.test.new", true, messages)
+
+        // Binary file should be unchanged
+        assertContentEquals(binaryContent, Files.readAllBytes(binaryFile))
+        // No warnings should be generated for binary files
+        assertTrue(messages.warnings.isEmpty())
     }
 
     @Test
