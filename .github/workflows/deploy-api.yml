@@ -16,13 +16,13 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools from .tool-versions
         uses: jdx/mise-action@v3
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Get latest release version
         id: get_version
@@ -57,9 +57,9 @@ jobs:
           pkill -f "flux-api" || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'api/package-lock.json'
 

@@ -48,16 +48,16 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download JAR artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: jar-artifact
           path: build/
 
       - name: Download templates cache
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: templates-cache
           path: templates/build/examples-snapshot/
@@ -76,7 +76,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Build native image
         timeout-minutes: 15
@@ -320,7 +320,7 @@ jobs:
           fi
 
       - name: Upload native executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}
           path: ./cli/build/native/nativeCompile/flux${{ runner.os == 'Windows' && '.exe' || '' }}
