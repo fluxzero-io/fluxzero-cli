@@ -16,7 +16,7 @@ jobs:
       version: ${{ steps.tag_version.outputs.new_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Bump version and push tag
         uses: mathieudutour/github-tag-action@v6.2
@@ -34,13 +34,13 @@ jobs:
       jar-name: fluxzero-cli-${{ needs.version.outputs.version }}.jar
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools from .tool-versions
         uses: jdx/mise-action@v3
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Build and test
         run: ./gradlew build shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
@@ -75,7 +75,7 @@ jobs:
           echo "API JAR functionality test successful!"
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: jar-artifact
           path: |
@@ -84,7 +84,7 @@ jobs:
             cli/build/release-scripts/
 
       - name: Upload templates cache
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: templates-cache
           path: templates/build/examples-snapshot/
@@ -96,13 +96,13 @@ jobs:
     needs: [version, build-and-test, native-build]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools from .tool-versions
         uses: jdx/mise-action@v3
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Publish to Maven Central
         run: |
@@ -130,13 +130,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup tools from .tool-versions
         uses: jdx/mise-action@v3
 
       - name: Download JAR artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: jar-artifact
           path: build/
@@ -161,7 +161,7 @@ jobs:
           echo "JAR verification successful!"
 
       - name: Download native artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: native-artifacts
 
@@ -310,7 +310,7 @@ jobs:
           rm -rf $TEST_HOME $TEST_HOME2
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.version }}
           name: Release ${{ needs.version.outputs.version }}
