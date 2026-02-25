@@ -89,6 +89,7 @@ jobs:
           name: templates-cache
           path: templates/build/examples-snapshot/
           retention-days: 1
+          include-hidden-files: true
 
   publish-plugins:
     runs-on: ubuntu-latest

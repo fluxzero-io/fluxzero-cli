@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Native Build**: Fixed hidden directories (`.fluxzero/`, `.run/`, `.gitignore`, etc.) being silently stripped from templates in native image builds. The `upload-artifact@v4` action excludes hidden files by default since September 2024; the templates cache artifact now opts in with `include-hidden-files: true`. This caused the CLI native binary to produce scaffolded projects missing dotfiles, while the JAR and REST API worked correctly.
+
 ### Improved
 
+- **Native Build**: Added CI assertions to verify hidden directories are present in scaffolded projects, preventing silent regressions.
 - **Maven & Gradle Plugins**: Project files are now only downloaded when the SDK version or language changes. A `.fluxzero/.sync-version` metadata file tracks the last synced state, eliminating redundant GitHub API calls on every build.
 
 ### Fixed

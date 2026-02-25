@@ -149,11 +149,24 @@ jobs:
             echo "ERROR: Git repository was not initialized!"
             exit 1
           fi
-          
+
+          # Verify hidden directories are included in the generated project
+          for hidden_dir in .fluxzero .run; do
+            if [ ! -d "$hidden_dir" ]; then
+              echo "ERROR: Hidden directory '$hidden_dir' not found! Template packaging may have stripped dotfiles."
+              exit 1
+            fi
+          done
+
+          if [ ! -f ".gitignore" ]; then
+            echo "ERROR: .gitignore not found! Template packaging may have stripped dotfiles."
+            exit 1
+          fi
+
           # List the generated structure for debugging
           echo "Generated project structure:"
           find . -type f | head -20
-          
+
           echo "Integration test successful - example project generated correctly!"
 
       - name: Test installation script
