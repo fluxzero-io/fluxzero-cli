@@ -1,12 +1,12 @@
 import com.vanniktech.maven.publish.GradlePlugin
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 // Configuration for dependencies that should be embedded into the shadow JAR
@@ -23,8 +23,8 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
-    testImplementation("io.mockk:mockk:1.14.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.4")
+    testImplementation("io.mockk:mockk:1.14.9")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // Functional testing
@@ -63,7 +63,7 @@ gradlePlugin {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -71,7 +71,7 @@ mavenPublishing {
     }
 
     // Publish as Gradle plugin using shadow JAR (embeds project-files and its dependencies)
-    configure(GradlePlugin(JavadocJar.Empty(), sourcesJar = true))
+    configure(GradlePlugin(JavadocJar.Empty(), SourcesJar.Sources()))
 
     coordinates("io.fluxzero.tools", "fluxzero-gradle-plugin", version.toString())
 

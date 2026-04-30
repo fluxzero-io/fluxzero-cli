@@ -1,11 +1,11 @@
 import com.vanniktech.maven.publish.JavaLibrary
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 
 plugins {
     kotlin("jvm")
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 group = "io.fluxzero.tools"
@@ -21,16 +21,16 @@ dependencies {
     compileOnly(project(":project-files"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
-    compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
-    compileOnly("org.apache.maven:maven-core:3.9.6")
-    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
+    compileOnly("org.apache.maven:maven-plugin-api:3.9.15")
+    compileOnly("org.apache.maven:maven-core:3.9.15")
+    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.2")
 
     // Test dependencies
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0")
-    testImplementation("org.apache.maven:maven-core:3.9.6")
-    testImplementation("org.apache.maven:maven-compat:3.9.6")
+    testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.5.1")
+    testImplementation("org.apache.maven:maven-core:3.9.15")
+    testImplementation("org.apache.maven:maven-compat:3.9.15")
 }
 
 // Copy compiled classes to Maven's expected location (target/classes)
@@ -91,7 +91,7 @@ tasks.assemble {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -99,7 +99,7 @@ mavenPublishing {
     }
 
     // Use shadow component for publishing the fat JAR
-    configure(JavaLibrary(JavadocJar.Empty(), false))
+    configure(JavaLibrary(JavadocJar.Empty(), SourcesJar.None()))
 
     coordinates("io.fluxzero.tools", "fluxzero-maven-plugin", version.toString())
 

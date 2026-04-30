@@ -14,6 +14,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * Gradle task that synchronizes project files for Fluxzero projects.
@@ -28,6 +29,7 @@ import org.gradle.api.tasks.TaskAction
  * - If the SDK version or language hasn't changed, the task is UP-TO-DATE
  * - No network requests are made unless necessary
  */
+@DisableCachingByDefault(because = "Synchronizes files from external Fluxzero release artifacts.")
 abstract class SyncProjectFilesTask : DefaultTask() {
 
     init {
