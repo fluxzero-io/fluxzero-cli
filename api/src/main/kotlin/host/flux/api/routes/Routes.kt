@@ -13,7 +13,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -106,15 +105,12 @@ fun Application.configureRoutes() {
                     )
                     call.response.header(HttpHeaders.CacheControl, "no-cache, no-store, must-revalidate, no-transform")
                     
-                    // Schedule cleanup after response is completely sent
-                    call.response.pipeline.intercept(ApplicationSendPipeline.Engine) {
-                        proceed() // Let the normal response processing continue
-                        // This runs after the response is fully sent
+                    // Stream the file directly
+                    try {
+                        call.respondFile(zipFile.toFile())
+                    } finally {
                         Files.deleteIfExists(zipFile)
                     }
-                    
-                    // Stream the file directly
-                    call.respondFile(zipFile.toFile())
 
 
                 } catch (e: Exception) {

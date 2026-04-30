@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    kotlin("plugin.serialization") version "2.1.20"
+    kotlin("plugin.serialization") version "2.3.21"
     application
     id("com.gradleup.shadow") version "9.0.0"
     id("org.graalvm.buildtools.native")
@@ -10,19 +10,19 @@ dependencies {
     implementation(project(":templates"))
     
     // Ktor server dependencies
-    implementation("io.ktor:ktor-server-core:2.3.12")
-    implementation("io.ktor:ktor-server-cio:2.3.12")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-    implementation("io.ktor:ktor-server-cors:2.3.12")
-    implementation("io.ktor:ktor-server-status-pages:2.3.12")
+    implementation("io.ktor:ktor-server-core:3.4.3")
+    implementation("io.ktor:ktor-server-cio:3.4.3")
+    implementation("io.ktor:ktor-server-content-negotiation:3.4.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.3")
+    implementation("io.ktor:ktor-server-cors:3.4.3")
+    implementation("io.ktor:ktor-server-status-pages:3.4.3")
     
     // Logging implementation
     implementation("ch.qos.logback:logback-classic:1.4.14")
     
     // Testing dependencies
-    testImplementation("io.ktor:ktor-server-test-host:2.3.12")
-    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    testImplementation("io.ktor:ktor-server-test-host:3.4.3")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.4.3")
 }
 
 application {

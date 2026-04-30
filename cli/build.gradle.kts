@@ -11,7 +11,7 @@ plugins {
 dependencies {
     implementation(project(":templates"))
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation("org.jline:jline:3.30.4")
+    implementation("org.jline:jline:4.0.14")
 }
 
 application {
