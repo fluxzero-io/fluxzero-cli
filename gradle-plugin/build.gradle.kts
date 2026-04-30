@@ -1,6 +1,6 @@
 import com.vanniktech.maven.publish.GradlePlugin
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 
 plugins {
     kotlin("jvm")
@@ -63,7 +63,7 @@ gradlePlugin {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -71,7 +71,7 @@ mavenPublishing {
     }
 
     // Publish as Gradle plugin using shadow JAR (embeds project-files and its dependencies)
-    configure(GradlePlugin(JavadocJar.Empty(), sourcesJar = true))
+    configure(GradlePlugin(JavadocJar.Empty(), SourcesJar.Sources()))
 
     coordinates("io.fluxzero.tools", "fluxzero-gradle-plugin", version.toString())
 

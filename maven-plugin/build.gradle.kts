@@ -1,6 +1,6 @@
 import com.vanniktech.maven.publish.JavaLibrary
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 
 plugins {
     kotlin("jvm")
@@ -91,7 +91,7 @@ tasks.assemble {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -99,7 +99,7 @@ mavenPublishing {
     }
 
     // Use shadow component for publishing the fat JAR
-    configure(JavaLibrary(JavadocJar.Empty(), false))
+    configure(JavaLibrary(JavadocJar.Empty(), SourcesJar.None()))
 
     coordinates("io.fluxzero.tools", "fluxzero-maven-plugin", version.toString())
 
