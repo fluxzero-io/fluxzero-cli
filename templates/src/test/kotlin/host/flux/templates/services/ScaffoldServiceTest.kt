@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 
 class ScaffoldServiceTest {
@@ -194,5 +195,26 @@ class ScaffoldServiceTest {
 
         assertTrue(result.success)
         verify { mockTemplateService.extractTemplate("test-template", match { it.endsWith("my_project_name") }) }
+    }
+
+    @Test
+    fun `makes Unix build wrappers executable`() {
+        every { mockTemplateService.extractTemplate(any(), any()) } answers {
+            val outputDir = tempDir.resolve("my-project")
+            Files.createDirectories(outputDir)
+            Files.writeString(outputDir.resolve("mvnw"), "#!/bin/sh\n")
+            Files.writeString(outputDir.resolve("mvnw.cmd"), "@REM Maven wrapper\n")
+        }
+
+        val request = ScaffoldProject(
+            template = "test-template",
+            name = "my-project",
+            outputDir = tempDir.toString()
+        )
+
+        val result = scaffoldService.scaffoldProject(request)
+
+        assertTrue(result.success)
+        assertTrue(Files.isExecutable(tempDir.resolve("my-project/mvnw")))
     }
 }

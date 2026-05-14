@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.slot
+import org.apache.commons.compress.archivers.zip.ZipFile
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -65,6 +66,40 @@ class ApiScaffoldServiceTest {
         // Verify the zip file was created
         assertTrue(Files.exists(result.zipFile!!))
         assertTrue(Files.size(result.zipFile!!) > 0)
+    }
+
+    @Test
+    fun `returns zip with executable Maven wrapper`() {
+        val request = InitRequest(
+            template = "test-template",
+            name = "MyProject",
+            packageName = "com.test"
+        )
+        val scaffoldRequestSlot = slot<host.flux.templates.models.ScaffoldProject>()
+
+        every { mockScaffoldService.scaffoldProject(capture(scaffoldRequestSlot)) } answers {
+            val outputDir = Path.of(scaffoldRequestSlot.captured.outputDir!!)
+            val projectDir = outputDir.resolve("myproject")
+            Files.createDirectories(projectDir)
+            val wrapper = projectDir.resolve("mvnw")
+            Files.writeString(wrapper, "#!/bin/sh\n")
+            wrapper.toFile().setExecutable(true, false)
+
+            ScaffoldResult(
+                success = true,
+                message = "Success",
+                outputPath = projectDir.toString()
+            )
+        }
+
+        val result = apiScaffoldService.scaffoldProjectAsZip(request)
+
+        assertTrue(result.success, "Expected success but got error: ${result.error}")
+        ZipFile.builder().setPath(result.zipFile!!).get().use { zip ->
+            val wrapperEntry = zip.getEntry("myproject/mvnw")
+            assertNotNull(wrapperEntry)
+            assertEquals(0b001_001_001, wrapperEntry.unixMode and 0b001_001_001)
+        }
     }
 
     @Test

@@ -19,6 +19,7 @@ dependencies {
     
     // Logging implementation
     implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     
     // Testing dependencies
     testImplementation("io.ktor:ktor-server-test-host:2.3.12")

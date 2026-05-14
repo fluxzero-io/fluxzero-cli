@@ -73,6 +73,8 @@ class ScaffoldService(
                     error = refactorResult.error
                 )
             }
+
+            ensureBuildWrappersExecutable(outputDir)
             
             // Initialize Git if requested
             if (request.initGit) {
@@ -101,6 +103,15 @@ class ScaffoldService(
                 message = "Failed to initialize project: ${e.message}",
                 error = e.message
             )
+        }
+    }
+
+    private fun ensureBuildWrappersExecutable(outputDir: Path) {
+        listOf("mvnw", "gradlew").forEach { wrapperName ->
+            val wrapper = outputDir.resolve(wrapperName)
+            if (Files.isRegularFile(wrapper)) {
+                wrapper.toFile().setExecutable(true, false)
+            }
         }
     }
     
