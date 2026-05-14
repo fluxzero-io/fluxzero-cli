@@ -44,6 +44,8 @@ class DefaultProjectFilesService(
 ) : ProjectFilesService {
 
     companion object {
+        const val UNKNOWN_VERSION = "unknown"
+
         /**
          * Minimum SDK version that includes project files in releases.
          * Versions before this do not have project files available.
@@ -62,44 +64,32 @@ class DefaultProjectFilesService(
 
             // Detect or use provided version
             val sdkVersion = version ?: SdkVersionDetector.detect(projectDir)
-            if (sdkVersion == null) {
-                logger.error { "No SDK version found - cannot sync project files" }
-                return SyncResult.Failed(
-                    error = buildString {
-                        appendLine("No Fluxzero SDK dependency found in project.")
-                        appendLine()
-                        appendLine("To fix this, add the Fluxzero SDK dependency to your project:")
-                        appendLine()
-                        appendLine("For Gradle (build.gradle.kts):")
-                        appendLine("  dependencies {")
-                        appendLine("      implementation(\"io.fluxzero:fluxzero-sdk:1.75.1\")")
-                        appendLine("  }")
-                        appendLine()
-                        appendLine("For Gradle with version catalog (gradle/libs.versions.toml):")
-                        appendLine("  [versions]")
-                        appendLine("  fluxzero = \"1.75.1\"")
-                        appendLine()
-                        appendLine("  [libraries]")
-                        appendLine("  fluxzero-sdk = { module = \"io.fluxzero:fluxzero-sdk\", version.ref = \"fluxzero\" }")
-                        appendLine()
-                        appendLine("For Maven (pom.xml):")
-                        appendLine("  <dependency>")
-                        appendLine("      <groupId>io.fluxzero</groupId>")
-                        appendLine("      <artifactId>fluxzero-sdk</artifactId>")
-                        appendLine("      <version>1.75.1</version>")
-                        appendLine("  </dependency>")
-                        appendLine()
-                        appendLine("Alternatively, you can bypass auto-detection by setting overrideSdkVersion:")
-                        appendLine("  • Gradle: fluxzero { projectFiles { overrideSdkVersion.set(\"1.75.1\") } }")
-                        appendLine("  • Maven: <overrideSdkVersion>1.75.1</overrideSdkVersion>")
-                    },
-                    cause = null
+            if (sdkVersion.isNullOrBlank() || sdkVersion == UNKNOWN_VERSION) {
+                logger.info { "No SDK version found - skipping project files sync" }
+                return SyncResult.Skipped(
+                    "No Fluxzero SDK version was detected. Project files were not synced."
+                )
+            }
+
+            if (sdkVersion.endsWith("-SNAPSHOT", ignoreCase = true)) {
+                logger.info { "SDK version $sdkVersion is a snapshot version - skipping project files sync" }
+                return SyncResult.Skipped(
+                    "Fluxzero SDK version $sdkVersion is a snapshot/local development version. " +
+                        "Project files are only synced for released SDK versions."
                 )
             }
 
             // Check minimum version requirement
             val parsedVersion = SemanticVersion.parse(sdkVersion)
-            if (parsedVersion != null && parsedVersion < MIN_SUPPORTED_VERSION) {
+            if (parsedVersion == null) {
+                logger.info { "SDK version $sdkVersion is not a supported release version - skipping project files sync" }
+                return SyncResult.Skipped(
+                    "Fluxzero SDK version $sdkVersion is not a supported release version. " +
+                        "Project files were not synced."
+                )
+            }
+
+            if (parsedVersion < MIN_SUPPORTED_VERSION) {
                 logger.info { "SDK version $sdkVersion is below minimum supported version $MIN_SUPPORTED_VERSION" }
                 return SyncResult.Skipped(
                     "Agent files are only available for SDK version $MIN_SUPPORTED_VERSION and later. " +
@@ -145,10 +135,10 @@ class DefaultProjectFilesService(
                 language = projectLanguage
             )
         } catch (e: GitHubApiException) {
-            logger.error(e) { "GitHub API error during sync" }
-            SyncResult.Failed(
-                error = "Failed to fetch project files: ${e.message}",
-                cause = e
+            logger.warn(e) { "GitHub API error during project files sync - continuing without sync" }
+            SyncResult.Skipped(
+                "Could not fetch Fluxzero project files from GitHub (${e.message}). " +
+                    "Build will continue without syncing."
             )
         } catch (e: IOException) {
             logger.warn(e) { "Network error during project files sync - continuing without sync" }

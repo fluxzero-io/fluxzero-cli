@@ -160,6 +160,8 @@ fluxzero {
 
 **Problem**: You see a message like "No SDK version detected"
 
+When the plugin cannot detect a released Fluxzero SDK version, it logs a warning and skips project-files sync. The build continues.
+
 **Solutions**:
 
 1. Ensure you have a Fluxzero SDK dependency:
@@ -188,6 +190,19 @@ fluxzero {
     }
 }
 ```
+
+### Local Snapshot SDK Versions
+
+**Problem**: You are testing a locally built SDK such as `0-SNAPSHOT`.
+
+Snapshot versions do not have matching release artifacts with project files, so the plugin skips sync and lets the build continue.
+To sync project files anyway, temporarily point `overrideSdkVersion` at a released SDK version.
+
+### GitHub Release or Asset Unavailable
+
+**Problem**: The matching GitHub release or project-files asset is unavailable, or GitHub returns an API error.
+
+Project-files sync is optional. The plugin logs a warning, skips sync, and lets the build continue.
 
 ### Wrong Language Detected
 
@@ -359,7 +374,7 @@ fluxzero {
 
 - Gradle 7.0 or later
 - Java 11 or later
-- Internet connection (for downloading agent files from GitHub)
+- Internet connection to sync agent files from GitHub; builds continue without syncing if GitHub is unavailable
 
 ## Support
 

@@ -25,6 +25,57 @@ class DefaultProjectFilesServiceTest {
     private val service = DefaultProjectFilesService(gitHubClient)
 
     @Test
+    fun `returns Skipped when SDK version cannot be detected`() {
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN
+        )
+
+        assertIs<SyncResult.Skipped>(result)
+        assert(result.reason.contains("No Fluxzero SDK version"))
+        verify(exactly = 0) { gitHubClient.downloadProjectFiles(any(), any()) }
+    }
+
+    @Test
+    fun `returns Skipped for Gradle unknown SDK version sentinel`() {
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = DefaultProjectFilesService.UNKNOWN_VERSION
+        )
+
+        assertIs<SyncResult.Skipped>(result)
+        assert(result.reason.contains("No Fluxzero SDK version"))
+        verify(exactly = 0) { gitHubClient.downloadProjectFiles(any(), any()) }
+    }
+
+    @Test
+    fun `returns Skipped for local snapshot SDK version`() {
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = "0-SNAPSHOT"
+        )
+
+        assertIs<SyncResult.Skipped>(result)
+        assert(result.reason.contains("snapshot"))
+        verify(exactly = 0) { gitHubClient.downloadProjectFiles(any(), any()) }
+    }
+
+    @Test
+    fun `returns Skipped for non-release SDK version`() {
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = "local-dev"
+        )
+
+        assertIs<SyncResult.Skipped>(result)
+        assert(result.reason.contains("not a supported release version"))
+        verify(exactly = 0) { gitHubClient.downloadProjectFiles(any(), any()) }
+    }
+
+    @Test
     fun `returns Skipped when connection is refused`() {
         every { gitHubClient.downloadProjectFiles(any(), any()) } throws
             ConnectException("Connection refused")
@@ -70,7 +121,7 @@ class DefaultProjectFilesServiceTest {
     }
 
     @Test
-    fun `returns Failed when GitHub API returns an error`() {
+    fun `returns Skipped when GitHub API returns an error`() {
         every { gitHubClient.downloadProjectFiles(any(), any()) } throws
             GitHubApiException("404 Not Found")
 
@@ -80,8 +131,8 @@ class DefaultProjectFilesServiceTest {
             version = "1.75.1"
         )
 
-        assertIs<SyncResult.Failed>(result)
-        assert(result.error.contains("404 Not Found"))
+        assertIs<SyncResult.Skipped>(result)
+        assert(result.reason.contains("404 Not Found"))
     }
 
     @Test

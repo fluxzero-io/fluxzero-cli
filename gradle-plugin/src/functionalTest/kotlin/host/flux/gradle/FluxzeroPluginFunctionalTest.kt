@@ -266,20 +266,18 @@ class FluxzeroPluginFunctionalTest {
             }
         """.trimIndent())
 
-        // Use buildAndFail() because the task will try to run but fail due to no SDK version
-        // The important thing is that it runs (FAILED) rather than being skipped
         val result = GradleRunner.create()
             .withProjectDir(testProjectDir)
             .withArguments(":submodule:syncProjectFiles", "--info")
             .withPluginClasspath()
-            .buildAndFail()
+            .build()
 
         // Submodule task should NOT be skipped because rootProjectOnly is false
-        // It will fail because there's no SDK version, but the key is it wasn't SKIPPED
+        // Missing SDK versions are skipped inside the sync service without failing the build.
         val outcome = result.task(":submodule:syncProjectFiles")?.outcome
         assertTrue(
-            outcome == TaskOutcome.FAILED,
-            "Expected task to run (FAILED, not SKIPPED) when rootProjectOnly=false, but was $outcome"
+            outcome == TaskOutcome.SUCCESS,
+            "Expected task to run successfully when rootProjectOnly=false, but was $outcome"
         )
     }
 }

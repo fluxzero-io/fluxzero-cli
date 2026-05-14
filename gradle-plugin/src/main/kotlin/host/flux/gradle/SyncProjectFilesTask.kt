@@ -108,7 +108,7 @@ abstract class SyncProjectFilesTask : DefaultTask() {
          * Returns "unknown" if not detectable to avoid task configuration errors.
          */
         fun detectSdkVersion(projectDir: java.io.File): String {
-            return SdkVersionDetector.detect(projectDir.toPath()) ?: "unknown"
+            return SdkVersionDetector.detect(projectDir.toPath()) ?: DefaultProjectFilesService.UNKNOWN_VERSION
         }
 
         /**

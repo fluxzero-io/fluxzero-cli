@@ -236,7 +236,9 @@ mvn clean install -Dfluxzero.projectFiles.rootProjectOnly=false
 
 ### Plugin Not Detecting SDK Version
 
-**Problem**: You see an error like "No Fluxzero SDK dependency found in project"
+**Problem**: You see a warning that no Fluxzero SDK version was detected.
+
+When the plugin cannot detect a released Fluxzero SDK version, it skips project-files sync and the build continues.
 
 **Solutions**:
 
@@ -303,6 +305,19 @@ mvn clean install -Dfluxzero.projectFiles.rootProjectOnly=false
     </configuration>
 </plugin>
 ```
+
+### Local Snapshot SDK Versions
+
+**Problem**: You are testing a locally built SDK such as `0-SNAPSHOT`.
+
+Snapshot versions do not have matching release artifacts with project files, so the plugin skips sync and lets the build continue.
+To sync project files anyway, temporarily set `overrideSdkVersion` to a released SDK version.
+
+### GitHub Release or Asset Unavailable
+
+**Problem**: The matching GitHub release or project-files asset is unavailable, or GitHub returns an API error.
+
+Project-files sync is optional. The plugin logs a warning, skips sync, and lets the build continue.
 
 ### Wrong Language Detected
 
@@ -568,7 +583,7 @@ All parameters can be set via properties:
 
 - Maven 3.6 or later
 - Java 11 or later
-- Internet connection (for downloading agent files from GitHub)
+- Internet connection to sync agent files from GitHub; builds continue without syncing if GitHub is unavailable
 
 ## Support
 
