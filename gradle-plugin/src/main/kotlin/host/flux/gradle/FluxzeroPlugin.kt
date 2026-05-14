@@ -1,8 +1,10 @@
 package host.flux.gradle
 
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPlugin
+import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
@@ -52,13 +54,18 @@ class FluxzeroPlugin : Plugin<Project> {
 
     private fun registerProjectFilesFeature(project: Project, extension: FluxzeroExtension) {
         val projectFiles = extension.projectFiles
+        val enabled = project.booleanGradleProperty("fluxzero.projectFiles.enabled").orElse(projectFiles.enabled)
+        val rootProjectOnly = project.booleanGradleProperty("fluxzero.projectFiles.rootProjectOnly").orElse(projectFiles.rootProjectOnly)
+        val forceUpdate = project.booleanGradleProperty("fluxzero.projectFiles.forceUpdate").orElse(projectFiles.forceUpdate)
+        val overrideSdkVersion = project.providers.gradleProperty("fluxzero.projectFiles.overrideSdkVersion").orElse(projectFiles.overrideSdkVersion)
+        val overrideLanguage = project.providers.gradleProperty("fluxzero.projectFiles.overrideLanguage").orElse(projectFiles.overrideLanguage)
 
         // Register the sync task
         val syncTask = project.tasks.register<SyncProjectFilesTask>("syncProjectFiles") {
             // Configure task only if feature is enabled and (not rootProjectOnly or this is root project)
             onlyIf {
-                projectFiles.enabled.get() &&
-                    (!projectFiles.rootProjectOnly.get() || project == project.rootProject)
+                enabled.get() &&
+                    (!rootProjectOnly.get() || project == project.rootProject)
             }
 
             // Set up project directory
@@ -69,18 +76,18 @@ class FluxzeroPlugin : Plugin<Project> {
 
             // Configure version - use override value or auto-detect
             sdkVersion.set(project.provider {
-                projectFiles.overrideSdkVersion.orNull
+                overrideSdkVersion.orNull
                     ?: SyncProjectFilesTask.detectSdkVersion(project.projectDir)
             })
 
             // Configure language - use override value or auto-detect
             language.set(project.provider {
-                projectFiles.overrideLanguage.orNull
+                overrideLanguage.orNull
                     ?: SyncProjectFilesTask.detectLanguage(project.projectDir)
             })
 
             // Configure force update
-            forceUpdate.set(projectFiles.forceUpdate)
+            this.forceUpdate.set(forceUpdate)
         }
 
         // Hook into the build lifecycle - run before compilation
@@ -99,10 +106,10 @@ class FluxzeroPlugin : Plugin<Project> {
 
         // Log configuration at the end of evaluation
         project.afterEvaluate {
-            if (projectFiles.enabled.get()) {
-                val version = projectFiles.overrideSdkVersion.orNull
+            if (enabled.get()) {
+                val version = overrideSdkVersion.orNull
                     ?: SyncProjectFilesTask.detectSdkVersion(project.projectDir)
-                val lang = projectFiles.overrideLanguage.orNull
+                val lang = overrideLanguage.orNull
                     ?: SyncProjectFilesTask.detectLanguage(project.projectDir)
 
                 if (version == "unknown") {
@@ -120,4 +127,10 @@ class FluxzeroPlugin : Plugin<Project> {
             }
         }
     }
+
+    private fun Project.booleanGradleProperty(name: String): Provider<Boolean> =
+        providers.gradleProperty(name).map { value ->
+            value.toBooleanStrictOrNull()
+                ?: throw GradleException("Invalid value for -P$name=$value. Must be 'true' or 'false'.")
+        }
 }

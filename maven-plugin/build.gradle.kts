@@ -1,6 +1,13 @@
 import com.vanniktech.maven.publish.JavaLibrary
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.SonatypeHost
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.transform.OutputKeys
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 plugins {
     kotlin("jvm")
@@ -9,6 +16,52 @@ plugins {
 }
 
 group = "io.fluxzero.tools"
+
+val mavenPluginMojoDescriptions = mapOf(
+    "sync-project-files" to "Synchronizes Fluxzero AI agent instruction files for a Maven project by detecting the SDK version and language, " +
+        "downloading matching project files, and writing them to the project root."
+)
+
+val mavenPluginParameterDescriptions = mapOf(
+    "enabled" to "Controls whether the sync-project-files goal runs. Set this to false to disable Fluxzero project-file sync without removing the plugin. " +
+        "Command-line property: fluxzero.projectFiles.enabled.",
+    "forceUpdate" to "When true, re-downloads and rewrites project files even when the local sync metadata says they are already current. " +
+        "Command-line property: fluxzero.projectFiles.forceUpdate.",
+    "overrideLanguage" to "Overrides automatic language detection. Accepted values are kotlin and java. Leave unset to detect the language from the Maven project. " +
+        "Command-line property: fluxzero.projectFiles.overrideLanguage.",
+    "overrideSdkVersion" to "Overrides automatic Fluxzero SDK version detection. Use this when the SDK version cannot be inferred from dependencies, BOMs, or properties. " +
+        "Command-line property: fluxzero.projectFiles.overrideSdkVersion.",
+    "projectDir" to "Maven-provided project base directory where Fluxzero project files are synced. This value is read-only and normally should not be configured.",
+    "rootProjectOnly" to "Controls multi-module execution. When true, sync only runs in the Maven execution root; set false to run in every module. " +
+        "Command-line property: fluxzero.projectFiles.rootProjectOnly.",
+    "session" to "Maven-provided session used to determine the execution root in multi-module builds. This value is read-only and should not be configured.",
+    "skip" to "Legacy opt-out flag. Set this to true to skip execution; prefer enabled=false for new configurations. " +
+        "Command-line property: fluxzero.projectFiles.skip."
+)
+
+fun Element.firstDirectChild(tagName: String): Element? =
+    (0 until childNodes.length)
+        .asSequence()
+        .map { childNodes.item(it) }
+        .filterIsInstance<Element>()
+        .firstOrNull { it.tagName == tagName }
+
+fun Element.setDirectDescription(document: Document, description: String, insertAfterTag: String? = null) {
+    val descriptionElement = firstDirectChild("description")
+    if (descriptionElement != null) {
+        descriptionElement.textContent = description
+        return
+    }
+
+    val newDescription = document.createElement("description")
+    newDescription.textContent = description
+    val insertAfter = insertAfterTag?.let { firstDirectChild(it) }
+    if (insertAfter?.nextSibling != null) {
+        insertBefore(newDescription, insertAfter.nextSibling)
+    } else {
+        appendChild(newDescription)
+    }
+}
 
 // Configuration for dependencies that should be embedded into the shadow JAR
 val shade by configurations.creating {
@@ -55,6 +108,40 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
     inputs.dir(file("target/classes"))
     inputs.property("version", project.version)
     outputs.dir(file("target/classes/META-INF/maven"))
+
+    doLast {
+        val descriptor = file("target/classes/META-INF/maven/plugin.xml")
+        val document = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(descriptor)
+
+        val mojos = document.getElementsByTagName("mojo")
+        for (mojoIndex in 0 until mojos.length) {
+            val mojo = mojos.item(mojoIndex) as Element
+            val goal = mojo.firstDirectChild("goal")?.textContent
+
+            mavenPluginMojoDescriptions[goal]?.let {
+                mojo.setDirectDescription(document, it, insertAfterTag = "goal")
+            }
+
+            val parameters = mojo.getElementsByTagName("parameter")
+            for (parameterIndex in 0 until parameters.length) {
+                val parameter = parameters.item(parameterIndex) as Element
+                val name = parameter.firstDirectChild("name")?.textContent
+                mavenPluginParameterDescriptions[name]?.let {
+                    parameter.setDirectDescription(document, it)
+                }
+            }
+        }
+
+        TransformerFactory.newInstance()
+            .newTransformer()
+            .apply {
+                setOutputProperty(OutputKeys.INDENT, "yes")
+                setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
+            }
+            .transform(DOMSource(document), StreamResult(descriptor))
+    }
 }
 
 // Configure shadow JAR to include all dependencies

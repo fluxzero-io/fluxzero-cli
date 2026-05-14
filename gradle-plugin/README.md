@@ -43,23 +43,33 @@ plugins {
 ```kotlin
 fluxzero {
     projectFiles {
-        // Enable or disable the plugin (default: true)
+        // Master switch. Set to false to keep the plugin configured but skip syncing (default: true).
         enabled.set(true)
 
-        // Only run on root project in multi-module builds (default: true)
+        // Multi-module guard. Keep true to sync once from the Gradle root project (default: true).
         rootProjectOnly.set(true)
 
-        // Force re-download even if files exist (default: false)
+        // Re-download and rewrite files even when the local sync metadata is current (default: false).
         forceUpdate.set(false)
 
-        // Override auto-detected language (optional)
+        // Use only when language detection is wrong or unavailable. Accepted values: "kotlin" or "java".
         overrideLanguage.set("kotlin") // or "java"
 
-        // Override auto-detected SDK version (optional)
+        // Use only when the Fluxzero SDK version cannot be inferred from dependencies, BOMs, or properties.
         overrideSdkVersion.set("1.75.1")
     }
 }
 ```
+
+Every setting is optional. The plugin auto-detects the language and SDK version in the common case.
+
+| Setting | Command-line property | Default | When to use it |
+|---------|-----------------------|---------|----------------|
+| `enabled` | `fluxzero.projectFiles.enabled` | `true` | Disable all plugin work without removing the plugin from the build file. |
+| `rootProjectOnly` | `fluxzero.projectFiles.rootProjectOnly` | `true` | Sync only from the root project. Set `false` if every module needs its own files. |
+| `forceUpdate` | `fluxzero.projectFiles.forceUpdate` | `false` | Force a fresh download when files look stale or you want to refresh local generated files. |
+| `overrideLanguage` | `fluxzero.projectFiles.overrideLanguage` | auto-detected | Set to `kotlin` or `java` only when automatic language detection picks the wrong target. |
+| `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected | Pin the SDK version when dependencies, BOMs, or properties do not expose it. |
 
 ### Disabling the Plugin
 
@@ -75,6 +85,15 @@ You can also disable it via command line:
 
 ```bash
 ./gradlew build -Pfluxzero.projectFiles.enabled=false
+```
+
+The same pattern works for the other settings, for example:
+
+```bash
+./gradlew syncProjectFiles -Pfluxzero.projectFiles.forceUpdate=true
+./gradlew build -Pfluxzero.projectFiles.overrideLanguage=kotlin
+./gradlew build -Pfluxzero.projectFiles.overrideSdkVersion=1.75.1
+./gradlew build -Pfluxzero.projectFiles.rootProjectOnly=false
 ```
 
 ## How It Works

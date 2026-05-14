@@ -87,6 +87,34 @@ class FluxzeroPluginFunctionalTest {
     }
 
     @Test
+    fun `sync task is skipped when disabled via project property`() {
+        buildFile.writeText("""
+            plugins {
+                kotlin("jvm") version "2.1.20"
+                id("io.fluxzero.tools.gradle.plugin")
+            }
+
+            repositories {
+                mavenCentral()
+            }
+
+            fluxzero {
+                projectFiles {
+                    enabled.set(true)
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("syncProjectFiles", "--info", "-Pfluxzero.projectFiles.enabled=false")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SKIPPED, result.task(":syncProjectFiles")?.outcome)
+    }
+
+    @Test
     fun `sync task handles no SDK version gracefully`() {
         // Create a project without Fluxzero SDK dependency
         buildFile.writeText("""

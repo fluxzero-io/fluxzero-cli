@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -40,7 +40,7 @@ fluxzero-cli is a Kotlin-based command-line tool for interacting with Flux and F
 
 **Commands** (`commands/`):
 - `Init.kt` - Project scaffolding with template selection and customization
-- `Version.kt` - Version display and update notifications  
+- `Version.kt` - Version display and update notifications
 - `Upgrade.kt` - Dependency and CLI upgrades
 
 **Core Services**:
@@ -90,7 +90,7 @@ src/main/kotlin/host/flux/cli/
 ├── Main.kt                  - Application entry point
 ├── UpdateChecker.kt         - Version checking
 ├── commands/                - CLI commands
-├── install/                 - Installation logic  
+├── install/                 - Installation logic
 ├── prompt/                  - User interaction
 └── template/               - Template processing
 
@@ -116,7 +116,7 @@ config/detekt/              - Code quality configuration
 - Update checking happens automatically on startup
 - Interactive prompts handle template selection and project naming
 - Package structure follows reverse domain naming: `host.flux.cli`
-- **Commit messages should not mention Claude or AI assistance**
+- **Commit messages should not mention Codex or AI assistance**
 
 ## Commit Messages
 
@@ -126,7 +126,7 @@ config/detekt/              - Code quality configuration
 - Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `deps`, `perf`, and `chore`.
 - Useful domains in this repo include `cli`, `init`, `upgrade`, `templates`, `project-files`, `gradle-plugin`, `maven-plugin`, `api`, `native`, `release`, `ci`, `deps`, and `docs`.
 - For non-trivial commits, include a body that explains why the change is needed, the behavioral impact, and the tests that were run.
-- Do not mention Claude or AI assistance in commit messages.
+- Do not mention Codex or AI assistance in commit messages.
 
 ### GraalVM Configuration
 

@@ -349,11 +349,20 @@ fluxzero {
 // Or with explicit configuration
 fluxzero {
     projectFiles {
-        enabled.set(true)                      // Enable/disable the plugin (default: true)
-        overrideLanguage.set("kotlin")         // "kotlin" or "java" (auto-detected by default)
-        overrideSdkVersion.set("1.2.0")        // Override SDK version (auto-detected from dependencies)
-        forceUpdate.set(false)                 // Force re-download even if files exist
-        rootProjectOnly.set(true)              // Only run on root project in multi-module builds
+        // Keep the plugin configured but skip all syncing when false (default: true).
+        enabled.set(true)
+
+        // Sync once from the root project in multi-module builds (default: true).
+        rootProjectOnly.set(true)
+
+        // Re-download and rewrite files even when local sync metadata is current (default: false).
+        forceUpdate.set(false)
+
+        // Use only when language detection is wrong or unavailable. Values: "kotlin" or "java".
+        overrideLanguage.set("kotlin")
+
+        // Use only when the SDK version cannot be inferred from dependencies, BOMs, or properties.
+        overrideSdkVersion.set("1.2.0")
     }
 }
 ```
@@ -365,6 +374,13 @@ pluginManagement {
         mavenCentral()
     }
 }
+```
+
+**Command line properties:**
+```bash
+./gradlew build -Pfluxzero.projectFiles.enabled=false
+./gradlew build -Pfluxzero.projectFiles.overrideLanguage=kotlin
+./gradlew syncProjectFiles -Pfluxzero.projectFiles.forceUpdate=true
 ```
 
 ### Maven Plugin
@@ -396,11 +412,20 @@ pluginManagement {
     <artifactId>fluxzero-maven-plugin</artifactId>
     <version>1.0.0</version>
     <configuration>
-        <enabled>true</enabled>                         <!-- Enable/disable (default: true) -->
-        <rootProjectOnly>true</rootProjectOnly>         <!-- Only run on root project (default: true) -->
-        <forceUpdate>false</forceUpdate>                <!-- Force re-download (default: false) -->
-        <overrideLanguage>kotlin</overrideLanguage>     <!-- Override language detection -->
-        <overrideSdkVersion>1.75.1</overrideSdkVersion> <!-- Override SDK version -->
+        <!-- Keep the plugin configured but skip all syncing when false (default: true). -->
+        <enabled>true</enabled>
+
+        <!-- Sync once from the execution root in multi-module builds (default: true). -->
+        <rootProjectOnly>true</rootProjectOnly>
+
+        <!-- Re-download and rewrite files even when local sync metadata is current (default: false). -->
+        <forceUpdate>false</forceUpdate>
+
+        <!-- Use only when language detection is wrong or unavailable. Values: "kotlin" or "java". -->
+        <overrideLanguage>kotlin</overrideLanguage>
+
+        <!-- Use only when the SDK version cannot be inferred from dependencies, BOMs, or properties. -->
+        <overrideSdkVersion>1.75.1</overrideSdkVersion>
     </configuration>
     <executions>
         <execution>

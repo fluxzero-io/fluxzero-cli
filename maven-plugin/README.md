@@ -70,19 +70,19 @@ Everything is auto-detected by default:
     <artifactId>fluxzero-maven-plugin</artifactId>
     <version>1.0.0</version>
     <configuration>
-        <!-- Enable or disable the plugin (default: true) -->
+        <!-- Master switch. Set to false to keep the plugin configured but skip syncing (default: true). -->
         <enabled>true</enabled>
 
-        <!-- Only run on root project in multi-module builds (default: true) -->
+        <!-- Multi-module guard. Keep true to sync once from the Maven execution root (default: true). -->
         <rootProjectOnly>true</rootProjectOnly>
 
-        <!-- Force re-download even if files exist (default: false) -->
+        <!-- Re-download and rewrite files even when the local sync metadata is current (default: false). -->
         <forceUpdate>false</forceUpdate>
 
-        <!-- Override auto-detected language (optional) -->
+        <!-- Use only when language detection is wrong or unavailable. Accepted values: "kotlin" or "java". -->
         <overrideLanguage>kotlin</overrideLanguage> <!-- or "java" -->
 
-        <!-- Override auto-detected SDK version (optional) -->
+        <!-- Use only when the Fluxzero SDK version cannot be inferred from dependencies, BOMs, or properties. -->
         <overrideSdkVersion>1.75.1</overrideSdkVersion>
     </configuration>
     <executions>
@@ -94,6 +94,17 @@ Everything is auto-detected by default:
     </executions>
 </plugin>
 ```
+
+Every setting is optional. The plugin auto-detects the language and SDK version in the common case.
+
+| Setting | Command-line property | Default | When to use it |
+|---------|-----------------------|---------|----------------|
+| `enabled` | `fluxzero.projectFiles.enabled` | `true` | Disable all plugin work without removing the plugin from the POM. Prefer this over `skip` for new configurations. |
+| `rootProjectOnly` | `fluxzero.projectFiles.rootProjectOnly` | `true` | Sync only from the execution root. Set `false` if every module needs its own files. |
+| `forceUpdate` | `fluxzero.projectFiles.forceUpdate` | `false` | Force a fresh download when files look stale or you want to refresh local generated files. |
+| `overrideLanguage` | `fluxzero.projectFiles.overrideLanguage` | auto-detected | Set to `kotlin` or `java` only when automatic language detection picks the wrong target. |
+| `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected | Pin the SDK version when dependencies, BOMs, or properties do not expose it. |
+| `skip` | `fluxzero.projectFiles.skip` | `false` | Legacy opt-out flag for older builds. Use `enabled=false` in new setups. |
 
 ### Disabling the Plugin
 
