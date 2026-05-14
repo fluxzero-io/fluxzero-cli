@@ -3,6 +3,7 @@ import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.SonatypeHost
 import org.w3c.dom.Document
 import org.w3c.dom.Element
+import org.w3c.dom.Node
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.OutputKeys
 import javax.xml.transform.TransformerFactory
@@ -18,25 +19,18 @@ plugins {
 group = "io.fluxzero.tools"
 
 val mavenPluginMojoDescriptions = mapOf(
-    "sync-project-files" to "Synchronizes Fluxzero AI agent instruction files for a Maven project by detecting the SDK version and language, " +
-        "downloading matching project files, and writing them to the project root."
+    "sync-project-files" to "Syncs Fluxzero AI agent instruction files for a Maven project."
 )
 
 val mavenPluginParameterDescriptions = mapOf(
-    "enabled" to "Controls whether the sync-project-files goal runs. Set this to false to disable Fluxzero project-file sync without removing the plugin. " +
-        "Command-line property: fluxzero.projectFiles.enabled.",
-    "forceUpdate" to "When true, re-downloads and rewrites project files even when the local sync metadata says they are already current. " +
-        "Command-line property: fluxzero.projectFiles.forceUpdate.",
-    "overrideLanguage" to "Overrides automatic language detection. Accepted values are kotlin and java. Leave unset to detect the language from the Maven project. " +
-        "Command-line property: fluxzero.projectFiles.overrideLanguage.",
-    "overrideSdkVersion" to "Overrides automatic Fluxzero SDK version detection. Use this when the SDK version cannot be inferred from dependencies, BOMs, or properties. " +
-        "Command-line property: fluxzero.projectFiles.overrideSdkVersion.",
-    "projectDir" to "Maven-provided project base directory where Fluxzero project files are synced. This value is read-only and normally should not be configured.",
-    "rootProjectOnly" to "Controls multi-module execution. When true, sync only runs in the Maven execution root; set false to run in every module. " +
-        "Command-line property: fluxzero.projectFiles.rootProjectOnly.",
-    "session" to "Maven-provided session used to determine the execution root in multi-module builds. This value is read-only and should not be configured.",
-    "skip" to "Legacy opt-out flag. Set this to true to skip execution; prefer enabled=false for new configurations. " +
-        "Command-line property: fluxzero.projectFiles.skip."
+    "enabled" to "Enable or disable sync-project-files. Property: fluxzero.projectFiles.enabled.",
+    "forceUpdate" to "Force project files to be downloaded and rewritten. Property: fluxzero.projectFiles.forceUpdate.",
+    "overrideLanguage" to "Override language detection with kotlin or java. Property: fluxzero.projectFiles.overrideLanguage.",
+    "overrideSdkVersion" to "Override Fluxzero SDK version detection. Property: fluxzero.projectFiles.overrideSdkVersion.",
+    "projectDir" to "Read-only Maven project base directory where Fluxzero project files are synced.",
+    "rootProjectOnly" to "Run only in the Maven execution root. Property: fluxzero.projectFiles.rootProjectOnly.",
+    "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
+    "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip."
 )
 
 fun Element.firstDirectChild(tagName: String): Element? =
@@ -60,6 +54,17 @@ fun Element.setDirectDescription(document: Document, description: String, insert
         insertBefore(newDescription, insertAfter.nextSibling)
     } else {
         appendChild(newDescription)
+    }
+}
+
+fun Node.removeWhitespaceTextNodes() {
+    for (index in childNodes.length - 1 downTo 0) {
+        val child = childNodes.item(index)
+        if (child.nodeType == Node.TEXT_NODE && child.textContent.isBlank()) {
+            removeChild(child)
+        } else {
+            child.removeWhitespaceTextNodes()
+        }
     }
 }
 
@@ -133,6 +138,8 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
                 }
             }
         }
+
+        document.removeWhitespaceTextNodes()
 
         TransformerFactory.newInstance()
             .newTransformer()
