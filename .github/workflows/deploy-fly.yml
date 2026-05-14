@@ -27,6 +27,8 @@ jobs:
         run: |
           ./gradlew :api:shadowJar --info
           ls -lh api/build/libs/flux-api-*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare JAR in build context
         run: |
@@ -61,4 +63,3 @@ jobs:
               echo "Stop failed, possibly already replacing; continuing..."
             fi
           done
-

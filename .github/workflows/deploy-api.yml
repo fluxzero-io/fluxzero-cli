@@ -55,6 +55,8 @@ jobs:
             echo "⚠️ API JAR health check failed (but continuing deployment)"
           fi
           pkill -f "flux-api" || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
