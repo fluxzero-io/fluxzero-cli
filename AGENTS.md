@@ -116,7 +116,6 @@ config/detekt/              - Code quality configuration
 - Update checking happens automatically on startup
 - Interactive prompts handle template selection and project naming
 - Package structure follows reverse domain naming: `host.flux.cli`
-- **Commit messages should not mention Codex or AI assistance**
 
 ## Commit Messages
 
@@ -126,7 +125,6 @@ config/detekt/              - Code quality configuration
 - Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `deps`, `perf`, and `chore`.
 - Useful domains in this repo include `cli`, `init`, `upgrade`, `templates`, `project-files`, `gradle-plugin`, `maven-plugin`, `api`, `native`, `release`, `ci`, `deps`, and `docs`.
 - For non-trivial commits, include a body that explains why the change is needed, the behavioral impact, and the tests that were run.
-- Do not mention Codex or AI assistance in commit messages.
 
 ### GraalVM Configuration
 
