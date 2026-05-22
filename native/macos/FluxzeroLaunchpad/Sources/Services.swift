@@ -129,6 +129,7 @@ final class CliRuntimeService: @unchecked Sendable {
 
     func ensureLatestCli() async throws -> CliStatus {
         try FileManager.default.createDirectory(at: paths.binDir, withIntermediateDirectories: true)
+        recoverLegacyTempDownload()
         let installed = installedVersion()
 
         do {
@@ -201,12 +202,32 @@ final class CliRuntimeService: @unchecked Sendable {
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw LaunchpadError.downloadFailed(url.absoluteString)
         }
-        let tempTarget = target.deletingLastPathComponent().appending(path: "\(target.lastPathComponent).tmp")
+        let tempTarget = target.deletingLastPathComponent().appending(path: "\(target.lastPathComponent).\(UUID().uuidString).download")
         try? FileManager.default.removeItem(at: tempTarget)
-        try data.write(to: tempTarget, options: .atomic)
+        defer {
+            try? FileManager.default.removeItem(at: tempTarget)
+        }
+        try data.write(to: tempTarget)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempTarget.path())
-        try? FileManager.default.removeItem(at: target)
+        if FileManager.default.fileExists(atPath: target.path()) {
+            try FileManager.default.removeItem(at: target)
+        }
         try FileManager.default.moveItem(at: tempTarget, to: target)
+    }
+
+    private func recoverLegacyTempDownload() {
+        let legacyTemp = paths.binDir.appending(path: "fz.tmp")
+        guard FileManager.default.fileExists(atPath: legacyTemp.path()) else { return }
+        if !FileManager.default.fileExists(atPath: paths.cliExecutable.path()) {
+            do {
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: legacyTemp.path())
+                try FileManager.default.moveItem(at: legacyTemp, to: paths.cliExecutable)
+                return
+            } catch {
+                try? FileManager.default.removeItem(at: paths.cliExecutable)
+            }
+        }
+        try? FileManager.default.removeItem(at: legacyTemp)
     }
 
     private func versionsEqual(_ left: String?, _ right: String?) -> Bool {

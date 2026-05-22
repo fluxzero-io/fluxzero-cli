@@ -17,7 +17,6 @@ struct FluxzeroLaunchpadApp: App {
                     model.handle(url: url)
                 }
         }
-        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("Refresh Fluxzero CLI") {
@@ -68,7 +67,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $model.selectedSection) {
-            Section {
+            Section("Fluxzero") {
                 ForEach(LaunchpadSection.allCases) { section in
                     Label(section.label, systemImage: section.systemImage)
                         .tag(section)
@@ -76,64 +75,21 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            BrandHeader()
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
-                .padding(.bottom, 10)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            SidebarStatus()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-        }
-    }
-}
-
-struct BrandHeader: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 34, height: 34)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Fluxzero")
-                    .font(.headline)
-                Text("Launchpad")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-struct SidebarStatus: View {
-    @EnvironmentObject private var model: LaunchpadModel
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if model.isBusy {
-                ProgressView()
-                    .controlSize(.small)
-            }
-            Text(model.statusMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 struct CreateScreen: View {
+    @EnvironmentObject private var model: LaunchpadModel
+
     var body: some View {
         DetailScroll {
             HeaderView(
                 title: "Fluxzero Launchpad",
                 subtitle: "Local projects for Codex and Claude Code."
             )
+            if model.isBusy || model.cliStatus == nil {
+                CliStatusBanner()
+            }
             GeneratorPanel()
             RecentProjectsPanel(limit: 5)
         }
@@ -161,12 +117,12 @@ struct UpgradesScreen: View {
             )
             VStack(alignment: .leading, spacing: 14) {
                 Label("Upgrade support is coming", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.title3.weight(.semibold))
+                    .font(.headline)
                 Text("The native app already tracks generated projects. The actual SDK upgrade flow stays disabled until the CLI upgrade contract is ready.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(22)
+            .padding(18)
             .nativePanel()
         }
     }
@@ -181,8 +137,8 @@ struct DetailScroll<Content: View>: View {
                 content
             }
             .frame(maxWidth: 980, alignment: .leading)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 30)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 28)
         }
     }
 }
@@ -192,12 +148,47 @@ struct HeaderView: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title)
                 .font(.largeTitle.weight(.semibold))
             Text(subtitle)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+struct CliStatusBanner: View {
+    @EnvironmentObject private var model: LaunchpadModel
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if model.isBusy {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            Text(model.isBusy ? "Preparing Fluxzero CLI..." : model.statusMessage)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Button {
+                model.refresh()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .help("Retry")
+        }
+        .font(.caption)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.28), lineWidth: 1)
+        )
     }
 }
 
@@ -209,22 +200,32 @@ struct GeneratorPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("Project")
-                .font(.title2.weight(.semibold))
+                .font(.headline)
+                .padding(.bottom, 14)
 
-            TextField("Project name", text: Binding(
-                get: { model.projectName },
-                set: { model.setProjectName($0) }
-            ))
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.large)
+            SettingsRow(label: "Name") {
+                TextField("Project name", text: Binding(
+                    get: { model.projectName },
+                    set: { model.setProjectName($0) }
+                ))
+                .textFieldStyle(.roundedBorder)
+            }
 
-            NativePromptEditor(
-                text: $model.prompt,
-                placeholder: "Describe what you want to build"
-            )
-            .frame(minHeight: 150)
+            SettingsDivider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                FieldLabel("Description")
+                NativePromptEditor(
+                    text: $model.prompt,
+                    placeholder: "Describe what you want to build"
+                )
+                .frame(minHeight: 118)
+            }
+            .padding(.vertical, 12)
+
+            SettingsDivider()
 
             HStack(spacing: 12) {
                 Button {
@@ -251,10 +252,13 @@ struct GeneratorPanel: View {
                 .buttonStyle(.link)
             }
             .disabled(actionsDisabled)
+            .padding(.vertical, 12)
+
+            SettingsDivider()
 
             AdvancedDisclosure()
         }
-        .padding(22)
+        .padding(18)
         .nativePanel()
     }
 }
@@ -263,9 +267,9 @@ struct AdvancedDisclosure: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.smooth(duration: 0.18)) {
+                withAnimation(.easeInOut(duration: 0.16)) {
                     model.advancedExpanded.toggle()
                 }
             } label: {
@@ -273,7 +277,7 @@ struct AdvancedDisclosure: View {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .rotationEffect(.degrees(model.advancedExpanded ? 90 : 0))
-                        .animation(.smooth(duration: 0.18), value: model.advancedExpanded)
+                        .animation(.easeInOut(duration: 0.16), value: model.advancedExpanded)
                     Image(systemName: "slider.horizontal.3")
                     Text("Advanced options")
                         .font(.headline)
@@ -281,13 +285,17 @@ struct AdvancedDisclosure: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.vertical, 12)
 
             if model.advancedExpanded {
+                SettingsDivider()
                 AdvancedOptions()
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .padding(.top, 12)
+                    .transition(.opacity)
             }
         }
-        .animation(.smooth(duration: 0.18), value: model.advancedExpanded)
+        .clipped()
+        .animation(.easeInOut(duration: 0.16), value: model.advancedExpanded)
     }
 }
 
@@ -350,7 +358,7 @@ struct AdvancedOptions: View {
         }
         .textFieldStyle(.roundedBorder)
         .controlSize(.regular)
-        .padding(.top, 2)
+        .padding(.bottom, 2)
     }
 
     private var cliFootnote: String {
@@ -372,6 +380,26 @@ struct FieldLabel: View {
         Text(text)
             .foregroundStyle(.secondary)
             .frame(width: 86, alignment: .leading)
+    }
+}
+
+struct SettingsRow<Content: View>: View {
+    let label: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            FieldLabel(label)
+            content
+        }
+        .padding(.vertical, 10)
+    }
+}
+
+struct SettingsDivider: View {
+    var body: some View {
+        Divider()
+            .padding(.leading, 100)
     }
 }
 
@@ -409,7 +437,7 @@ struct RecentProjectsPanel: View {
                 }
             }
         }
-        .padding(22)
+        .padding(18)
         .nativePanel()
     }
 }
@@ -460,7 +488,7 @@ struct ProjectRow: View {
             }
         }
         .padding(10)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
@@ -559,11 +587,11 @@ final class PromptEditorNSView: NSView {
 
     private func configure() {
         wantsLayer = true
-        layer?.cornerRadius = 10
+        layer?.cornerRadius = 8
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
-        layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.86).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.28).cgColor
+        layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -611,11 +639,11 @@ final class PromptEditorNSView: NSView {
 }
 
 extension View {
-    func nativePanel(cornerRadius: CGFloat = 18) -> some View {
-        background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    func nativePanel(cornerRadius: CGFloat = 12) -> some View {
+        background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.25), lineWidth: 1)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 1)
             )
     }
 }
