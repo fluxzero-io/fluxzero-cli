@@ -49,6 +49,7 @@ struct LaunchpadView: View {
             .background(LaunchpadBackdrop())
         }
         .navigationSplitViewStyle(.balanced)
+        .background(WindowConfigurator())
         .alert("Fluxzero Launchpad", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -67,7 +68,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $model.selectedSection) {
-            Section("Fluxzero") {
+            Section {
                 ForEach(LaunchpadSection.allCases) { section in
                     Label(section.label, systemImage: section.systemImage)
                         .tag(section)
@@ -150,7 +151,7 @@ struct HeaderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.largeTitle.weight(.semibold))
+                .font(.title.weight(.semibold))
             Text(subtitle)
                 .foregroundStyle(.secondary)
         }
@@ -200,65 +201,58 @@ struct GeneratorPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("Project")
                 .font(.headline)
-                .padding(.bottom, 14)
 
             SettingsRow(label: "Name") {
                 TextField("Project name", text: Binding(
                     get: { model.projectName },
                     set: { model.setProjectName($0) }
                 ))
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .softInput()
             }
 
-            SettingsDivider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                FieldLabel("Description")
+            SettingsRow(label: "Description", alignment: .top) {
                 NativePromptEditor(
                     text: $model.prompt,
                     placeholder: "Describe what you want to build"
                 )
                 .frame(minHeight: 118)
             }
-            .padding(.vertical, 12)
 
-            SettingsDivider()
+            SettingsRow(label: "") {
+                HStack(spacing: 12) {
+                    Button {
+                        model.createAndOpen(agent: .codex)
+                    } label: {
+                        Label("Open in Codex", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
 
-            HStack(spacing: 12) {
-                Button {
-                    model.createAndOpen(agent: .codex)
-                } label: {
-                    Label("Open in Codex", systemImage: "sparkles")
+                    Button {
+                        model.createAndOpen(agent: .claude)
+                    } label: {
+                        Label("Open in Claude Code", systemImage: "terminal")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    Spacer()
+
+                    Button("Create only") {
+                        model.createOnly()
+                    }
+                    .buttonStyle(.link)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-
-                Button {
-                    model.createAndOpen(agent: .claude)
-                } label: {
-                    Label("Open in Claude Code", systemImage: "terminal")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
-                Spacer()
-
-                Button("Create only") {
-                    model.createOnly()
-                }
-                .buttonStyle(.link)
+                .disabled(actionsDisabled)
             }
-            .disabled(actionsDisabled)
-            .padding(.vertical, 12)
-
-            SettingsDivider()
 
             AdvancedDisclosure()
         }
-        .padding(18)
+        .padding(22)
         .nativePanel()
     }
 }
@@ -285,12 +279,11 @@ struct AdvancedDisclosure: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 12)
+            .padding(.vertical, 2)
 
             if model.advancedExpanded {
-                SettingsDivider()
                 AdvancedOptions()
-                    .padding(.top, 12)
+                    .padding(.top, 2)
                     .transition(.opacity)
             }
         }
@@ -303,62 +296,90 @@ struct AdvancedOptions: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
-            GridRow {
-                FieldLabel("Location")
-                HStack {
-                    TextField("Location", text: $model.location)
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsGroup {
+                AdvancedSettingRow(
+                    title: "Location",
+                    subtitle: model.location
+                ) {
                     Button("Choose") {
                         model.chooseLocation()
                     }
                 }
-            }
-            GridRow {
-                FieldLabel("Template")
-                Picker("Template", selection: $model.template) {
-                    ForEach(model.templates, id: \.self) {
-                        Text($0).tag($0)
+                SettingsGroupDivider()
+                AdvancedSettingRow(
+                    title: "Template",
+                    subtitle: "Starter project"
+                ) {
+                    Picker("Template", selection: $model.template) {
+                        ForEach(model.templates, id: \.self) {
+                            Text($0).tag($0)
+                        }
                     }
+                    .labelsHidden()
+                    .frame(width: 220)
                 }
-                .labelsHidden()
-            }
-            GridRow {
-                FieldLabel("Build")
-                Picker("Build", selection: $model.buildSystem) {
-                    ForEach(DesktopBuildSystem.allCases) { option in
-                        Text(option.label).tag(option)
+                SettingsGroupDivider()
+                AdvancedSettingRow(
+                    title: "Build system",
+                    subtitle: "Project tooling"
+                ) {
+                    Picker("Build", selection: $model.buildSystem) {
+                        ForEach(DesktopBuildSystem.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
             }
-            GridRow {
-                FieldLabel("Group ID")
-                TextField("Group ID", text: $model.groupId)
+
+            SettingsGroup {
+                AdvancedSettingRow(
+                    title: "Group ID",
+                    subtitle: "Java package prefix"
+                ) {
+                    TextField("Group ID", text: $model.groupId)
+                        .textFieldStyle(.plain)
+                        .softInput(width: 260)
+                }
+                SettingsGroupDivider()
+                AdvancedSettingRow(
+                    title: "Artifact ID",
+                    subtitle: "Build artifact name"
+                ) {
+                    TextField("Artifact ID", text: $model.artifactId)
+                        .textFieldStyle(.plain)
+                        .softInput(width: 260)
+                }
+                SettingsGroupDivider()
+                AdvancedSettingRow(
+                    title: "Package",
+                    subtitle: "Generated source package"
+                ) {
+                    TextField("Package", text: $model.packageName)
+                        .textFieldStyle(.plain)
+                        .softInput(width: 260)
+                }
+                SettingsGroupDivider()
+                AdvancedSettingRow(
+                    title: "Git repository",
+                    subtitle: "Initialize version control"
+                ) {
+                    Toggle("", isOn: $model.initGit)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
             }
-            GridRow {
-                FieldLabel("Artifact ID")
-                TextField("Artifact ID", text: $model.artifactId)
-            }
-            GridRow {
-                FieldLabel("Package")
-                TextField("Package", text: $model.packageName)
-            }
-            GridRow {
-                FieldLabel("Git")
-                Toggle("Initialize repository", isOn: $model.initGit)
-            }
-            GridRow {
-                FieldLabel("CLI")
-                Text(cliFootnote)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+
+            Text(cliFootnote)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .lineLimit(2)
         }
-        .textFieldStyle(.roundedBorder)
         .controlSize(.regular)
-        .padding(.bottom, 2)
+        .padding(.top, 4)
     }
 
     private var cliFootnote: String {
@@ -385,21 +406,58 @@ struct FieldLabel: View {
 
 struct SettingsRow<Content: View>: View {
     let label: String
+    var alignment: VerticalAlignment = .center
     @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: alignment, spacing: 18) {
             FieldLabel(label)
             content
         }
-        .padding(.vertical, 10)
     }
 }
 
-struct SettingsDivider: View {
+struct SettingsGroup<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
+        )
+    }
+}
+
+struct AdvancedSettingRow<Content: View>: View {
+    let title: String
+    let subtitle: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 18)
+            content
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+}
+
+struct SettingsGroupDivider: View {
     var body: some View {
         Divider()
-            .padding(.leading, 100)
+            .padding(.leading, 14)
     }
 }
 
@@ -437,7 +495,7 @@ struct RecentProjectsPanel: View {
                 }
             }
         }
-        .padding(18)
+        .padding(22)
         .nativePanel()
     }
 }
@@ -488,10 +546,10 @@ struct ProjectRow: View {
             }
         }
         .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
         )
     }
 }
@@ -512,8 +570,31 @@ struct ProjectActionButton: View {
 
 struct LaunchpadBackdrop: View {
     var body: some View {
-        Color(nsColor: .windowBackgroundColor)
+        Color(nsColor: .textBackgroundColor)
             .ignoresSafeArea()
+    }
+}
+
+struct WindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            configure(window: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            configure(window: nsView.window)
+        }
+    }
+
+    private func configure(window: NSWindow?) {
+        guard let window else { return }
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = false
+        window.toolbarStyle = .unified
     }
 }
 
@@ -587,11 +668,14 @@ final class PromptEditorNSView: NSView {
 
     private func configure() {
         wantsLayer = true
-        layer?.cornerRadius = 8
+        layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.28).cgColor
+        layer?.borderWidth = 0
         layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.08
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = NSSize(width: 0, height: 3)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -643,7 +727,29 @@ extension View {
         background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 1)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.12), lineWidth: 1)
             )
+            .shadow(color: .black.opacity(0.06), radius: 18, x: 0, y: 7)
+    }
+
+    func softInput(width: CGFloat? = nil) -> some View {
+        modifier(SoftInputModifier(width: width))
+    }
+}
+
+struct SoftInputModifier: ViewModifier {
+    let width: CGFloat?
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 11)
+            .frame(width: width)
+            .frame(height: 32)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.045), radius: 7, x: 0, y: 2)
     }
 }
