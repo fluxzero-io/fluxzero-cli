@@ -161,9 +161,9 @@ final class CliRuntimeService: @unchecked Sendable {
 
         do {
             let release = try await fetchLatestRelease()
-            if FileManager.default.isExecutableFile(atPath: paths.cliExecutable.path()) && versionsEqual(installed, release.tagName) {
+            if FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) && versionsEqual(installed, release.tagName) {
                 return CliStatus(
-                    executablePath: paths.cliExecutable.path(),
+                    executablePath: paths.cliExecutable.fsPath,
                     version: installed,
                     latestVersion: release.tagName,
                     updated: false,
@@ -172,16 +172,16 @@ final class CliRuntimeService: @unchecked Sendable {
             }
             try await download(release.downloadURL(), to: paths.cliExecutable)
             return CliStatus(
-                executablePath: paths.cliExecutable.path(),
+                executablePath: paths.cliExecutable.fsPath,
                 version: installedVersion() ?? release.tagName,
                 latestVersion: release.tagName,
                 updated: true,
                 message: "Downloaded Fluxzero CLI \(release.tagName)."
             )
         } catch {
-            if FileManager.default.isExecutableFile(atPath: paths.cliExecutable.path()) {
+            if FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) {
                 return CliStatus(
-                    executablePath: paths.cliExecutable.path(),
+                    executablePath: paths.cliExecutable.fsPath,
                     version: installed,
                     latestVersion: nil,
                     updated: false,
@@ -193,8 +193,8 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     func listTemplates() -> [String] {
-        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.path()) else { return [] }
-        guard let result = try? runner.run([paths.cliExecutable.path(), "templates", "list"]), result.successful else { return [] }
+        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) else { return [] }
+        guard let result = try? runner.run([paths.cliExecutable.fsPath, "templates", "list"]), result.successful else { return [] }
         return result.output
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "-", with: "", options: .anchored) }
@@ -203,8 +203,8 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     func installedVersion() -> String? {
-        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.path()) else { return nil }
-        guard let result = try? runner.run([paths.cliExecutable.path(), "version"], timeout: 15), result.successful else { return nil }
+        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) else { return nil }
+        guard let result = try? runner.run([paths.cliExecutable.fsPath, "version"], timeout: 15), result.successful else { return nil }
         let regex = try? NSRegularExpression(pattern: #"^v?\d+\.\d+\.\d+(?:[-.A-Za-z0-9]+)?$"#)
         return result.output
             .split(whereSeparator: \.isNewline)
@@ -239,15 +239,15 @@ final class CliRuntimeService: @unchecked Sendable {
         } catch {
             throw LaunchpadError.downloadFailed("Could not stage downloaded CLI: \(error.localizedDescription)")
         }
-        guard FileManager.default.fileExists(atPath: stagedExecutable.path()) else {
+        guard FileManager.default.fileExists(atPath: stagedExecutable.fsPath) else {
             throw LaunchpadError.downloadFailed("Downloaded CLI staging file was not created.")
         }
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedExecutable.path())
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedExecutable.fsPath)
         try installExecutable(from: stagedExecutable, to: target)
     }
 
     private func installExecutable(from stagedExecutable: URL, to target: URL) throws {
-        if FileManager.default.fileExists(atPath: target.path()) {
+        if FileManager.default.fileExists(atPath: target.fsPath) {
             _ = try FileManager.default.replaceItemAt(target, withItemAt: stagedExecutable, backupItemName: nil)
         } else {
             try FileManager.default.moveItem(at: stagedExecutable, to: target)
@@ -256,10 +256,10 @@ final class CliRuntimeService: @unchecked Sendable {
 
     private func recoverLegacyTempDownload() {
         let legacyTemp = paths.binDir.appending(path: "fz.tmp")
-        guard FileManager.default.fileExists(atPath: legacyTemp.path()) else { return }
-        if !FileManager.default.fileExists(atPath: paths.cliExecutable.path()) {
+        guard FileManager.default.fileExists(atPath: legacyTemp.fsPath) else { return }
+        if !FileManager.default.fileExists(atPath: paths.cliExecutable.fsPath) {
             do {
-                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: legacyTemp.path())
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: legacyTemp.fsPath)
                 try FileManager.default.moveItem(at: legacyTemp, to: paths.cliExecutable)
                 return
             } catch {
@@ -371,7 +371,7 @@ final class ProjectGenerator: @unchecked Sendable {
             throw LaunchpadError.cliFailed(result.output)
         }
         guard !result.output.split(whereSeparator: \.isNewline).contains(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("Error:") }),
-              FileManager.default.fileExists(atPath: projectDir.path()) else {
+              FileManager.default.fileExists(atPath: projectDir.fsPath) else {
             throw LaunchpadError.projectMissing(result.output)
         }
 
@@ -380,14 +380,14 @@ final class ProjectGenerator: @unchecked Sendable {
         let project = GeneratedProject(
             id: stableProjectId(projectDir),
             name: normalizedName,
-            path: projectDir.path(),
+            path: projectDir.fsPath,
             template: request.template,
             buildSystem: request.buildSystem.rawValue,
             packageName: request.packageName,
             generatedAt: ISO8601DateFormatter().string(from: Date()),
             cliVersion: cliVersion,
             sdkVersion: sdkVersion,
-            promptPath: promptPath.path()
+            promptPath: promptPath.fsPath
         )
         try registry.saveProject(project)
         return project
@@ -395,10 +395,10 @@ final class ProjectGenerator: @unchecked Sendable {
 
     func buildCommand(_ request: GenerateProjectRequest) -> [String] {
         var command = [
-            cliExecutable.path(), "init",
+            cliExecutable.fsPath, "init",
             "--template", request.template,
             "--name", request.name,
-            "--dir", URL(fileURLWithPath: request.outputBaseDir).standardizedFileURL.path(),
+            "--dir", URL(fileURLWithPath: request.outputBaseDir).standardizedFileURL.fsPath,
             "--package", request.packageName,
             "--build", request.buildSystem.rawValue
         ]
@@ -418,7 +418,7 @@ final class ProjectGenerator: @unchecked Sendable {
     }
 
     private func stableProjectId(_ projectDir: URL) -> String {
-        let data = Data(projectDir.standardizedFileURL.path().utf8)
+        let data = Data(projectDir.standardizedFileURL.fsPath.utf8)
         let digest = SHA256.hash(data: data)
         return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
@@ -505,7 +505,7 @@ final class AgentLauncher: @unchecked Sendable {
     private func findExecutable(_ name: String) -> String? {
         (ProcessInfo.processInfo.environment["PATH"] ?? "")
             .split(separator: ":")
-            .map { URL(fileURLWithPath: String($0)).appending(path: name).path() }
+            .map { URL(fileURLWithPath: String($0)).appending(path: name).fsPath }
             .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
@@ -561,7 +561,7 @@ final class DeepLinkActionRunner: @unchecked Sendable {
             if projectDir.isNonEmptyDirectory {
                 return try agentLauncher.launch(
                     choice: agentChoice,
-                    projectPath: projectDir.path(),
+                    projectPath: projectDir.fsPath,
                     prompt: prompt?.nilIfBlank ?? projectDir.startPromptText ?? ""
                 )
             }
@@ -572,7 +572,7 @@ final class DeepLinkActionRunner: @unchecked Sendable {
             let request = GenerateProjectRequest(
                 template: selectedTemplate,
                 name: projectName,
-                outputBaseDir: outputBaseDir.path(),
+                outputBaseDir: outputBaseDir.fsPath,
                 packageName: packageName?.nilIfBlank ?? Self.defaultPackage(groupId: group, artifactId: artifact),
                 groupId: group,
                 artifactId: artifact,
@@ -589,7 +589,7 @@ final class DeepLinkActionRunner: @unchecked Sendable {
                 return try agentLauncher.launch(choice: agentChoice, projectPath: project.path, prompt: project.promptPath.flatMap { try? String(contentsOf: URL(fileURLWithPath: $0), encoding: .utf8) } ?? prompt ?? "")
             } catch {
                 if projectDir.isNonEmptyDirectory {
-                    return try agentLauncher.launch(choice: agentChoice, projectPath: projectDir.path(), prompt: prompt?.nilIfBlank ?? projectDir.startPromptText ?? "")
+                    return try agentLauncher.launch(choice: agentChoice, projectPath: projectDir.fsPath, prompt: prompt?.nilIfBlank ?? projectDir.startPromptText ?? "")
                 }
                 throw error
             }
@@ -683,6 +683,10 @@ extension Bool {
 }
 
 extension URL {
+    var fsPath: String {
+        path(percentEncoded: false)
+    }
+
     var queryItems: [String: String] {
         URLComponents(url: self, resolvingAgainstBaseURL: false)?
             .queryItems?
@@ -693,8 +697,8 @@ extension URL {
 
     var isNonEmptyDirectory: Bool {
         var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path(), isDirectory: &isDirectory), isDirectory.boolValue else { return false }
-        return ((try? FileManager.default.contentsOfDirectory(atPath: path())) ?? []).isEmpty == false
+        guard FileManager.default.fileExists(atPath: fsPath, isDirectory: &isDirectory), isDirectory.boolValue else { return false }
+        return ((try? FileManager.default.contentsOfDirectory(atPath: fsPath)) ?? []).isEmpty == false
     }
 
     var startPromptText: String? {

@@ -68,7 +68,7 @@ final class LaunchpadModel: ObservableObject {
         panel.canCreateDirectories = true
         panel.directoryURL = URL(fileURLWithPath: location)
         if panel.runModal() == .OK, let url = panel.url {
-            location = url.path()
+            location = url.fsPath
             advancedExpanded = true
         }
     }
