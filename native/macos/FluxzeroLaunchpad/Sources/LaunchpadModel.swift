@@ -16,6 +16,7 @@ final class LaunchpadModel: ObservableObject {
     @Published var initGit = true
     @Published var advancedExpanded = false
     @Published var selectedAgent: AgentChoice = .codex
+    @Published var selectedSection: LaunchpadSection = .create
     @Published var templates = ["flux-basic-java", "flux-basic-kotlin", "gamerental"]
     @Published var projects: [GeneratedProject] = []
     @Published var cliStatus: CliStatus?
@@ -34,24 +35,29 @@ final class LaunchpadModel: ObservableObject {
 
     func refresh() {
         Task {
-            await prepare()
+            await prepare(showError: true)
         }
     }
 
-    func prepare() async {
+    func prepare(showError: Bool = false) async {
         isBusy = true
         defer { isBusy = false }
         do {
-            let status = try await cliRuntime.ensureLatestCli()
-            let loadedTemplates = cliRuntime.listTemplates()
+            let runtime = cliRuntime
+            let (status, loadedTemplates) = try await Task.detached(priority: .userInitiated) {
+                let status = try await runtime.ensureLatestCli()
+                return (status, runtime.listTemplates())
+            }.value
             cliStatus = status
             templates = loadedTemplates.isEmpty ? templates : loadedTemplates
             projects = registry.listProjects()
             statusMessage = status.message
         } catch {
             projects = registry.listProjects()
-            statusMessage = "Using local project history."
-            errorMessage = error.localizedDescription
+            statusMessage = "Fluxzero CLI is not ready yet: \(error.localizedDescription)"
+            if showError {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -111,11 +117,15 @@ final class LaunchpadModel: ObservableObject {
         guard let link = DeepLinkParser.parse(url) else { return }
         switch link {
         case .new(let link):
+            selectedSection = .create
             apply(link)
         case .direct(let direct):
             Task {
                 do {
-                    _ = try await DeepLinkActionRunner(paths: paths, cliRuntime: cliRuntime, registry: registry, agentLauncher: agentLauncher).run(direct)
+                    let runner = DeepLinkActionRunner(paths: paths, cliRuntime: cliRuntime, registry: registry, agentLauncher: agentLauncher)
+                    _ = try await Task.detached(priority: .userInitiated) {
+                        try await runner.run(direct)
+                    }.value
                     projects = registry.listProjects()
                 } catch {
                     errorMessage = error.localizedDescription
@@ -133,8 +143,11 @@ final class LaunchpadModel: ObservableObject {
         defer { isBusy = false }
         do {
             let request = makeRequest(agent: agent)
-            let generator = ProjectGenerator(cliExecutable: URL(fileURLWithPath: cliStatus.executablePath), registry: registry)
-            let project = try generator.generate(request, cliVersion: cliStatus.version)
+            let registry = registry
+            let project = try await Task.detached(priority: .userInitiated) {
+                let generator = ProjectGenerator(cliExecutable: URL(fileURLWithPath: cliStatus.executablePath), registry: registry)
+                return try generator.generate(request, cliVersion: cliStatus.version)
+            }.value
             projects = registry.listProjects()
             statusMessage = "Created \(project.name)."
             if agent != .none {

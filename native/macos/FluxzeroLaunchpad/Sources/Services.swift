@@ -197,13 +197,13 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     private func download(_ url: URL, to target: URL) async throws {
-        let (tempUrl, response) = try await URLSession.shared.download(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw LaunchpadError.downloadFailed(url.absoluteString)
         }
         let tempTarget = target.deletingLastPathComponent().appending(path: "\(target.lastPathComponent).tmp")
         try? FileManager.default.removeItem(at: tempTarget)
-        try FileManager.default.moveItem(at: tempUrl, to: tempTarget)
+        try data.write(to: tempTarget, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempTarget.path())
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: tempTarget, to: target)
