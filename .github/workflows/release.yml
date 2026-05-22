@@ -139,9 +139,15 @@ jobs:
       version: ${{ needs.version.outputs.version }}
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
 
+  desktop-build:
+    needs: [version, build-and-test]
+    uses: ./.github/workflows/desktop-build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
   release:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build]
+    needs: [version, build-and-test, native-build, desktop-build]
     permissions:
       contents: write
 
@@ -180,7 +186,15 @@ jobs:
       - name: Download native artifacts
         uses: actions/download-artifact@v7
         with:
+          pattern: flux-*
           path: native-artifacts
+
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: desktop-artifacts
+          merge-multiple: true
 
       - name: Prepare native executables for release
         run: |
@@ -342,5 +356,8 @@ jobs:
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64
             build/native-releases/flux-windows-amd64.exe
+            desktop-artifacts/*.dmg
+            desktop-artifacts/*.msi
+            desktop-artifacts/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

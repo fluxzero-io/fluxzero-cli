@@ -45,7 +45,22 @@ sudo mv fz /usr/local/bin/fz
 - 🚀 **Instant execution** (no JVM warm-up time)
 - 🌍 **Cross-platform** (Linux, macOS, Windows)
 
-### Option 3: Manual JAR Installation (Legacy)
+### Option 3: Fluxzero Launchpad
+
+Fluxzero also ships a desktop app, Fluxzero Launchpad, for generating projects locally and opening them in coding agents.
+
+Desktop artifacts are published with each release:
+
+- **macOS Intel / Apple Silicon**: `Fluxzero Launchpad-*.dmg`
+- **Windows x64**: `Fluxzero Launchpad-*.msi` or `Fluxzero Launchpad-*.exe`
+
+The app manages its own `fz` binary, checks for the latest CLI release on launch, writes a `START_PROMPT.md` into generated projects, opens Codex through `codex://new` with the generated project path and prompt, and keeps a local history of generated projects for future SDK and agent-file upgrades. Installed macOS builds and launched Windows builds register experimental Fluxzero URL schemes:
+
+- `fluxzero://new?...` opens Launchpad and pre-fills the generator.
+- `fluxzero://open?path=...&prompt=...&agent=codex|claude|both` opens an existing project directly in an agent.
+- `fluxzero://create?name=...&prompt=...&agent=codex|claude|both` creates a project with defaults and opens it directly in an agent.
+
+### Option 4: Manual JAR Installation (Legacy)
 
 1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases)
 2. Run it with Java: `java -jar fluxzero-cli.jar`
