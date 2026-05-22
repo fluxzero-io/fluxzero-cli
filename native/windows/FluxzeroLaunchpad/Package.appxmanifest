@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  IgnorableNamespaces="uap uap3">
+  <Identity Name="Fluxzero.Launchpad" Publisher="CN=Fluxzero" Version="0.1.0.0" />
+  <Properties>
+    <DisplayName>Fluxzero Launchpad</DisplayName>
+    <PublisherDisplayName>Fluxzero</PublisherDisplayName>
+    <Logo>Assets\fluxzero.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="Fluxzero Launchpad"
+        Description="Create Fluxzero projects and open them in coding agents."
+        BackgroundColor="transparent"
+        Square44x44Logo="Assets\fluxzero.png"
+        Square150x150Logo="Assets\fluxzero.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\fluxzero.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <uap3:Extension Category="windows.protocol">
+          <uap3:Protocol Name="fluxzero" />
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

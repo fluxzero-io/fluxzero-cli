@@ -1,4 +1,6 @@
 .gradle
+.build/
+.swiftpm/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -31,6 +33,7 @@ out/
 .springBeans
 .sts4-cache
 bin/
+obj/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
@@ -47,5 +50,6 @@ bin/
 ### Mac OS ###
 .DS_Storeapi/node_modules/
 maven-plugin/target/
+AppPackages/
 .local-registry/
 maven-plugin/examples/*/target/
