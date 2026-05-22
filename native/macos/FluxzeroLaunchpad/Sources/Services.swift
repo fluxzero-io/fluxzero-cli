@@ -117,7 +117,27 @@ enum NativePlatform {
     }
 }
 
+private actor CliInstallGate {
+    private var inFlight: Task<CliStatus, Error>?
+
+    func run(_ operation: @escaping @Sendable () async throws -> CliStatus) async throws -> CliStatus {
+        if let inFlight {
+            return try await inFlight.value
+        }
+        let task = Task {
+            try await operation()
+        }
+        inFlight = task
+        defer {
+            inFlight = nil
+        }
+        return try await task.value
+    }
+}
+
 final class CliRuntimeService: @unchecked Sendable {
+    private static let installGate = CliInstallGate()
+
     private let paths: AppPaths
     private let runner: CommandRunner
     private let latestReleaseURL = URL(string: "https://api.github.com/repos/fluxzero-io/fluxzero-cli/releases/latest")!
@@ -128,7 +148,14 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     func ensureLatestCli() async throws -> CliStatus {
+        try await Self.installGate.run { [self] in
+            try await ensureLatestCliUncoordinated()
+        }
+    }
+
+    private func ensureLatestCliUncoordinated() async throws -> CliStatus {
         try FileManager.default.createDirectory(at: paths.binDir, withIntermediateDirectories: true)
+        removeManagedDownloadLeftovers()
         recoverLegacyTempDownload()
         let installed = installedVersion()
 
@@ -198,21 +225,33 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     private func download(_ url: URL, to target: URL) async throws {
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (downloadedFile, response) = try await URLSession.shared.download(from: url)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
             throw LaunchpadError.downloadFailed(url.absoluteString)
         }
-        let tempTarget = target.deletingLastPathComponent().appending(path: "\(target.lastPathComponent).\(UUID().uuidString).download")
-        try? FileManager.default.removeItem(at: tempTarget)
+        let stagedExecutable = target.deletingLastPathComponent().appending(path: ".\(target.lastPathComponent).\(UUID().uuidString).staged")
+        try? FileManager.default.removeItem(at: stagedExecutable)
         defer {
-            try? FileManager.default.removeItem(at: tempTarget)
+            try? FileManager.default.removeItem(at: stagedExecutable)
         }
-        try data.write(to: tempTarget)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tempTarget.path())
+        do {
+            try FileManager.default.copyItem(at: downloadedFile, to: stagedExecutable)
+        } catch {
+            throw LaunchpadError.downloadFailed("Could not stage downloaded CLI: \(error.localizedDescription)")
+        }
+        guard FileManager.default.fileExists(atPath: stagedExecutable.path()) else {
+            throw LaunchpadError.downloadFailed("Downloaded CLI staging file was not created.")
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stagedExecutable.path())
+        try installExecutable(from: stagedExecutable, to: target)
+    }
+
+    private func installExecutable(from stagedExecutable: URL, to target: URL) throws {
         if FileManager.default.fileExists(atPath: target.path()) {
-            try FileManager.default.removeItem(at: target)
+            _ = try FileManager.default.replaceItemAt(target, withItemAt: stagedExecutable, backupItemName: nil)
+        } else {
+            try FileManager.default.moveItem(at: stagedExecutable, to: target)
         }
-        try FileManager.default.moveItem(at: tempTarget, to: target)
     }
 
     private func recoverLegacyTempDownload() {
@@ -228,6 +267,16 @@ final class CliRuntimeService: @unchecked Sendable {
             }
         }
         try? FileManager.default.removeItem(at: legacyTemp)
+    }
+
+    private func removeManagedDownloadLeftovers() {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: paths.binDir, includingPropertiesForKeys: nil) else { return }
+        for file in files {
+            let name = file.lastPathComponent
+            if name.hasPrefix("fz.") && (name.hasSuffix(".download") || name.hasSuffix(".staged")) {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
     }
 
     private func versionsEqual(_ left: String?, _ right: String?) -> Bool {
