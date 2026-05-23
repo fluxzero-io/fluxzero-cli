@@ -63,9 +63,10 @@ struct LaunchpadView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(LaunchpadBackdrop())
+            .navigationTitle(model.selectedSection.label)
         }
         .navigationSplitViewStyle(.balanced)
-        .background(Color(nsColor: .textBackgroundColor))
+        .background(Color(nsColor: .windowBackgroundColor))
         .alert("Fluxzero Launchpad", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -92,62 +93,26 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
 struct CreateScreen: View {
-    var body: some View {
-        ScrollView {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 28) {
-                    CreateMainContent()
-                        .frame(width: 700, alignment: .topLeading)
-                    RecentProjectsPanel(limit: 5)
-                        .frame(width: 340)
-                        .padding(.top, 8)
-                }
-                .frame(maxWidth: 1080, alignment: .center)
-
-                VStack(alignment: .leading, spacing: 24) {
-                    CreateMainContent()
-                        .frame(maxWidth: 700, alignment: .topLeading)
-                    RecentProjectsPanel(limit: 5)
-                        .frame(maxWidth: 700)
-                }
-                .frame(maxWidth: 700, alignment: .center)
-            }
-            .padding(.horizontal, 34)
-            .padding(.vertical, 34)
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(nsColor: .textBackgroundColor))
-    }
-}
-
-struct CreateMainContent: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        DetailScroll {
             if model.isBusy || model.cliStatus == nil {
                 CliStatusBanner()
             }
             GeneratorPanel()
+            RecentProjectsPanel(limit: 5)
         }
-        .frame(maxWidth: 700, alignment: .topLeading)
     }
 }
 
 struct ProjectsScreen: View {
     var body: some View {
         DetailScroll {
-            HeaderView(
-                title: "Projects",
-                subtitle: "Generated Fluxzero projects."
-            )
             RecentProjectsPanel(limit: nil)
         }
     }
@@ -156,10 +121,6 @@ struct ProjectsScreen: View {
 struct UpgradesScreen: View {
     var body: some View {
         DetailScroll {
-            HeaderView(
-                title: "Upgrades",
-                subtitle: "SDK and agent manual upgrades."
-            )
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Upgrade support is coming", systemImage: "arrow.triangle.2.circlepath")
@@ -182,27 +143,13 @@ struct DetailScroll<Content: View>: View {
             VStack(alignment: .leading, spacing: 22) {
                 content
             }
-            .frame(maxWidth: 980, alignment: .leading)
-            .padding(.horizontal, 30)
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(.horizontal, 36)
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(nsColor: .textBackgroundColor))
-    }
-}
-
-struct HeaderView: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.title.weight(.semibold))
-            Text(subtitle)
-                .foregroundStyle(.secondary)
-        }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -243,53 +190,64 @@ struct GeneratorPanel: View {
     }
 
     var body: some View {
-        Form {
-            Section("Project") {
-                TextField("Name", text: Binding(
-                    get: { model.projectName },
-                    set: { model.setProjectName($0) }
-                ))
+        VStack(alignment: .leading, spacing: 14) {
+            GroupBox {
+                VStack(spacing: 0) {
+                    LabeledContent("Name") {
+                        TextField("Project name", text: Binding(
+                            get: { model.projectName },
+                            set: { model.setProjectName($0) }
+                        ))
+                    }
 
-                LabeledContent("Description") {
-                    PromptTextEditor(
-                        text: $model.prompt,
-                        prompt: "Describe what you want to build"
-                    )
-                    .frame(minHeight: 130)
+                    SettingsDivider()
+
+                    LabeledContent("Description") {
+                        PromptTextEditor(
+                            text: $model.prompt,
+                            prompt: "Describe what you want to build"
+                        )
+                        .frame(minHeight: 130)
+                    }
+
+                    SettingsDivider()
+
+                    HStack(spacing: 12) {
+                        Button("Create only") {
+                            model.createOnly()
+                        }
+                        .buttonStyle(.link)
+
+                        Spacer()
+
+                        Button {
+                            model.createAndOpen(agent: .claude)
+                        } label: {
+                            Label("Open in Claude Code", systemImage: "terminal")
+                        }
+
+                        Button {
+                            model.createAndOpen(agent: .codex)
+                        } label: {
+                            Label("Open in Codex", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .disabled(actionsDisabled)
+                    .padding(.vertical, 8)
                 }
+            } label: {
+                Text("Project")
+            }
 
-                HStack(spacing: 12) {
-                    Button("Create only") {
-                        model.createOnly()
-                    }
-                    .buttonStyle(.link)
-
-                    Spacer()
-
-                    Button {
-                        model.createAndOpen(agent: .claude)
-                    } label: {
-                        Label("Open in Claude Code", systemImage: "terminal")
-                    }
-
-                    Button {
-                        model.createAndOpen(agent: .codex)
-                    } label: {
-                        Label("Open in Codex", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .disabled(actionsDisabled)
-
-                DisclosureGroup("Advanced options", isExpanded: $model.advancedExpanded) {
+            DisclosureGroup("Advanced options", isExpanded: $model.advancedExpanded) {
+                GroupBox {
                     AdvancedOptions()
-                        .padding(.top, 6)
                 }
+                .padding(.top, 8)
             }
         }
-        .formStyle(.grouped)
-        .scrollDisabled(true)
-        .frame(maxWidth: 700, alignment: .topLeading)
+        .frame(maxWidth: 760, alignment: .topLeading)
     }
 }
 
@@ -297,24 +255,30 @@ struct AdvancedOptions: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             LabeledContent("Location") {
                 HStack {
                     Text(model.location)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Button("Choose") {
+                    Button("Choose...") {
                         model.chooseLocation()
                     }
                 }
             }
+            .padding(.vertical, 8)
+
+            SettingsDivider()
 
             Picker("Template", selection: $model.template) {
                 ForEach(model.templates, id: \.self) {
                     Text($0).tag($0)
                 }
             }
+            .padding(.vertical, 8)
+
+            SettingsDivider()
 
             Picker("Build system", selection: $model.buildSystem) {
                 ForEach(DesktopBuildSystem.allCases) { option in
@@ -322,14 +286,42 @@ struct AdvancedOptions: View {
                 }
             }
             .pickerStyle(.segmented)
+            .padding(.vertical, 8)
 
-            TextField("Group ID", text: $model.groupId)
-            TextField("Artifact ID", text: $model.artifactId)
-            TextField("Package", text: $model.packageName)
+            SettingsDivider()
+
+            LabeledContent("Group ID") {
+                TextField("Group ID", text: $model.groupId)
+            }
+            .padding(.vertical, 8)
+
+            SettingsDivider()
+
+            LabeledContent("Artifact ID") {
+                TextField("Artifact ID", text: $model.artifactId)
+            }
+            .padding(.vertical, 8)
+
+            SettingsDivider()
+
+            LabeledContent("Package") {
+                TextField("Package", text: $model.packageName)
+            }
+            .padding(.vertical, 8)
+
+            SettingsDivider()
 
             Toggle("Initialize Git repository", isOn: $model.initGit)
+                .toggleStyle(.switch)
+                .padding(.vertical, 8)
         }
         .controlSize(.regular)
+    }
+}
+
+struct SettingsDivider: View {
+    var body: some View {
+        Divider()
     }
 }
 
@@ -435,7 +427,7 @@ struct ProjectActionButton: View {
 
 struct LaunchpadBackdrop: View {
     var body: some View {
-        Color(nsColor: .textBackgroundColor)
+        Color(nsColor: .windowBackgroundColor)
             .ignoresSafeArea()
     }
 }
