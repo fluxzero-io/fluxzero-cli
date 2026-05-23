@@ -98,16 +98,46 @@ struct SidebarView: View {
 }
 
 struct CreateScreen: View {
+    var body: some View {
+        ScrollView {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 28) {
+                    CreateMainContent()
+                        .frame(width: 700, alignment: .topLeading)
+                    RecentProjectsPanel(limit: 5)
+                        .frame(width: 340)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: 1080, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 24) {
+                    CreateMainContent()
+                        .frame(maxWidth: 700, alignment: .topLeading)
+                    RecentProjectsPanel(limit: 5)
+                        .frame(maxWidth: 700)
+                }
+                .frame(maxWidth: 700, alignment: .center)
+            }
+            .padding(.horizontal, 34)
+            .padding(.vertical, 34)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+}
+
+struct CreateMainContent: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        DetailScroll {
+        VStack(alignment: .leading, spacing: 18) {
             if model.isBusy || model.cliStatus == nil {
                 CliStatusBanner()
             }
             GeneratorPanel()
-            RecentProjectsPanel(limit: 5)
         }
+        .frame(maxWidth: 700, alignment: .topLeading)
     }
 }
 
@@ -154,8 +184,9 @@ struct DetailScroll<Content: View>: View {
             .frame(maxWidth: 980, alignment: .leading)
             .padding(.horizontal, 30)
             .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .textBackgroundColor))
     }
 }
@@ -266,8 +297,7 @@ struct GeneratorPanel: View {
 
             AdvancedDisclosure()
         }
-        .padding(22)
-        .nativePanel()
+        .frame(maxWidth: 700, alignment: .topLeading)
     }
 }
 
