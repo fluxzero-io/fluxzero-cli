@@ -18,6 +18,11 @@ struct FluxzeroLaunchpadApp: App {
                 }
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Fluxzero Launchpad") {
+                    showAboutPanel()
+                }
+            }
             CommandGroup(after: .newItem) {
                 Button("Refresh Fluxzero CLI") {
                     model.refresh()
@@ -25,6 +30,16 @@ struct FluxzeroLaunchpadApp: App {
                 .keyboardShortcut("r", modifiers: [.command])
             }
         }
+    }
+
+    private func showAboutPanel() {
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        let cliVersion = model.cliStatus?.version ?? "not ready"
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Fluxzero Launchpad",
+            .applicationVersion: appVersion,
+            .version: "Fluxzero CLI \(cliVersion)"
+        ])
     }
 }
 
@@ -46,10 +61,11 @@ struct LaunchpadView: View {
                     UpgradesScreen()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(LaunchpadBackdrop())
         }
         .navigationSplitViewStyle(.balanced)
-        .background(WindowConfigurator())
+        .background(Color(nsColor: .textBackgroundColor))
         .alert("Fluxzero Launchpad", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -76,6 +92,8 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -84,10 +102,6 @@ struct CreateScreen: View {
 
     var body: some View {
         DetailScroll {
-            HeaderView(
-                title: "Fluxzero Launchpad",
-                subtitle: "Local projects for Codex and Claude Code."
-            )
             if model.isBusy || model.cliStatus == nil {
                 CliStatusBanner()
             }
@@ -141,6 +155,8 @@ struct DetailScroll<Content: View>: View {
             .padding(.horizontal, 30)
             .padding(.vertical, 28)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .textBackgroundColor))
     }
 }
 
@@ -222,33 +238,31 @@ struct GeneratorPanel: View {
                 .frame(minHeight: 118)
             }
 
-            SettingsRow(label: "") {
-                HStack(spacing: 12) {
-                    Button {
-                        model.createAndOpen(agent: .codex)
-                    } label: {
-                        Label("Open in Codex", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-
-                    Button {
-                        model.createAndOpen(agent: .claude)
-                    } label: {
-                        Label("Open in Claude Code", systemImage: "terminal")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-
-                    Spacer()
-
-                    Button("Create only") {
-                        model.createOnly()
-                    }
-                    .buttonStyle(.link)
+            HStack(spacing: 12) {
+                Button("Create only") {
+                    model.createOnly()
                 }
-                .disabled(actionsDisabled)
+                .buttonStyle(.link)
+
+                Spacer()
+
+                Button {
+                    model.createAndOpen(agent: .claude)
+                } label: {
+                    Label("Open in Claude Code", systemImage: "terminal")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+
+                Button {
+                    model.createAndOpen(agent: .codex)
+                } label: {
+                    Label("Open in Codex", systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
+            .disabled(actionsDisabled)
 
             AdvancedDisclosure()
         }
@@ -372,21 +386,9 @@ struct AdvancedOptions: View {
                         .toggleStyle(.switch)
                 }
             }
-
-            Text(cliFootnote)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(2)
         }
         .controlSize(.regular)
         .padding(.top, 4)
-    }
-
-    private var cliFootnote: String {
-        guard let status = model.cliStatus else {
-            return model.statusMessage
-        }
-        return "\(status.executablePath) - \(status.version ?? "unknown version")"
     }
 }
 
@@ -575,29 +577,6 @@ struct LaunchpadBackdrop: View {
     }
 }
 
-struct WindowConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            configure(window: view.window)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            configure(window: nsView.window)
-        }
-    }
-
-    private func configure(window: NSWindow?) {
-        guard let window else { return }
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = false
-        window.toolbarStyle = .unified
-    }
-}
-
 struct NativePromptEditor: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
@@ -670,12 +649,10 @@ final class PromptEditorNSView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
-        layer?.borderWidth = 0
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
         layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
-        layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.08
-        layer?.shadowRadius = 10
-        layer?.shadowOffset = NSSize(width: 0, height: 3)
+        layer?.shadowOpacity = 0
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -727,9 +704,9 @@ extension View {
         background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.12), lineWidth: 1)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.16), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 18, x: 0, y: 7)
+            .shadow(color: .black.opacity(0.035), radius: 10, x: 0, y: 4)
     }
 
     func softInput(width: CGFloat? = nil) -> some View {
@@ -748,8 +725,7 @@ struct SoftInputModifier: ViewModifier {
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.12), lineWidth: 1)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.045), radius: 7, x: 0, y: 2)
     }
 }
