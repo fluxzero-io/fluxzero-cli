@@ -307,6 +307,11 @@ final class ProjectRegistry: @unchecked Sendable {
         try write(RegistryState(projects: updated))
     }
 
+    func removeProject(_ project: GeneratedProject) throws {
+        let updated = listProjects().filter { $0.id != project.id && $0.path != project.path }
+        try write(RegistryState(projects: updated))
+    }
+
     private func write(_ state: RegistryState) throws {
         try FileManager.default.createDirectory(at: registryFile.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try encoder.encode(state)

@@ -41,7 +41,7 @@ enum LaunchpadSection: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .create: "Create"
+        case .create: "Create Project"
         case .projects: "Projects"
         case .upgrades: "Upgrades"
         }

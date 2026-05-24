@@ -23,6 +23,7 @@ final class LaunchpadModel: ObservableObject {
     @Published var isBusy = false
     @Published var statusMessage = "Preparing Fluxzero CLI..."
     @Published var errorMessage: String?
+    @Published var pendingProjectDeletion: GeneratedProject?
 
     private let paths = AppPaths.detect()
     private lazy var cliRuntime = CliRuntimeService(paths: paths)
@@ -111,6 +112,26 @@ final class LaunchpadModel: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(promptText, forType: .string)
         statusMessage = "Prompt copied."
+    }
+
+    func requestDeleteProject(_ project: GeneratedProject) {
+        pendingProjectDeletion = project
+    }
+
+    func deleteProject(_ project: GeneratedProject) {
+        do {
+            let projectURL = URL(fileURLWithPath: project.path)
+            if FileManager.default.fileExists(atPath: projectURL.fsPath) {
+                try FileManager.default.trashItem(at: projectURL, resultingItemURL: nil)
+            }
+            try registry.removeProject(project)
+            projects = registry.listProjects()
+            pendingProjectDeletion = nil
+            statusMessage = "Moved \(project.name) to Trash."
+        } catch {
+            pendingProjectDeletion = nil
+            errorMessage = error.localizedDescription
+        }
     }
 
     func handle(url: URL) {
