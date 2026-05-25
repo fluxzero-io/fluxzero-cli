@@ -8,7 +8,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let menu = NSMenu()
     private var cancellables: Set<AnyCancellable> = []
     private var animationTimer: Timer?
+    private var settleTimer: Timer?
     private var rotation: CGFloat = 0
+    private static let animationFramesPerSecond: TimeInterval = 24
+    private static let fullRotationDuration: CGFloat = 8
+    private static let hexagonStep: CGFloat = 60
+    private static let angleTolerance: CGFloat = 0.001
+    private static let rotationStep = 360.0 / (fullRotationDuration * CGFloat(animationFramesPerSecond))
 
     init(model: LaunchpadModel = .shared) {
         self.model = model
@@ -64,7 +70,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if model.isBusy {
             menu.addItem(statusItem(title: model.statusMessage))
         } else if model.isLaunchpadUpToDate {
-            menu.addItem(statusItem(title: "Fluxzero Launchpad is up to date."))
+            menu.addItem(statusItem(title: "Fluxzero Launchpad is up to date"))
         } else {
             menu.addItem(item("Check for Updates", action: #selector(refresh)))
         }
@@ -89,23 +95,72 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private func setAnimating(_ isAnimating: Bool) {
         if isAnimating {
+            settleTimer?.invalidate()
+            settleTimer = nil
             guard animationTimer == nil else { return }
-            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
+            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.animationFramesPerSecond, repeats: true) { [weak self] _ in
                 Task { @MainActor in
-                    self?.tick()
+                    self?.advanceRotation()
                 }
             }
         } else {
+            let wasAnimating = animationTimer != nil
             animationTimer?.invalidate()
             animationTimer = nil
-            rotation = 0
-            statusItem.button?.image = FluxzeroMenuBarAssets.templateImage
+            guard wasAnimating else { return }
+            settleToNextHexagonStep()
         }
     }
 
-    private func tick() {
-        rotation = (rotation + 360.0 / (8.0 * 24.0)).truncatingRemainder(dividingBy: 360.0)
+    private func advanceRotation() {
+        setRotation(rotation + Self.rotationStep)
+    }
+
+    private func settleToNextHexagonStep() {
+        settleTimer?.invalidate()
+        let target = nextHexagonStep(after: rotation)
+        if forwardDistance(from: rotation, to: target) <= Self.rotationStep {
+            setRotation(target)
+            return
+        }
+
+        settleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.animationFramesPerSecond, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if self.forwardDistance(from: self.rotation, to: target) <= Self.rotationStep {
+                    self.setRotation(target)
+                    self.settleTimer?.invalidate()
+                    self.settleTimer = nil
+                } else {
+                    self.advanceRotation()
+                }
+            }
+        }
+    }
+
+    private func setRotation(_ degrees: CGFloat) {
+        rotation = normalizedDegrees(degrees)
         statusItem.button?.image = FluxzeroMenuBarAssets.rotatedTemplateImage(degrees: rotation)
+    }
+
+    private func nextHexagonStep(after degrees: CGFloat) -> CGFloat {
+        let normalized = normalizedDegrees(degrees)
+        let currentStep = floor(normalized / Self.hexagonStep) * Self.hexagonStep
+        let remainder = normalized - currentStep
+        if remainder < Self.angleTolerance {
+            return normalizedDegrees(currentStep)
+        }
+        return normalizedDegrees(currentStep + Self.hexagonStep)
+    }
+
+    private func forwardDistance(from start: CGFloat, to end: CGFloat) -> CGFloat {
+        normalizedDegrees(end - start)
+    }
+
+    private func normalizedDegrees(_ degrees: CGFloat) -> CGFloat {
+        let normalized = degrees.truncatingRemainder(dividingBy: 360)
+        return normalized >= 0 ? normalized : normalized + 360
     }
 
     @objc private func showLaunchpad() {

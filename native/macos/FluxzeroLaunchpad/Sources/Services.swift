@@ -167,7 +167,7 @@ final class CliRuntimeService: @unchecked Sendable {
                     version: installed,
                     latestVersion: release.tagName,
                     updated: false,
-                    message: "Fluxzero Launchpad is up to date."
+                    message: "Fluxzero Launchpad is up to date"
                 )
             }
             try await download(release.downloadURL(), to: paths.cliExecutable)
