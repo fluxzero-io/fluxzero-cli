@@ -3,44 +3,97 @@ import SwiftUI
 
 @main
 struct FluxzeroLaunchpadApp: App {
-    @StateObject private var model = LaunchpadModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup("Fluxzero Launchpad") {
-            LaunchpadView()
-                .environmentObject(model)
-                .frame(minWidth: 700, minHeight: 440)
-                .background(WindowSizeLimiter(minSize: NSSize(width: 700, height: 440), maxSize: NSSize(width: 760, height: 560)))
-                .task {
-                    await model.prepare()
-                }
-                .onOpenURL { url in
-                    model.handle(url: url)
-                }
+        Settings {
+            ProjectDefaultsSettingsView()
+                .environmentObject(LaunchpadModel.shared)
+                .frame(width: 560, height: 390)
         }
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Fluxzero Launchpad") {
-                    showAboutPanel()
+                    FluxzeroAppActions.showAboutPanel()
                 }
             }
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings...") {
+                    SettingsWindowController.shared.show()
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+            }
             CommandGroup(after: .newItem) {
-                Button("Refresh Fluxzero CLI") {
-                    model.refresh()
+                Button("Check for Updates") {
+                    LaunchpadModel.shared.refresh()
                 }
                 .keyboardShortcut("r", modifiers: [.command])
             }
         }
     }
+}
 
-    private func showAboutPanel() {
-        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+@MainActor
+enum FluxzeroAppActions {
+    static func showAboutPanel(model: LaunchpadModel = .shared) {
         let cliVersion = model.cliStatus?.version ?? "not ready"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Fluxzero Launchpad",
-            .applicationVersion: appVersion,
+            .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0",
             .version: "Fluxzero CLI \(cliVersion)"
         ])
+    }
+}
+
+@MainActor
+enum FluxzeroMenuBarAssets {
+    static let templateImage: NSImage = {
+        let image = Bundle.main.url(forResource: "FluxzeroMenuBarTemplate", withExtension: "png")
+            .flatMap { NSImage(contentsOf: $0) }
+            ?? NSImage(systemSymbolName: "hexagon", accessibilityDescription: "Fluxzero")
+            ?? NSImage(size: NSSize(width: 16, height: 18))
+        let template = image.copy() as? NSImage ?? image
+        template.isTemplate = true
+        template.size = NSSize(width: 18, height: 18)
+        return template
+    }()
+
+    static func rotatedTemplateImage(degrees: CGFloat) -> NSImage {
+        let source = templateImage
+        let size = source.size
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+
+        let transform = NSAffineTransform()
+        transform.translateX(by: size.width / 2, yBy: size.height / 2)
+        transform.rotate(byDegrees: degrees)
+        transform.translateX(by: -size.width / 2, yBy: -size.height / 2)
+        transform.concat()
+
+        source.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .sourceOver, fraction: 1)
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
+    }
+}
+
+@MainActor
+enum FluxzeroAlertPresenter {
+    private static var isShowing = false
+
+    static func show(_ message: String, completion: @escaping () -> Void) {
+        guard !isShowing else { return }
+        isShowing = true
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not complete the Fluxzero action"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        isShowing = false
+        completion()
     }
 }
 
@@ -48,28 +101,10 @@ struct LaunchpadView: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        NavigationStack {
-            CreateScreen()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(LaunchpadBackdrop())
-                .navigationTitle("")
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        AppTitle()
-                    }
-                }
-        }
+        CreateScreen()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(LaunchpadBackdrop())
         .background(Color(nsColor: .windowBackgroundColor))
-        .alert("Fluxzero Launchpad", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) {
-            Button("OK") {
-                model.errorMessage = nil
-            }
-        } message: {
-            Text(model.errorMessage ?? "")
-        }
         .alert("Delete project?", isPresented: Binding(
             get: { model.pendingProjectDeletion != nil },
             set: { if !$0 { model.pendingProjectDeletion = nil } }
@@ -82,19 +117,6 @@ struct LaunchpadView: View {
             }
         } message: { project in
             Text("This moves \"\(project.name)\" to the Trash and removes it from recent projects.")
-        }
-    }
-}
-
-struct AppTitle: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 20, height: 20)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            Text("Create Fluxzero Project")
-                .font(.headline)
         }
     }
 }
@@ -200,7 +222,7 @@ struct SettingsForm<Content: View>: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .frame(maxWidth: 620)
-        .padding(.top, 28)
+        .padding(.top, 4)
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -236,13 +258,14 @@ struct CliStatusBanner: View {
 
 struct GeneratorPanel: View {
     @EnvironmentObject private var model: LaunchpadModel
+    private let destinationControlWidth: CGFloat = 160
 
     private var actionsDisabled: Bool {
         model.isBusy || model.projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
-        Section("Fluxzero Project") {
+        Section("New Fluxzero Project") {
             LabeledContent("Name") {
                 AppKitPlaceholderTextField(
                     text: Binding(
@@ -254,107 +277,132 @@ struct GeneratorPanel: View {
                 .frame(maxWidth: .infinity, minHeight: 22)
             }
 
-            LabeledContent("Description") {
+            TopAlignedFormRow("Description") {
                 AppKitPlaceholderTextView(
                     text: $model.prompt,
                     placeholder: "Describe what you want to build"
                 )
-                .frame(maxWidth: .infinity, minHeight: 64)
+                .frame(maxWidth: .infinity, minHeight: 96)
             }
+
+            LabeledContent("Open project in") {
+                TrailingControlColumn(width: destinationControlWidth) {
+                    Picker("Open project in", selection: $model.selectedAgent) {
+                        ForEach(AgentChoice.openDestinations) { option in
+                            Label(option.label, systemImage: option.systemImage).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
+            }
+
+            AdvancedDisclosure()
         }
 
         Section {
-            HStack(spacing: 12) {
-                Button("Create only") {
-                    model.createOnly()
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.link)
-
-                Spacer()
-
+            HStack {
+                Spacer(minLength: 0)
                 Button {
-                    model.createAndOpen(agent: .claude)
+                    model.createAndOpenSelectedDestination()
                 } label: {
-                    Label("Open in Claude Code", systemImage: "terminal")
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    model.createAndOpen(agent: .codex)
-                } label: {
-                    Label("Open in Codex", systemImage: "sparkles")
+                    Text(model.selectedAgent.actionTitle)
+                        .frame(minWidth: 88)
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .disabled(actionsDisabled)
             }
-            .disabled(actionsDisabled)
         }
+    }
+}
 
-        AdvancedDisclosure()
+struct TopAlignedFormRow<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 18) {
+            Text(title)
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
 struct AdvancedOptions: View {
     @EnvironmentObject private var model: LaunchpadModel
+    private let controlWidth: CGFloat = 240
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            AdvancedGroup {
-                AdvancedRow(title: "Location", subtitle: model.location) {
-                    Button("Choose...") {
-                        model.chooseLocation()
-                    }
+        VStack(spacing: 0) {
+            AdvancedRow(title: "Location", subtitle: model.location) {
+                Button("Choose...") {
+                    model.chooseLocation()
                 }
-                AdvancedDivider()
-                AdvancedRow(title: "Template", subtitle: "Starter project") {
+            }
+            AdvancedDivider()
+            AdvancedRow(title: "Template", subtitle: "Starter project") {
+                TrailingControlColumn(width: controlWidth) {
                     Picker("Template", selection: $model.template) {
                         ForEach(model.templates, id: \.self) {
                             Text($0).tag($0)
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 220)
-                }
-                AdvancedDivider()
-                AdvancedRow(title: "Build system", subtitle: "Project tooling") {
-                    Picker("Build system", selection: $model.buildSystem) {
-                        ForEach(DesktopBuildSystem.allCases) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 220)
+                    .pickerStyle(.menu)
+                    .fixedSize()
                 }
             }
-
-            AdvancedGroup {
-                AdvancedRow(title: "Group ID", subtitle: "Java package prefix") {
-                    TextField("Group ID", text: $model.groupId)
-                        .textFieldStyle(.plain)
-                        .frame(width: 240)
+            AdvancedDivider()
+            AdvancedRow(title: "Build system", subtitle: "Project tooling") {
+                Picker("Build system", selection: $model.buildSystem) {
+                    ForEach(DesktopBuildSystem.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
                 }
-                AdvancedDivider()
-                AdvancedRow(title: "Artifact ID", subtitle: "Build artifact name") {
-                    TextField("Artifact ID", text: $model.artifactId)
-                        .textFieldStyle(.plain)
-                        .frame(width: 240)
-                }
-                AdvancedDivider()
-                AdvancedRow(title: "Package", subtitle: "Generated source package") {
-                    TextField("Package", text: $model.packageName)
-                        .textFieldStyle(.plain)
-                        .frame(width: 240)
-                }
-                AdvancedDivider()
-                AdvancedRow(title: "Git repository", subtitle: "Initialize version control") {
-                    Toggle("", isOn: $model.initGit)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: controlWidth)
+            }
+            AdvancedDivider()
+            AdvancedRow(title: "Group ID", subtitle: "Java package prefix") {
+                TextField("", text: $model.groupId)
+                    .labelsHidden()
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: controlWidth)
+            }
+            AdvancedDivider()
+            AdvancedRow(title: "Artifact ID", subtitle: "Build artifact name") {
+                TextField("", text: $model.artifactId)
+                    .labelsHidden()
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: controlWidth)
+            }
+            AdvancedDivider()
+            AdvancedRow(title: "Package", subtitle: "Generated source package") {
+                TextField("", text: $model.packageName)
+                    .labelsHidden()
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: controlWidth)
+            }
+            AdvancedDivider()
+            AdvancedRow(title: "Git repository", subtitle: "Initialize version control") {
+                Toggle("", isOn: $model.initGit)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
             }
         }
+        .padding(.top, 8)
         .controlSize(.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -364,49 +412,13 @@ struct AdvancedDisclosure: View {
     @EnvironmentObject private var model: LaunchpadModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    model.advancedExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .rotationEffect(.degrees(model.advancedExpanded ? 90 : 0))
-                    Text("Advanced options")
-                        .font(.headline)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if model.advancedExpanded {
-                AdvancedOptions()
-                    .transition(.opacity)
-                    .clipped()
-            }
+        DisclosureGroup(isExpanded: $model.advancedExpanded) {
+            AdvancedOptions()
+        } label: {
+            Text("Advanced options")
         }
-        .clipped()
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.18), value: model.advancedExpanded)
-    }
-}
-
-struct AdvancedGroup<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            content
-        }
-        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 1)
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -426,17 +438,15 @@ struct AdvancedRow<Content: View>: View {
             }
             Spacer(minLength: 18)
             content
-                .frame(width: 300, alignment: .trailing)
+                .frame(width: 260, alignment: .trailing)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.vertical, 9)
     }
 }
 
 struct AdvancedDivider: View {
     var body: some View {
         Divider()
-                .padding(.leading, 14)
     }
 }
 
@@ -628,6 +638,7 @@ final class PlaceholderTextViewContainer: NSView {
     let scrollView = NSScrollView()
     let textView = NSTextView()
     let placeholderLabel = HitTransparentTextField(labelWithString: "")
+    private var placeholderTopConstraint: NSLayoutConstraint?
 
     override var isFlipped: Bool {
         true
@@ -662,7 +673,7 @@ final class PlaceholderTextViewContainer: NSView {
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.textColor = .labelColor
         textView.alignment = .right
-        textView.textContainerInset = NSSize(width: 0, height: 2)
+        textView.textContainerInset = .zero
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
@@ -680,6 +691,8 @@ final class PlaceholderTextViewContainer: NSView {
         addSubview(scrollView)
         addSubview(placeholderLabel)
 
+        let placeholderTopConstraint = placeholderLabel.topAnchor.constraint(equalTo: topAnchor)
+        self.placeholderTopConstraint = placeholderTopConstraint
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -687,17 +700,23 @@ final class PlaceholderTextViewContainer: NSView {
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             placeholderLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
             placeholderLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
-            placeholderLabel.topAnchor.constraint(equalTo: topAnchor)
+            placeholderTopConstraint
         ])
     }
 
     override func layout() {
         super.layout()
         textView.frame = scrollView.contentView.bounds
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.containerSize = NSSize(
             width: scrollView.contentSize.width,
             height: CGFloat.greatestFiniteMagnitude
         )
+        if let textContainer = textView.textContainer {
+            textView.layoutManager?.ensureLayout(for: textContainer)
+        }
+        placeholderTopConstraint?.constant = textView.textContainerOrigin.y
     }
 
     override func mouseDown(with event: NSEvent) {

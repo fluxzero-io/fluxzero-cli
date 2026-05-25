@@ -4,6 +4,8 @@ import SwiftUI
 
 @MainActor
 final class LaunchpadModel: ObservableObject {
+    static let shared = LaunchpadModel()
+
     @Published var projectName = ""
     @Published var prompt = ""
     @Published var location = "\(NSHomeDirectory())/FluxzeroProjects"
@@ -24,13 +26,26 @@ final class LaunchpadModel: ObservableObject {
     @Published var statusMessage = "Preparing Fluxzero CLI..."
     @Published var errorMessage: String?
     @Published var pendingProjectDeletion: GeneratedProject?
+    @Published var creationDefaults = ProjectCreationDefaults.fallback
 
     private let paths = AppPaths.detect()
     private lazy var cliRuntime = CliRuntimeService(paths: paths)
     private lazy var registry = ProjectRegistry(registryFile: paths.registryFile)
+    private let creationDefaultsStore = ProjectCreationDefaultsStore()
     private let agentLauncher = AgentLauncher()
 
+    var isLaunchpadUpToDate: Bool {
+        guard let version = cliStatus?.version?.trimmingPrefix("v"),
+              let latestVersion = cliStatus?.latestVersion?.trimmingPrefix("v") else {
+            return false
+        }
+        return version == latestVersion
+    }
+
     init() {
+        let savedDefaults = creationDefaultsStore.load()
+        creationDefaults = savedDefaults
+        applyCreationDefaults(savedDefaults)
         updateDerivedIdentifiers(from: projectName)
     }
 
@@ -74,21 +89,40 @@ final class LaunchpadModel: ObservableObject {
         }
     }
 
+    func chooseDefaultLocation() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: creationDefaults.location)
+        if panel.runModal() == .OK, let url = panel.url {
+            updateCreationDefault(\.location, to: url.fsPath)
+        }
+    }
+
+    func updateCreationDefault<Value>(_ keyPath: WritableKeyPath<ProjectCreationDefaults, Value>, to value: Value) {
+        var updated = creationDefaults
+        updated[keyPath: keyPath] = value
+        setCreationDefaults(updated)
+    }
+
+    func updateDefaultTemplate(_ template: String) {
+        var updated = creationDefaults
+        updated.template = template
+        if template.localizedCaseInsensitiveContains("kotlin") {
+            updated.buildSystem = .gradle
+        }
+        setCreationDefaults(updated)
+    }
+
     func setProjectName(_ value: String) {
         projectName = value
         updateDerivedIdentifiers(from: value)
     }
 
-    func createAndOpen(agent: AgentChoice) {
-        selectedAgent = agent
+    func createAndOpenSelectedDestination() {
         Task {
-            await generate(openIn: agent)
-        }
-    }
-
-    func createOnly() {
-        Task {
-            await generate(openIn: .none)
+            await generate(openIn: selectedAgent)
         }
     }
 
@@ -134,24 +168,37 @@ final class LaunchpadModel: ObservableObject {
         }
     }
 
-    func handle(url: URL) {
+    func handle(url: URL, presentationMode: DeepLinkPresentationMode = .interactive) {
         guard let link = DeepLinkParser.parse(url) else { return }
         switch link {
         case .new(let link):
             selectedSection = .create
             apply(link)
-        case .direct(let direct):
-            Task {
-                do {
-                    let runner = DeepLinkActionRunner(paths: paths, cliRuntime: cliRuntime, registry: registry, agentLauncher: agentLauncher)
-                    _ = try await Task.detached(priority: .userInitiated) {
-                        try await runner.run(direct)
-                    }.value
-                    projects = registry.listProjects()
-                } catch {
-                    errorMessage = error.localizedDescription
+            if presentationMode == .background {
+                Task {
+                    await runDirectLink(link.asDirectCreate(defaults: creationDefaults))
                 }
             }
+        case .direct(let direct):
+            Task {
+                await runDirectLink(direct)
+            }
+        }
+    }
+
+    private func runDirectLink(_ direct: FluxzeroDirectLink) async {
+        isBusy = true
+        statusMessage = direct.isCreateRequest ? "Creating project..." : "Opening project..."
+        defer { isBusy = false }
+        do {
+            let runner = DeepLinkActionRunner(paths: paths, cliRuntime: cliRuntime, registry: registry, agentLauncher: agentLauncher)
+            let result = try await Task.detached(priority: .userInitiated) {
+                try await runner.run(direct)
+            }.value
+            projects = registry.listProjects()
+            statusMessage = result.statusMessage
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -161,6 +208,7 @@ final class LaunchpadModel: ObservableObject {
             return
         }
         isBusy = true
+        statusMessage = "Creating project..."
         defer { isBusy = false }
         do {
             let request = makeRequest(agent: agent)
@@ -220,10 +268,76 @@ final class LaunchpadModel: ObservableObject {
         }
     }
 
+    private func setCreationDefaults(_ defaults: ProjectCreationDefaults) {
+        creationDefaults = defaults
+        creationDefaultsStore.save(defaults)
+        applyCreationDefaults(defaults)
+    }
+
+    private func applyCreationDefaults(_ defaults: ProjectCreationDefaults) {
+        location = defaults.location
+        template = defaults.template
+        groupId = defaults.groupId
+        buildSystem = defaults.buildSystem
+        initGit = defaults.initGit
+        selectedAgent = defaults.agentChoice
+        updateDerivedIdentifiers(from: projectName)
+    }
+
     private func updateDerivedIdentifiers(from name: String) {
         let artifact = ProjectNameNormalizer.normalize(name)
         artifactId = artifact
         let suffix = artifact.replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression).ifBlank("app")
         packageName = "\(groupId).\(suffix)"
+    }
+}
+
+extension FluxzeroNewProjectLink {
+    func asDirectCreate(defaults: ProjectCreationDefaults) -> FluxzeroDirectLink {
+        .create(
+            name: name,
+            template: template ?? defaults.template,
+            location: location ?? defaults.location,
+            groupId: defaults.groupId,
+            artifactId: nil,
+            packageName: nil,
+            description: "A Fluxzero application",
+            buildSystem: defaults.buildSystem,
+            initGit: defaults.initGit,
+            prompt: prompt,
+            agentChoice: agentChoice ?? defaults.agentChoice
+        )
+    }
+}
+
+extension FluxzeroDirectLink {
+    var isCreateRequest: Bool {
+        switch self {
+        case .create:
+            true
+        case .open:
+            false
+        }
+    }
+}
+
+extension AgentLaunchResult {
+    var statusMessage: String {
+        if openedCodexDownload {
+            return "Codex installer opened."
+        }
+        if openedCodex && openedClaude {
+            return "Opened project in Codex and Claude Code."
+        }
+        if openedCodex {
+            return "Opened project in Codex."
+        }
+        if openedClaude {
+            return "Opened project in Claude Code."
+        }
+        if openedFinder {
+            return "Opened project in Finder."
+        }
+        return "Done."
     }
 }

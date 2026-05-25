@@ -11,6 +11,7 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 INFO_PLIST="$SCRIPT_DIR/AppBundle/Info.plist"
 ICON_SOURCE="$REPO_ROOT/desktop/src/main/resources/icons/fluxzero.icns"
+ASSET_DIR="$SCRIPT_DIR/Assets"
 
 swift build --package-path "$SCRIPT_DIR" -c release
 BIN_DIR="$(swift build --package-path "$SCRIPT_DIR" -c release --show-bin-path)"
@@ -31,6 +32,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$BINARY_SOURCE" "$MACOS_DIR/FluxzeroLaunchpad"
 cp "$INFO_PLIST" "$CONTENTS_DIR/Info.plist"
 cp "$ICON_SOURCE" "$RESOURCES_DIR/Fluxzero.icns"
+cp "$ASSET_DIR/FluxzeroMenuBar.svg" "$RESOURCES_DIR/FluxzeroMenuBar.svg"
+cp "$ASSET_DIR/FluxzeroMenuBarTemplate.png" "$RESOURCES_DIR/FluxzeroMenuBarTemplate.png"
 chmod 755 "$MACOS_DIR/FluxzeroLaunchpad"
 
 if command -v codesign >/dev/null 2>&1; then

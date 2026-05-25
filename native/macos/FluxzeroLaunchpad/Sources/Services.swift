@@ -167,7 +167,7 @@ final class CliRuntimeService: @unchecked Sendable {
                     version: installed,
                     latestVersion: release.tagName,
                     updated: false,
-                    message: "Fluxzero CLI is up to date."
+                    message: "Fluxzero Launchpad is up to date."
                 )
             }
             try await download(release.downloadURL(), to: paths.cliExecutable)
@@ -465,6 +465,8 @@ final class AgentLauncher: @unchecked Sendable {
         switch choice {
         case .none:
             return AgentLaunchResult()
+        case .finder:
+            return revealProject(projectPath: projectPath)
         case .codex:
             return try launchCodex(projectPath: projectPath, prompt: prompt)
         case .claude:
@@ -487,6 +489,11 @@ final class AgentLauncher: @unchecked Sendable {
     func launchClaude(projectPath: String, prompt: String) throws -> AgentLaunchResult {
         NSWorkspace.shared.open(claudeDeepLink(projectPath: projectPath, prompt: prompt))
         return AgentLaunchResult(openedClaude: true)
+    }
+
+    func revealProject(projectPath: String) -> AgentLaunchResult {
+        openFolder(projectPath)
+        return AgentLaunchResult(openedFinder: true)
     }
 
     func openFolder(_ path: String) {
@@ -529,12 +536,14 @@ struct AgentLaunchResult: Sendable {
     var openedCodex = false
     var openedCodexDownload = false
     var openedClaude = false
+    var openedFinder = false
 
     func merged(with other: AgentLaunchResult) -> AgentLaunchResult {
         AgentLaunchResult(
             openedCodex: openedCodex || other.openedCodex,
             openedCodexDownload: openedCodexDownload || other.openedCodexDownload,
-            openedClaude: openedClaude || other.openedClaude
+            openedClaude: openedClaude || other.openedClaude,
+            openedFinder: openedFinder || other.openedFinder
         )
     }
 }
@@ -555,6 +564,9 @@ final class DeepLinkActionRunner: @unchecked Sendable {
     func run(_ link: FluxzeroDirectLink) async throws -> AgentLaunchResult {
         switch link {
         case .open(let path, let prompt, let agentChoice):
+            if agentChoice == .finder {
+                return agentLauncher.revealProject(projectPath: path)
+            }
             return try agentLauncher.launch(choice: agentChoice, projectPath: path, prompt: prompt ?? "")
         case .create(let name, let template, let location, let groupId, let artifactId, let packageName, let description, let buildSystem, let initGit, let prompt, let agentChoice):
             let projectName = name?.nilIfBlank ?? nil
@@ -564,6 +576,9 @@ final class DeepLinkActionRunner: @unchecked Sendable {
             guard !normalizedName.isEmpty else { throw LaunchpadError.invalidProjectName }
             let projectDir = outputBaseDir.appending(path: normalizedName)
             if projectDir.isNonEmptyDirectory {
+                if agentChoice == .finder {
+                    return agentLauncher.revealProject(projectPath: projectDir.fsPath)
+                }
                 return try agentLauncher.launch(
                     choice: agentChoice,
                     projectPath: projectDir.fsPath,
@@ -591,9 +606,15 @@ final class DeepLinkActionRunner: @unchecked Sendable {
             let generator = ProjectGenerator(cliExecutable: URL(fileURLWithPath: status.executablePath), registry: registry)
             do {
                 let project = try generator.generate(request, cliVersion: status.version)
+                if agentChoice == .finder {
+                    return agentLauncher.revealProject(projectPath: project.path)
+                }
                 return try agentLauncher.launch(choice: agentChoice, projectPath: project.path, prompt: project.promptPath.flatMap { try? String(contentsOf: URL(fileURLWithPath: $0), encoding: .utf8) } ?? prompt ?? "")
             } catch {
                 if projectDir.isNonEmptyDirectory {
+                    if agentChoice == .finder {
+                        return agentLauncher.revealProject(projectPath: projectDir.fsPath)
+                    }
                     return try agentLauncher.launch(choice: agentChoice, projectPath: projectDir.fsPath, prompt: prompt?.nilIfBlank ?? projectDir.startPromptText ?? "")
                 }
                 throw error
@@ -630,7 +651,7 @@ enum DeepLinkParser {
             let agent: AgentChoice = switch command?.lowercased() {
             case "codex": .codex
             case "claude", "claude-code": .claude
-            default: AgentChoice(urlValue: params["agent"]) ?? .codex
+            default: AgentChoice(urlValue: params["agent"]) ?? .finder
             }
             return .direct(.open(path: path, prompt: params["prompt"], agentChoice: agent))
         case "create":
@@ -646,7 +667,7 @@ enum DeepLinkParser {
                     buildSystem: DesktopBuildSystem(urlValue: params["build"] ?? params["buildSystem"]),
                     initGit: Bool(urlValue: params["git"]) ?? true,
                     prompt: params["prompt"],
-                    agentChoice: AgentChoice(urlValue: params["agent"]) ?? .codex
+                    agentChoice: AgentChoice(urlValue: params["agent"]) ?? .finder
                 )
             )
         default:
@@ -658,10 +679,11 @@ enum DeepLinkParser {
 extension AgentChoice {
     init?(urlValue: String?) {
         switch urlValue?.lowercased().replacingOccurrences(of: "_", with: "-") {
+        case "finder", "folder", "open-folder", "reveal": self = .finder
         case "codex": self = .codex
         case "claude", "claude-code": self = .claude
         case "both", "all": self = .both
-        case "none", "generate": self = .none
+        case "none", "generate", "dont-open", "don't-open", "no-open": self = .none
         default: return nil
         }
     }

@@ -16,18 +16,39 @@ enum DesktopBuildSystem: String, CaseIterable, Identifiable, Codable, Sendable {
 
 enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
     case none
+    case finder
     case codex
     case claude
     case both
+
+    static let openDestinations: [AgentChoice] = [.codex, .finder, .claude, .none]
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .none: "Create only"
+        case .none: "Don't open"
+        case .finder: "Finder"
         case .codex: "Codex"
         case .claude: "Claude Code"
         case .both: "Codex and Claude"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .none: "slash.circle"
+        case .finder: "folder"
+        case .codex: "sparkles"
+        case .claude: "terminal"
+        case .both: "rectangle.split.2x1"
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .none: "Generate"
+        case .finder, .codex, .claude, .both: "Open"
         }
     }
 }
@@ -53,6 +74,76 @@ enum LaunchpadSection: String, CaseIterable, Identifiable, Sendable {
         case .projects: "folder"
         case .upgrades: "arrow.triangle.2.circlepath"
         }
+    }
+}
+
+enum DeepLinkPresentationMode: Sendable {
+    case interactive
+    case background
+}
+
+struct ProjectCreationDefaults: Codable, Equatable, Sendable {
+    var location: String
+    var template: String
+    var groupId: String
+    var buildSystem: DesktopBuildSystem
+    var initGit: Bool
+    var agentChoice: AgentChoice
+
+    static var fallback: ProjectCreationDefaults {
+        ProjectCreationDefaults(
+            location: "\(NSHomeDirectory())/FluxzeroProjects",
+            template: "flux-basic-java",
+            groupId: "com.example",
+            buildSystem: .maven,
+            initGit: true,
+            agentChoice: .codex
+        )
+    }
+}
+
+final class ProjectCreationDefaultsStore: @unchecked Sendable {
+    private let defaults: UserDefaults
+    private let key = "projectCreationDefaults.v3"
+    private let legacyV2Key = "projectCreationDefaults.v2"
+    private let legacyV1Key = "projectCreationDefaults.v1"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func load() -> ProjectCreationDefaults {
+        guard let data = defaults.data(forKey: key),
+              let settings = try? JSONDecoder().decode(ProjectCreationDefaults.self, from: data) else {
+            return loadLegacySettings()
+        }
+        return settings
+    }
+
+    func save(_ settings: ProjectCreationDefaults) {
+        guard let data = try? JSONEncoder().encode(settings) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    private func loadLegacySettings() -> ProjectCreationDefaults {
+        if let data = defaults.data(forKey: legacyV2Key),
+           var settings = try? JSONDecoder().decode(ProjectCreationDefaults.self, from: data) {
+            if settings.agentChoice == .none {
+                settings.agentChoice = .finder
+            }
+            save(settings)
+            return settings
+        }
+
+        guard let data = defaults.data(forKey: legacyV1Key),
+              var settings = try? JSONDecoder().decode(ProjectCreationDefaults.self, from: data) else {
+            return .fallback
+        }
+        if settings.agentChoice == .none {
+            settings.agentChoice = .codex
+        }
+        save(settings)
+        return settings
     }
 }
 

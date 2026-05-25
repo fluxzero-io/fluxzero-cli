@@ -10,7 +10,7 @@ native shells replace the Java-like feel with platform-native UX:
 
 ## Design Direction
 
-- The launcher opens directly on the generator. No marketing screen.
+- The macOS launcher is menu-bar-first and only opens the generator window when requested.
 - Primary actions are sibling choices: Open in Codex, Open in Claude Code, or Create only.
 - Advanced fields stay collapsed by default.
 - The managed CLI path/version stays as an advanced footnote.
@@ -20,9 +20,9 @@ native shells replace the Java-like feel with platform-native UX:
 
 All implementations use the same experimental URL contract:
 
-- `fluxzero://new?...` opens the Launchpad UI and pre-fills the generator.
-- `fluxzero://open?path=...&prompt=...&agent=codex|claude|both` opens an existing project directly in an agent.
-- `fluxzero://create?name=...&prompt=...&agent=codex|claude|both` creates a project with defaults and opens it in an agent.
+- `fluxzero://new?...` creates a project headlessly on macOS when received from outside the app. The Launchpad window remains available from the menu-bar item.
+- `fluxzero://open?path=...&prompt=...&agent=codex|claude|both` opens an existing project directly in an agent, or in Finder when `agent` is omitted.
+- `fluxzero://create?name=...&prompt=...&agent=codex|claude|both` creates a project with defaults and opens it in an agent, or in Finder when `agent` is omitted.
 
 Shared query parameters:
 
