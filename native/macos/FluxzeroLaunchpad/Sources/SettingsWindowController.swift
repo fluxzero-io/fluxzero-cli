@@ -61,6 +61,7 @@ struct ProjectDefaultsSettingsView: View {
                         Button("Choose...") {
                             model.chooseDefaultLocation()
                         }
+                        .accessibilityLabel("Choose default project location")
                     }
                     .frame(width: controlWidth, alignment: .trailing)
                 }
@@ -93,6 +94,7 @@ struct ProjectDefaultsSettingsView: View {
                     TextField("", text: binding(\.groupId))
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
+                        .accessibilityLabel("Group ID")
                         .frame(width: controlWidth)
                 }
 

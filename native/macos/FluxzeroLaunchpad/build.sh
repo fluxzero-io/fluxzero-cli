@@ -16,6 +16,14 @@ EXECUTABLE_NAME="FluxzeroLaunchpad"
 CONFIGURATION="${CONFIGURATION:-release}"
 MACOS_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 BUILD_UNIVERSAL="${BUILD_UNIVERSAL:-1}"
+CLI_BUNDLE_DIR="$RESOURCES_DIR/FluxzeroCLI"
+FLUXZERO_CLI_DIR="${FLUXZERO_CLI_DIR:-}"
+FLUXZERO_CLI_UNIVERSAL="${FLUXZERO_CLI_UNIVERSAL:-}"
+FLUXZERO_CLI_ARM64="${FLUXZERO_CLI_ARM64:-}"
+FLUXZERO_CLI_AMD64="${FLUXZERO_CLI_AMD64:-${FLUXZERO_CLI_X86_64:-}}"
+REQUIRE_BUNDLED_CLI="${REQUIRE_BUNDLED_CLI:-0}"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+CODE_SIGN_ENTITLEMENTS="${CODE_SIGN_ENTITLEMENTS:-}"
 
 mkdir -p "$BUILD_DIR"
 
@@ -47,6 +55,65 @@ build_slice() {
     printf '%s\n' "$binary"
 }
 
+find_cli_in_dir() {
+    local arch="$1"
+    local dir="$2"
+    local legacy_arch="$arch"
+    if [[ "$arch" == "amd64" ]]; then
+        legacy_arch="x86_64"
+    fi
+
+    if [[ -z "$dir" ]]; then
+        return 1
+    fi
+
+    local candidates=(
+        "$dir/fz-$arch"
+        "$dir/flux-macos-$arch"
+        "$dir/fz-$legacy_arch"
+        "$dir/flux-macos-$legacy_arch"
+    )
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+copy_cli_binary() {
+    local source="$1"
+    local target_name="$2"
+    if [[ -z "$source" ]]; then
+        return 1
+    fi
+    if [[ ! -f "$source" ]]; then
+        echo "Missing Fluxzero CLI binary: $source" >&2
+        exit 1
+    fi
+    cp "$source" "$CLI_BUNDLE_DIR/$target_name"
+    chmod 755 "$CLI_BUNDLE_DIR/$target_name"
+    return 0
+}
+
+sign_target() {
+    local target="$1"
+    if ! command -v codesign >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local args=(--force --sign "$CODE_SIGN_IDENTITY" --options runtime)
+    if [[ -n "$CODE_SIGN_ENTITLEMENTS" ]]; then
+        args+=(--entitlements "$CODE_SIGN_ENTITLEMENTS")
+    fi
+    if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+        args+=(--timestamp)
+    fi
+    codesign "${args[@]}" "$target" >/dev/null
+}
+
 if [[ ! -f "$ICON_SOURCE" ]]; then
     echo "Missing app icon: $ICON_SOURCE" >&2
     exit 1
@@ -65,7 +132,7 @@ else
 fi
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$CLI_BUNDLE_DIR"
 if [[ "$BUILD_UNIVERSAL" == "1" ]]; then
     lipo -create "$ARM64_BINARY" "$X86_64_BINARY" -output "$MACOS_DIR/$EXECUTABLE_NAME"
 else
@@ -77,8 +144,40 @@ cp "$ASSET_DIR/FluxzeroMenuBar.svg" "$RESOURCES_DIR/FluxzeroMenuBar.svg"
 cp "$ASSET_DIR/FluxzeroMenuBarTemplate.png" "$RESOURCES_DIR/FluxzeroMenuBarTemplate.png"
 chmod 755 "$MACOS_DIR/$EXECUTABLE_NAME"
 
-if command -v codesign >/dev/null 2>&1; then
-    codesign --force --sign - "$APP_BUNDLE" >/dev/null
+COPIED_ARM64_CLI=0
+COPIED_AMD64_CLI=0
+COPIED_UNIVERSAL_CLI=0
+
+if copy_cli_binary "$FLUXZERO_CLI_UNIVERSAL" "fz-universal"; then
+    COPIED_UNIVERSAL_CLI=1
 fi
+if copy_cli_binary "${FLUXZERO_CLI_ARM64:-$(find_cli_in_dir arm64 "$FLUXZERO_CLI_DIR" || true)}" "fz-arm64"; then
+    COPIED_ARM64_CLI=1
+fi
+if copy_cli_binary "${FLUXZERO_CLI_AMD64:-$(find_cli_in_dir amd64 "$FLUXZERO_CLI_DIR" || true)}" "fz-amd64"; then
+    COPIED_AMD64_CLI=1
+fi
+
+if [[ "$REQUIRE_BUNDLED_CLI" == "1" && "$COPIED_UNIVERSAL_CLI" != "1" ]]; then
+    if [[ "$BUILD_UNIVERSAL" == "1" && ("$COPIED_ARM64_CLI" != "1" || "$COPIED_AMD64_CLI" != "1") ]]; then
+        echo "REQUIRE_BUNDLED_CLI=1 requires FLUXZERO_CLI_UNIVERSAL or both FLUXZERO_CLI_ARM64 and FLUXZERO_CLI_AMD64." >&2
+        exit 1
+    fi
+    if [[ "$BUILD_UNIVERSAL" != "1" && "$COPIED_ARM64_CLI" != "1" && "$COPIED_AMD64_CLI" != "1" ]]; then
+        echo "REQUIRE_BUNDLED_CLI=1 requires a bundled Fluxzero CLI binary." >&2
+        exit 1
+    fi
+fi
+
+if [[ "$COPIED_UNIVERSAL_CLI" != "1" && "$COPIED_ARM64_CLI" != "1" && "$COPIED_AMD64_CLI" != "1" ]]; then
+    rmdir "$CLI_BUNDLE_DIR"
+else
+    for cli_binary in "$CLI_BUNDLE_DIR"/*; do
+        [[ -f "$cli_binary" ]] || continue
+        sign_target "$cli_binary"
+    done
+fi
+
+sign_target "$APP_BUNDLE"
 
 echo "$APP_BUNDLE"

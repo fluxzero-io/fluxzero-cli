@@ -8,7 +8,9 @@ APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 VOLUME_NAME="${VOLUME_NAME:-Fluxzero Launchpad}"
 DMG_NAME="${DMG_NAME:-Fluxzero-Launchpad.dmg}"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
+DMG_SIZE="${DMG_SIZE:-256m}"
 ICON_SIZE=128
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 
 copy_jpackage_background() {
     local output_path="$1"
@@ -101,7 +103,7 @@ rm -f "$DMG_PATH"
 detach_existing_volume
 
 hdiutil create \
-    -size 32m \
+    -size "$DMG_SIZE" \
     -fs HFS+ \
     -nospotlight \
     -volname "$VOLUME_NAME" \
@@ -139,5 +141,9 @@ hdiutil convert "$RW_DMG" \
     -o "$DMG_PATH" >/dev/null
 
 hdiutil verify "$DMG_PATH" >/dev/null
+
+if [[ -n "$CODE_SIGN_IDENTITY" && "$CODE_SIGN_IDENTITY" != "-" ]]; then
+    codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp "$DMG_PATH" >/dev/null
+fi
 
 echo "$DMG_PATH"

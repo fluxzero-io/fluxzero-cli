@@ -38,7 +38,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
             button.toolTip = "Fluxzero Launchpad"
-            button.setAccessibilityLabel("Fluxzero")
+            button.setAccessibilityLabel("Fluxzero Launchpad")
+            button.setAccessibilityValue("Ready")
         }
     }
 
@@ -47,6 +48,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] isBusy in
                 self?.setAnimating(isBusy)
+            }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest(model.$isBusy, model.$statusMessage)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isBusy, message in
+                self?.updateStatusItemAccessibility(isBusy: isBusy, message: message)
             }
             .store(in: &cancellables)
 
@@ -97,6 +105,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if isAnimating {
             settleTimer?.invalidate()
             settleTimer = nil
+            guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                animationTimer?.invalidate()
+                animationTimer = nil
+                statusItem.button?.image = FluxzeroMenuBarAssets.templateImage
+                return
+            }
             guard animationTimer == nil else { return }
             animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.animationFramesPerSecond, repeats: true) { [weak self] _ in
                 Task { @MainActor in
@@ -142,6 +156,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func setRotation(_ degrees: CGFloat) {
         rotation = normalizedDegrees(degrees)
         statusItem.button?.image = FluxzeroMenuBarAssets.rotatedTemplateImage(degrees: rotation)
+    }
+
+    private func updateStatusItemAccessibility(isBusy: Bool, message: String) {
+        let value = isBusy ? message : "Ready"
+        statusItem.button?.setAccessibilityValue(value)
     }
 
     private func nextHexagonStep(after degrees: CGFloat) -> CGFloat {

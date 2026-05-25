@@ -250,6 +250,7 @@ struct CliStatusBanner: View {
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
+            .accessibilityLabel("Retry")
             .help("Retry")
         }
         .font(.caption)
@@ -272,7 +273,8 @@ struct GeneratorPanel: View {
                     get: { model.projectName },
                     set: { model.setProjectName($0) }
                     ),
-                    placeholder: "Enter project name"
+                    placeholder: "Enter project name",
+                    accessibilityLabel: "Project name"
                 )
                 .frame(maxWidth: .infinity, minHeight: 22)
             }
@@ -280,7 +282,8 @@ struct GeneratorPanel: View {
             TopAlignedFormRow("Description") {
                 AppKitPlaceholderTextView(
                     text: $model.prompt,
-                    placeholder: "Describe what you want to build"
+                    placeholder: "Describe what you want to build",
+                    accessibilityLabel: "Project description"
                 )
                 .frame(maxWidth: .infinity, minHeight: 96)
             }
@@ -346,6 +349,7 @@ struct AdvancedOptions: View {
                 Button("Choose...") {
                     model.chooseLocation()
                 }
+                .accessibilityLabel("Choose project location")
             }
             AdvancedDivider()
             AdvancedRow(title: "Template", subtitle: "Starter project") {
@@ -375,6 +379,7 @@ struct AdvancedOptions: View {
             AdvancedRow(title: "Group ID", subtitle: "Java package prefix") {
                 TextField("", text: $model.groupId)
                     .labelsHidden()
+                    .accessibilityLabel("Group ID")
                     .textFieldStyle(.plain)
                     .multilineTextAlignment(.trailing)
                     .frame(width: controlWidth)
@@ -383,6 +388,7 @@ struct AdvancedOptions: View {
             AdvancedRow(title: "Artifact ID", subtitle: "Build artifact name") {
                 TextField("", text: $model.artifactId)
                     .labelsHidden()
+                    .accessibilityLabel("Artifact ID")
                     .textFieldStyle(.plain)
                     .multilineTextAlignment(.trailing)
                     .frame(width: controlWidth)
@@ -391,6 +397,7 @@ struct AdvancedOptions: View {
             AdvancedRow(title: "Package", subtitle: "Generated source package") {
                 TextField("", text: $model.packageName)
                     .labelsHidden()
+                    .accessibilityLabel("Package")
                     .textFieldStyle(.plain)
                     .multilineTextAlignment(.trailing)
                     .frame(width: controlWidth)
@@ -410,6 +417,7 @@ struct AdvancedOptions: View {
 
 struct AdvancedDisclosure: View {
     @EnvironmentObject private var model: LaunchpadModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         DisclosureGroup(isExpanded: $model.advancedExpanded) {
@@ -418,7 +426,7 @@ struct AdvancedDisclosure: View {
             Text("Advanced options")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.easeInOut(duration: 0.18), value: model.advancedExpanded)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: model.advancedExpanded)
     }
 }
 
@@ -481,6 +489,7 @@ struct EmptyProjectsView: View {
             Image(systemName: "folder.badge.plus")
                 .font(.title)
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("No projects yet")
                 .foregroundStyle(.secondary)
         }
@@ -496,6 +505,7 @@ struct ProjectRow: View {
         HStack(spacing: 12) {
             Image(systemName: "folder.fill")
                 .foregroundStyle(.blue)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(project.name)
                     .font(.body)
@@ -534,7 +544,7 @@ struct ProjectActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .frame(width: 26, height: 24)
+                .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isHovering ? Color(nsColor: .selectedControlColor).opacity(0.18) : Color.clear)
@@ -542,6 +552,7 @@ struct ProjectActionButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(foregroundStyle)
+        .accessibilityLabel(help)
         .help(help)
         .onHover { isHovering = $0 }
     }
@@ -557,6 +568,7 @@ struct ProjectActionButton: View {
 struct AppKitPlaceholderTextField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    let accessibilityLabel: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -572,6 +584,7 @@ struct AppKitPlaceholderTextField: NSViewRepresentable {
         textField.delegate = context.coordinator
         textField.font = .systemFont(ofSize: NSFont.systemFontSize)
         textField.lineBreakMode = .byTruncatingTail
+        textField.setAccessibilityLabel(accessibilityLabel)
         return textField
     }
 
@@ -580,6 +593,7 @@ struct AppKitPlaceholderTextField: NSViewRepresentable {
             nsView.stringValue = text
         }
         nsView.placeholderString = placeholder
+        nsView.setAccessibilityLabel(accessibilityLabel)
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
@@ -599,6 +613,7 @@ struct AppKitPlaceholderTextField: NSViewRepresentable {
 struct AppKitPlaceholderTextView: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    let accessibilityLabel: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
@@ -608,6 +623,7 @@ struct AppKitPlaceholderTextView: NSViewRepresentable {
         let view = PlaceholderTextViewContainer()
         view.textView.delegate = context.coordinator
         view.placeholderLabel.stringValue = placeholder
+        view.updateAccessibilityLabel(accessibilityLabel)
         return view
     }
 
@@ -616,6 +632,7 @@ struct AppKitPlaceholderTextView: NSViewRepresentable {
             nsView.textView.string = text
         }
         nsView.placeholderLabel.stringValue = placeholder
+        nsView.updateAccessibilityLabel(accessibilityLabel)
         nsView.updatePlaceholder()
     }
 
@@ -680,6 +697,7 @@ final class PlaceholderTextViewContainer: NSView {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         scrollView.documentView = textView
+        scrollView.setAccessibilityRole(.scrollArea)
 
         placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
         placeholderLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
@@ -687,6 +705,7 @@ final class PlaceholderTextViewContainer: NSView {
         placeholderLabel.alignment = .right
         placeholderLabel.isSelectable = false
         placeholderLabel.refusesFirstResponder = true
+        placeholderLabel.setAccessibilityHidden(true)
 
         addSubview(scrollView)
         addSubview(placeholderLabel)
@@ -722,6 +741,11 @@ final class PlaceholderTextViewContainer: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(textView)
         super.mouseDown(with: event)
+    }
+
+    func updateAccessibilityLabel(_ label: String) {
+        textView.setAccessibilityLabel(label)
+        scrollView.setAccessibilityLabel(label)
     }
 
     func updatePlaceholder() {

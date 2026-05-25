@@ -21,7 +21,7 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
     case claude
     case both
 
-    static let openDestinations: [AgentChoice] = [.codex, .finder, .claude, .none]
+    static let openDestinations: [AgentChoice] = [.codex, .both, .finder, .claude, .none]
 
     var id: String { rawValue }
 
@@ -102,7 +102,8 @@ struct ProjectCreationDefaults: Codable, Equatable, Sendable {
     }
 }
 
-final class ProjectCreationDefaultsStore: @unchecked Sendable {
+@MainActor
+final class ProjectCreationDefaultsStore {
     private let defaults: UserDefaults
     private let key = "projectCreationDefaults.v3"
     private let legacyV2Key = "projectCreationDefaults.v2"

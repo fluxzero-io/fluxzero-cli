@@ -51,7 +51,26 @@ struct AppPaths: Sendable {
     }
 }
 
-final class CommandRunner: @unchecked Sendable {
+private final class CommandOutputBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
+
+    var stringValue: String {
+        lock.lock()
+        let value = String(data: data, encoding: .utf8) ?? ""
+        lock.unlock()
+        return value
+    }
+}
+
+struct CommandRunner: Sendable {
     func run(_ command: [String], timeout: TimeInterval = 300) throws -> CommandResult {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: command[0])
@@ -62,6 +81,16 @@ final class CommandRunner: @unchecked Sendable {
         process.standardError = outputPipe
         process.standardInput = Pipe()
 
+        let output = CommandOutputBuffer()
+        let outputHandle = outputPipe.fileHandleForReading
+        outputHandle.readabilityHandler = { handle in
+            output.append(handle.availableData)
+        }
+        defer {
+            outputHandle.readabilityHandler = nil
+            try? outputHandle.close()
+        }
+
         try process.run()
 
         let deadline = Date().addingTimeInterval(timeout)
@@ -70,13 +99,18 @@ final class CommandRunner: @unchecked Sendable {
         }
         if process.isRunning {
             process.terminate()
-            return CommandResult(exitCode: -1, output: "Command timed out: \(command.joined(separator: " "))")
+            process.waitUntilExit()
+            outputHandle.readabilityHandler = nil
+            output.append(outputHandle.readDataToEndOfFile())
+            return CommandResult(exitCode: -1, output: "Command timed out: \(command.joined(separator: " "))\n\(output.stringValue)")
         }
 
-        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        outputHandle.readabilityHandler = nil
+        output.append(outputHandle.readDataToEndOfFile())
         return CommandResult(
             exitCode: process.terminationStatus,
-            output: String(data: data, encoding: .utf8) ?? ""
+            output: output.stringValue
         )
     }
 }
@@ -135,7 +169,7 @@ private actor CliInstallGate {
     }
 }
 
-final class CliRuntimeService: @unchecked Sendable {
+final class CliRuntimeService: Sendable {
     private static let installGate = CliInstallGate()
 
     private let paths: AppPaths
@@ -154,6 +188,17 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     private func ensureLatestCliUncoordinated() async throws -> CliStatus {
+        if let bundled = bundledCliExecutable(), FileManager.default.isExecutableFile(atPath: bundled.fsPath) {
+            let version = version(for: bundled)
+            return CliStatus(
+                executablePath: bundled.fsPath,
+                version: version,
+                latestVersion: version,
+                updated: false,
+                message: "Fluxzero Launchpad is up to date"
+            )
+        }
+
         try FileManager.default.createDirectory(at: paths.binDir, withIntermediateDirectories: true)
         removeManagedDownloadLeftovers()
         recoverLegacyTempDownload()
@@ -193,8 +238,9 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     func listTemplates() -> [String] {
-        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) else { return [] }
-        guard let result = try? runner.run([paths.cliExecutable.fsPath, "templates", "list"]), result.successful else { return [] }
+        let executable = bundledCliExecutable() ?? paths.cliExecutable
+        guard FileManager.default.isExecutableFile(atPath: executable.fsPath) else { return [] }
+        guard let result = try? runner.run([executable.fsPath, "templates", "list"]), result.successful else { return [] }
         return result.output
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "-", with: "", options: .anchored) }
@@ -203,8 +249,12 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 
     func installedVersion() -> String? {
-        guard FileManager.default.isExecutableFile(atPath: paths.cliExecutable.fsPath) else { return nil }
-        guard let result = try? runner.run([paths.cliExecutable.fsPath, "version"], timeout: 15), result.successful else { return nil }
+        version(for: paths.cliExecutable)
+    }
+
+    private func version(for executable: URL) -> String? {
+        guard FileManager.default.isExecutableFile(atPath: executable.fsPath) else { return nil }
+        guard let result = try? runner.run([executable.fsPath, "version"], timeout: 15), result.successful else { return nil }
         let regex = try? NSRegularExpression(pattern: #"^v?\d+\.\d+\.\d+(?:[-.A-Za-z0-9]+)?$"#)
         return result.output
             .split(whereSeparator: \.isNewline)
@@ -214,6 +264,18 @@ final class CliRuntimeService: @unchecked Sendable {
                 let range = NSRange(line.startIndex..<line.endIndex, in: line)
                 return regex.firstMatch(in: line, range: range) != nil
             }
+    }
+
+    private func bundledCliExecutable() -> URL? {
+        [
+            "fz-\(NativePlatform.currentArchitecture)",
+            "fz-universal",
+            "flux-macos-\(NativePlatform.currentArchitecture)"
+        ]
+        .compactMap { resource in
+            Bundle.main.url(forResource: resource, withExtension: nil, subdirectory: "FluxzeroCLI")
+        }
+        .first
     }
 
     private func fetchLatestRelease() async throws -> GitHubRelease {
@@ -285,41 +347,51 @@ final class CliRuntimeService: @unchecked Sendable {
     }
 }
 
-final class ProjectRegistry: @unchecked Sendable {
+final class ProjectRegistry: Sendable {
     private let registryFile: URL
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
+    private let queue = DispatchQueue(label: "io.fluxzero.launchpad.project-registry")
 
     init(registryFile: URL = AppPaths.detect().registryFile) {
         self.registryFile = registryFile
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     }
 
     func listProjects() -> [GeneratedProject] {
-        guard let data = try? Data(contentsOf: registryFile) else { return [] }
-        let state = try? decoder.decode(RegistryState.self, from: data)
-        return (state?.projects ?? []).sorted { $0.generatedAt > $1.generatedAt }
+        queue.sync {
+            listProjectsUnlocked()
+        }
     }
 
     func saveProject(_ project: GeneratedProject) throws {
-        let updated = ([project] + listProjects().filter { $0.path != project.path })
-            .sorted { $0.generatedAt > $1.generatedAt }
-        try write(RegistryState(projects: updated))
+        try queue.sync {
+            let updated = ([project] + listProjectsUnlocked().filter { $0.path != project.path })
+                .sorted { $0.generatedAt > $1.generatedAt }
+            try writeUnlocked(RegistryState(projects: updated))
+        }
     }
 
     func removeProject(_ project: GeneratedProject) throws {
-        let updated = listProjects().filter { $0.id != project.id && $0.path != project.path }
-        try write(RegistryState(projects: updated))
+        try queue.sync {
+            let updated = listProjectsUnlocked().filter { $0.id != project.id && $0.path != project.path }
+            try writeUnlocked(RegistryState(projects: updated))
+        }
     }
 
-    private func write(_ state: RegistryState) throws {
+    private func listProjectsUnlocked() -> [GeneratedProject] {
+        guard let data = try? Data(contentsOf: registryFile) else { return [] }
+        let state = try? JSONDecoder().decode(RegistryState.self, from: data)
+        return (state?.projects ?? []).sorted { $0.generatedAt > $1.generatedAt }
+    }
+
+    private func writeUnlocked(_ state: RegistryState) throws {
         try FileManager.default.createDirectory(at: registryFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(state)
         try data.write(to: registryFile, options: .atomic)
     }
 }
 
-final class PromptWriter: @unchecked Sendable {
+struct PromptWriter: Sendable {
     static let fileName = "START_PROMPT.md"
 
     func write(projectDir: URL, request: GenerateProjectRequest, sdkVersion: String?) throws -> URL {
@@ -350,7 +422,7 @@ final class PromptWriter: @unchecked Sendable {
     }
 }
 
-final class ProjectGenerator: @unchecked Sendable {
+struct ProjectGenerator: Sendable {
     private let cliExecutable: URL
     private let registry: ProjectRegistry
     private let runner: CommandRunner
@@ -460,7 +532,7 @@ enum ProjectNameNormalizer {
     }
 }
 
-final class AgentLauncher: @unchecked Sendable {
+struct AgentLauncher: Sendable {
     func launch(choice: AgentChoice, projectPath: String, prompt: String) throws -> AgentLaunchResult {
         switch choice {
         case .none:
@@ -548,13 +620,18 @@ struct AgentLaunchResult: Sendable {
     }
 }
 
-final class DeepLinkActionRunner: @unchecked Sendable {
+struct DeepLinkActionRunner: Sendable {
     private let paths: AppPaths
     private let cliRuntime: CliRuntimeService
     private let registry: ProjectRegistry
     private let agentLauncher: AgentLauncher
 
-    init(paths: AppPaths = .detect(), cliRuntime: CliRuntimeService? = nil, registry: ProjectRegistry? = nil, agentLauncher: AgentLauncher = AgentLauncher()) {
+    init(
+        paths: AppPaths = .detect(),
+        cliRuntime: CliRuntimeService? = nil,
+        registry: ProjectRegistry? = nil,
+        agentLauncher: AgentLauncher = AgentLauncher()
+    ) {
         self.paths = paths
         self.cliRuntime = cliRuntime ?? CliRuntimeService(paths: paths)
         self.registry = registry ?? ProjectRegistry(registryFile: paths.registryFile)
@@ -735,7 +812,9 @@ extension URL {
 
 extension String {
     var urlEncoded: String {
-        addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? self
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?#")
+        return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
     }
 
     var nilIfBlank: String? {
