@@ -187,6 +187,24 @@ struct CliStatus: Equatable, Sendable {
     var message: String
 }
 
+struct JavaRuntimeStatus: Equatable, Sendable {
+    enum Source: String, Sendable {
+        case system
+        case managed
+        case missing
+    }
+
+    var homePath: String?
+    var source: Source
+    var version: String?
+
+    var isReady: Bool {
+        homePath != nil
+    }
+
+    static let missing = JavaRuntimeStatus(homePath: nil, source: .missing, version: nil)
+}
+
 struct CommandResult: Sendable {
     var exitCode: Int32
     var output: String

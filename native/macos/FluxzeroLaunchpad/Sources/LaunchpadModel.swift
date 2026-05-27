@@ -27,10 +27,13 @@ final class LaunchpadModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var pendingProjectDeletion: GeneratedProject?
     @Published var creationDefaults = ProjectCreationDefaults.fallback
+    @Published var isGitAvailable = true
+    @Published var javaStatus: JavaRuntimeStatus = .missing
 
     private let paths = AppPaths.detect()
     private lazy var cliRuntime = CliRuntimeService(paths: paths)
     private lazy var registry = ProjectRegistry(registryFile: paths.registryFile)
+    private lazy var dependencies = DevelopmentDependencyService(paths: paths)
     private let creationDefaultsStore = ProjectCreationDefaultsStore()
     private let agentLauncher = AgentLauncher()
 
@@ -60,12 +63,18 @@ final class LaunchpadModel: ObservableObject {
         defer { isBusy = false }
         do {
             let runtime = cliRuntime
-            let (status, loadedTemplates) = try await Task.detached(priority: .userInitiated) {
+            let dependencies = dependencies
+            let (status, loadedTemplates, gitAvailable, detectedJava) = try await Task.detached(priority: .userInitiated) {
                 let status = try await runtime.ensureLatestCli()
-                return (status, runtime.listTemplates())
+                return (status, runtime.listTemplates(), dependencies.isGitAvailable(), dependencies.detectJava25())
             }.value
             cliStatus = status
             templates = loadedTemplates.isEmpty ? templates : loadedTemplates
+            isGitAvailable = gitAvailable
+            if !gitAvailable {
+                initGit = false
+            }
+            javaStatus = detectedJava
             projects = registry.listProjects()
             statusMessage = status.message
         } catch {
@@ -188,9 +197,12 @@ final class LaunchpadModel: ObservableObject {
 
     private func runDirectLink(_ direct: FluxzeroDirectLink) async {
         isBusy = true
-        statusMessage = direct.isCreateRequest ? "Creating project..." : "Opening project..."
         defer { isBusy = false }
         do {
+            if direct.isCreateRequest {
+                try await prepareJava25()
+            }
+            statusMessage = direct.isCreateRequest ? "Creating project..." : "Opening project..."
             let runner = DeepLinkActionRunner(paths: paths, cliRuntime: cliRuntime, registry: registry, agentLauncher: agentLauncher)
             let result = try await Task.detached(priority: .userInitiated) {
                 try await runner.run(direct)
@@ -208,9 +220,10 @@ final class LaunchpadModel: ObservableObject {
             return
         }
         isBusy = true
-        statusMessage = "Creating project..."
         defer { isBusy = false }
         do {
+            try await prepareJava25()
+            statusMessage = "Creating project..."
             let request = makeRequest(agent: agent)
             let registry = registry
             let project = try await Task.detached(priority: .userInitiated) {
@@ -241,7 +254,7 @@ final class LaunchpadModel: ObservableObject {
             artifactId: effectiveArtifact,
             description: description.nilIfBlank ?? "A Fluxzero application",
             buildSystem: buildSystem,
-            initGit: initGit,
+            initGit: initGit && isGitAvailable,
             firstPrompt: prompt,
             agentChoice: agent
         )
@@ -289,6 +302,14 @@ final class LaunchpadModel: ObservableObject {
         artifactId = artifact
         let suffix = artifact.replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression).ifBlank("app")
         packageName = "\(groupId).\(suffix)"
+    }
+
+    private func prepareJava25() async throws {
+        statusMessage = "Preparing Java 25..."
+        let dependencies = dependencies
+        javaStatus = try await Task.detached(priority: .userInitiated) {
+            try await dependencies.ensureJava25()
+        }.value
     }
 }
 

@@ -98,7 +98,9 @@ struct ProjectDefaultsSettingsView: View {
                         .frame(width: controlWidth)
                 }
 
-                Toggle("Initialize Git repository", isOn: binding(\.initGit))
+                if model.isGitAvailable {
+                    Toggle("Initialize Git repository", isOn: binding(\.initGit))
+                }
             }
 
             Section("After Creation") {

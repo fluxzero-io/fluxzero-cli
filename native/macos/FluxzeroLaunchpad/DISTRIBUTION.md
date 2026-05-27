@@ -8,8 +8,9 @@ Fluxzero Launchpad is built as a universal macOS app targeting macOS 14 and newe
 native/macos/FluxzeroLaunchpad/package-dmg.sh
 ```
 
-Local builds may omit a bundled CLI. In that case the app falls back to the managed CLI download path in `~/Library/Application Support/Fluxzero/Launchpad/bin/fz`.
-The staging image defaults to `DMG_SIZE=256m`, which leaves room for bundled native CLI binaries.
+Local builds may omit bundled CLI assets. In that case the app falls back to the managed CLI download path in `~/Library/Application Support/Fluxzero/Launchpad/bin/fz`.
+When Java 25+ is missing, the app downloads a managed Temurin JDK on first project generation and installs it at `~/Library/Java/JavaVirtualMachines/fluxzero-temurin-25.jdk`.
+The staging image defaults to `DMG_SIZE=256m`, which leaves room for the universal app and bundled native CLI binaries.
 
 ## Release DMG
 
@@ -57,3 +58,16 @@ native/macos/FluxzeroLaunchpad/notarize-dmg.sh native/macos/FluxzeroLaunchpad/bu
 The app is not sandboxed yet. A sandboxed build should grant the app access to one user-selected project root, store that access as a security-scoped bookmark, and only generate projects under that root. The bundled CLI then inherits the app sandbox, so the CLI must only read bundled resources, use network access declared by entitlement, and write inside the security-scoped project location.
 
 A starter entitlement file is included at `AppBundle/FluxzeroLaunchpad.sandbox.entitlements`, but do not enable it for release until security-scoped bookmark storage is implemented and verified.
+
+## Dependency Simulation
+
+The native app has dependency test overrides for Git and Java:
+
+```sh
+FLUXZERO_LAUNCHPAD_SIMULATE_MISSING_GIT=1
+FLUXZERO_LAUNCHPAD_SIMULATE_MISSING_JAVA=1
+FLUXZERO_LAUNCHPAD_JAVA_INSTALL_DIR=/private/tmp/fluxzero-java-test
+FLUXZERO_LAUNCHPAD_JAVA_SOURCE=/path/to/TestJDK.jdk
+```
+
+When Java 25+ is missing, Launchpad first checks the managed install location, then installs from `FLUXZERO_LAUNCHPAD_JAVA_SOURCE` when set, and otherwise downloads a Temurin JDK from the Adoptium binary API.

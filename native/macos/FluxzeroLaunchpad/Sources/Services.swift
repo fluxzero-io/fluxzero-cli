@@ -9,6 +9,7 @@ enum LaunchpadError: LocalizedError {
     case projectMissing(String)
     case releaseParseFailed
     case downloadFailed(String)
+    case javaInstallFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -24,6 +25,8 @@ enum LaunchpadError: LocalizedError {
             "Could not parse the latest Fluxzero CLI release."
         case .downloadFailed(let message):
             "Could not download Fluxzero CLI.\n\(message)"
+        case .javaInstallFailed(let message):
+            "Could not prepare Java 25.\n\(message)"
         }
     }
 }
@@ -344,6 +347,257 @@ final class CliRuntimeService: Sendable {
     private func versionsEqual(_ left: String?, _ right: String?) -> Bool {
         guard let left, let right else { return false }
         return left.trimmingPrefix("v") == right.trimmingPrefix("v")
+    }
+}
+
+private actor JavaInstallGate {
+    private var inFlight: Task<JavaRuntimeStatus, Error>?
+
+    func run(_ operation: @escaping @Sendable () async throws -> JavaRuntimeStatus) async throws -> JavaRuntimeStatus {
+        if let inFlight {
+            return try await inFlight.value
+        }
+        let task = Task {
+            try await operation()
+        }
+        inFlight = task
+        defer {
+            inFlight = nil
+        }
+        return try await task.value
+    }
+}
+
+final class DevelopmentDependencyService: Sendable {
+    private static let javaInstallGate = JavaInstallGate()
+
+    private let paths: AppPaths
+    private let runner: CommandRunner
+
+    init(paths: AppPaths = .detect(), runner: CommandRunner = CommandRunner()) {
+        self.paths = paths
+        self.runner = runner
+    }
+
+    func isGitAvailable() -> Bool {
+        guard !Self.envFlag("FLUXZERO_LAUNCHPAD_SIMULATE_MISSING_GIT") else { return false }
+        return gitCandidates().contains { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    func detectJava25() -> JavaRuntimeStatus {
+        if !Self.envFlag("FLUXZERO_LAUNCHPAD_SIMULATE_MISSING_JAVA"),
+           let system = systemJavaHome() {
+            return system
+        }
+        if let managed = managedJavaHome() {
+            return managed
+        }
+        return .missing
+    }
+
+    func ensureJava25() async throws -> JavaRuntimeStatus {
+        try await Self.javaInstallGate.run { [self] in
+            if let ready = readyJavaHomeBeforeInstall() {
+                return ready
+            }
+            try await installJava25()
+            guard let managed = managedJavaHome() else {
+                throw LaunchpadError.javaInstallFailed("Installed Java could not be verified.")
+            }
+            return managed
+        }
+    }
+
+    private func readyJavaHomeBeforeInstall() -> JavaRuntimeStatus? {
+        if !Self.envFlag("FLUXZERO_LAUNCHPAD_SIMULATE_MISSING_JAVA"),
+           let system = systemJavaHome() {
+            return system
+        }
+        return managedJavaHome()
+    }
+
+    private func gitCandidates() -> [String] {
+        var paths = (ProcessInfo.processInfo.environment["PATH"] ?? "")
+            .split(separator: ":")
+            .map { URL(fileURLWithPath: String($0)).appending(path: "git").fsPath }
+        paths += [
+            "/opt/homebrew/bin/git",
+            "/usr/local/bin/git",
+            "/Library/Developer/CommandLineTools/usr/bin/git",
+            "/Applications/Xcode.app/Contents/Developer/usr/bin/git"
+        ]
+        return Array(Set(paths))
+    }
+
+    private func systemJavaHome() -> JavaRuntimeStatus? {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/libexec/java_home"),
+              let result = try? runner.run(["/usr/libexec/java_home", "-v", "25+"], timeout: 10),
+              result.successful,
+              let homePath = result.output
+                .split(whereSeparator: \.isNewline)
+                .map({ String($0).trimmingCharacters(in: .whitespacesAndNewlines) })
+                .last(where: { $0.hasPrefix("/") }) else {
+            return nil
+        }
+        guard let version = javaVersion(homePath: homePath) else { return nil }
+        return JavaRuntimeStatus(homePath: homePath, source: .system, version: version)
+    }
+
+    private func managedJavaHome() -> JavaRuntimeStatus? {
+        let home = managedJdkBundle().appending(path: "Contents").appending(path: "Home")
+        guard let version = javaVersion(homePath: home.fsPath) else { return nil }
+        return JavaRuntimeStatus(homePath: home.fsPath, source: .managed, version: version)
+    }
+
+    private func javaVersion(homePath: String) -> String? {
+        let java = URL(fileURLWithPath: homePath).appending(path: "bin").appending(path: "java")
+        guard FileManager.default.isExecutableFile(atPath: java.fsPath),
+              let result = try? runner.run([java.fsPath, "-version"], timeout: 10),
+              result.successful else {
+            return nil
+        }
+        let output = result.output
+        guard majorJavaVersion(output) >= 25 else { return nil }
+        return output.firstMatch(pattern: #"version\s+"([^"]+)""#)
+    }
+
+    private func majorJavaVersion(_ versionOutput: String) -> Int {
+        guard let version = versionOutput.firstMatch(pattern: #"version\s+"([^"]+)""#) else { return 0 }
+        if version.hasPrefix("1.") {
+            return Int(version.split(separator: ".").dropFirst().first ?? "") ?? 0
+        }
+        return Int(version.split(separator: ".").first ?? "") ?? 0
+    }
+
+    private func installJava25() async throws {
+        if let source = configuredJavaSource() {
+            try installJdk(from: source)
+            return
+        }
+        try await downloadAndInstallJava25()
+    }
+
+    private func configuredJavaSource() -> URL? {
+        ProcessInfo.processInfo.environment["FLUXZERO_LAUNCHPAD_JAVA_SOURCE"]
+            .flatMap(\.nilIfBlank)
+            .map { URL(fileURLWithPath: $0).standardizedFileURL }
+    }
+
+    private func managedJdkBundle() -> URL {
+        if let override = ProcessInfo.processInfo.environment["FLUXZERO_LAUNCHPAD_JAVA_INSTALL_DIR"]?.nilIfBlank {
+            let url = URL(fileURLWithPath: override).standardizedFileURL
+            return url.pathExtension == "jdk" ? url : url.appending(path: "fluxzero-temurin-25.jdk")
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library")
+            .appending(path: "Java")
+            .appending(path: "JavaVirtualMachines")
+            .appending(path: "fluxzero-temurin-25.jdk")
+    }
+
+    private func installJdk(from source: URL) throws {
+        if source.pathExtension == "gz" || source.pathExtension == "tgz" {
+            try installJdkArchive(source)
+            return
+        }
+        let bundle = try normalizedJdkBundle(from: source)
+        try installJdkBundle(bundle)
+    }
+
+    private func normalizedJdkBundle(from source: URL) throws -> URL {
+        let source = source.standardizedFileURL
+        if FileManager.default.isExecutableFile(atPath: source.appending(path: "Contents/Home/bin/java").fsPath) {
+            return source
+        }
+        if source.lastPathComponent == "Home",
+           FileManager.default.isExecutableFile(atPath: source.appending(path: "bin/java").fsPath) {
+            return source.deletingLastPathComponent().deletingLastPathComponent()
+        }
+        if FileManager.default.isExecutableFile(atPath: source.appending(path: "bin/java").fsPath) {
+            let staging = stagingJdkBundle()
+            try? FileManager.default.removeItem(at: staging)
+            try FileManager.default.createDirectory(at: staging.appending(path: "Contents"), withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: staging.appending(path: "Contents/Home"))
+            return staging
+        }
+        throw LaunchpadError.javaInstallFailed("Java source does not look like a JDK: \(source.fsPath)")
+    }
+
+    private func installJdkBundle(_ sourceBundle: URL) throws {
+        let target = managedJdkBundle()
+        let staging = stagingJdkBundle()
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: staging)
+        try FileManager.default.copyItem(at: sourceBundle, to: staging)
+        guard FileManager.default.isExecutableFile(atPath: staging.appending(path: "Contents/Home/bin/java").fsPath) else {
+            try? FileManager.default.removeItem(at: staging)
+            throw LaunchpadError.javaInstallFailed("Staged JDK is missing Contents/Home/bin/java.")
+        }
+        try? FileManager.default.removeItem(at: target)
+        try FileManager.default.moveItem(at: staging, to: target)
+    }
+
+    private func installJdkArchive(_ archive: URL) throws {
+        let extractionDir = paths.appDataDir
+            .appending(path: "tmp")
+            .appending(path: "jdk-\(UUID().uuidString)")
+        try? FileManager.default.removeItem(at: extractionDir)
+        try FileManager.default.createDirectory(at: extractionDir, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: extractionDir)
+        }
+
+        let result = try runner.run(["/usr/bin/tar", "-xzf", archive.fsPath, "-C", extractionDir.fsPath], timeout: 600)
+        guard result.successful else {
+            throw LaunchpadError.javaInstallFailed(result.output)
+        }
+        guard let bundle = findExtractedJdkBundle(in: extractionDir) else {
+            throw LaunchpadError.javaInstallFailed("Downloaded archive did not contain a macOS JDK bundle.")
+        }
+        try installJdkBundle(bundle)
+    }
+
+    private func findExtractedJdkBundle(in root: URL) -> URL? {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+        for case let url as URL in enumerator {
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            if FileManager.default.isExecutableFile(atPath: url.appending(path: "Contents/Home/bin/java").fsPath) {
+                return url
+            }
+        }
+        return nil
+    }
+
+    private func downloadAndInstallJava25() async throws {
+        let (downloadedFile, response) = try await URLSession.shared.download(from: temurinDownloadURL())
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw LaunchpadError.javaInstallFailed("Could not download Temurin JDK 25.")
+        }
+        try installJdkArchive(downloadedFile)
+    }
+
+    private func temurinDownloadURL() -> URL {
+        let architecture = NativePlatform.currentArchitecture == "arm64" ? "aarch64" : "x64"
+        return URL(string: "https://api.adoptium.net/v3/binary/latest/25/ga/mac/\(architecture)/jdk/hotspot/normal/eclipse?project=jdk")!
+    }
+
+    private func stagingJdkBundle() -> URL {
+        managedJdkBundle()
+            .deletingLastPathComponent()
+            .appending(path: ".fluxzero-temurin-25-\(UUID().uuidString).staged.jdk")
+    }
+
+    private static func envFlag(_ name: String) -> Bool {
+        switch ProcessInfo.processInfo.environment[name]?.lowercased() {
+        case "1", "true", "yes", "y": true
+        default: false
+        }
     }
 }
 

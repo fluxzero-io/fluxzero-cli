@@ -47,34 +47,79 @@ enum FluxzeroAppActions {
 
 @MainActor
 enum FluxzeroMenuBarAssets {
-    static let templateImage: NSImage = {
-        let image = Bundle.main.url(forResource: "FluxzeroMenuBarTemplate", withExtension: "png")
+    private static let imageSize = NSSize(width: 18, height: 18)
+    private static var rotatedImageCache: [Int: NSImage] = [:]
+
+    private static let sourceImage: NSImage = {
+        let image = Bundle.main.url(forResource: "FluxzeroMenuBar", withExtension: "svg")
             .flatMap { NSImage(contentsOf: $0) }
+            ?? Bundle.main.url(forResource: "FluxzeroMenuBarTemplate", withExtension: "png")
+                .flatMap { NSImage(contentsOf: $0) }
             ?? NSImage(systemSymbolName: "hexagon", accessibilityDescription: "Fluxzero")
-            ?? NSImage(size: NSSize(width: 16, height: 18))
+            ?? NSImage(size: imageSize)
         let template = image.copy() as? NSImage ?? image
         template.isTemplate = true
-        template.size = NSSize(width: 18, height: 18)
         return template
     }()
 
+    static let templateImage: NSImage = {
+        drawRotatedImage(degrees: 0)
+    }()
+
     static func rotatedTemplateImage(degrees: CGFloat) -> NSImage {
-        let source = templateImage
-        let size = source.size
-        let image = NSImage(size: size)
-        image.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
+        let normalized = normalizedDegrees(degrees)
+        if normalized < 0.001 {
+            return templateImage
+        }
 
-        let transform = NSAffineTransform()
-        transform.translateX(by: size.width / 2, yBy: size.height / 2)
-        transform.rotate(byDegrees: degrees)
-        transform.translateX(by: -size.width / 2, yBy: -size.height / 2)
-        transform.concat()
+        let cacheKey = Int((normalized * 100).rounded())
+        if let cached = rotatedImageCache[cacheKey] {
+            return cached
+        }
 
-        source.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .sourceOver, fraction: 1)
-        image.unlockFocus()
+        let image = drawRotatedImage(degrees: normalized)
+        rotatedImageCache[cacheKey] = image
+        return image
+    }
+
+    private static func drawRotatedImage(degrees: CGFloat) -> NSImage {
+        let image = NSImage(size: imageSize, flipped: false) { bounds in
+            NSGraphicsContext.current?.imageInterpolation = .high
+
+            let transform = NSAffineTransform()
+            transform.translateX(by: bounds.midX, yBy: bounds.midY)
+            transform.rotate(byDegrees: degrees)
+            transform.translateX(by: -bounds.midX, yBy: -bounds.midY)
+            transform.concat()
+
+            sourceImage.draw(
+                in: aspectFitRect(for: sourceImage.size, in: bounds),
+                from: NSRect(origin: .zero, size: sourceImage.size),
+                operation: .sourceOver,
+                fraction: 1
+            )
+            return true
+        }
         image.isTemplate = true
         return image
+    }
+
+    private static func aspectFitRect(for sourceSize: NSSize, in bounds: NSRect) -> NSRect {
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return bounds }
+        let scale = min(bounds.width / sourceSize.width, bounds.height / sourceSize.height)
+        let width = sourceSize.width * scale
+        let height = sourceSize.height * scale
+        return NSRect(
+            x: bounds.midX - width / 2,
+            y: bounds.midY - height / 2,
+            width: width,
+            height: height
+        )
+    }
+
+    private static func normalizedDegrees(_ degrees: CGFloat) -> CGFloat {
+        let normalized = degrees.truncatingRemainder(dividingBy: 360)
+        return normalized >= 0 ? normalized : normalized + 360
     }
 }
 
@@ -402,11 +447,13 @@ struct AdvancedOptions: View {
                     .multilineTextAlignment(.trailing)
                     .frame(width: controlWidth)
             }
-            AdvancedDivider()
-            AdvancedRow(title: "Git repository", subtitle: "Initialize version control") {
-                Toggle("", isOn: $model.initGit)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+            if model.isGitAvailable {
+                AdvancedDivider()
+                AdvancedRow(title: "Git repository", subtitle: "Initialize version control") {
+                    Toggle("", isOn: $model.initGit)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
             }
         }
         .padding(.top, 8)
