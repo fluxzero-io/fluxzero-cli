@@ -12,7 +12,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var rotation: CGFloat = 0
     private static let animationFramesPerSecond: TimeInterval = 24
     private static let fullRotationDuration: CGFloat = 8
-    private static let hexagonStep: CGFloat = 60
+    private static let logoRestingStep: CGFloat = 120
     private static let angleTolerance: CGFloat = 0.001
     private static let rotationStep = 360.0 / (fullRotationDuration * CGFloat(animationFramesPerSecond))
 
@@ -122,18 +122,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             animationTimer?.invalidate()
             animationTimer = nil
             guard wasAnimating else { return }
-            settleToNextHexagonStep()
+            settleToNextLogoRestingStep()
         }
     }
 
     private func advanceRotation() {
-        setRotation(rotation + Self.rotationStep)
+        setRotation(rotation - Self.rotationStep)
     }
 
-    private func settleToNextHexagonStep() {
+    private func settleToNextLogoRestingStep() {
         settleTimer?.invalidate()
-        let target = nextHexagonStep(after: rotation)
-        if forwardDistance(from: rotation, to: target) <= Self.rotationStep {
+        let target = previousLogoRestingStep(before: rotation)
+        if clockwiseDistance(from: rotation, to: target) <= Self.rotationStep {
             setRotation(target)
             return
         }
@@ -142,7 +142,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             Task { @MainActor in
                 guard let self else { return }
 
-                if self.forwardDistance(from: self.rotation, to: target) <= Self.rotationStep {
+                if self.clockwiseDistance(from: self.rotation, to: target) <= Self.rotationStep {
                     self.setRotation(target)
                     self.settleTimer?.invalidate()
                     self.settleTimer = nil
@@ -163,18 +163,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         statusItem.button?.setAccessibilityValue(value)
     }
 
-    private func nextHexagonStep(after degrees: CGFloat) -> CGFloat {
+    private func previousLogoRestingStep(before degrees: CGFloat) -> CGFloat {
         let normalized = normalizedDegrees(degrees)
-        let currentStep = floor(normalized / Self.hexagonStep) * Self.hexagonStep
-        let remainder = normalized - currentStep
+        let previousStep = floor(normalized / Self.logoRestingStep) * Self.logoRestingStep
+        let remainder = normalized - previousStep
         if remainder < Self.angleTolerance {
-            return normalizedDegrees(currentStep)
+            return normalizedDegrees(previousStep)
         }
-        return normalizedDegrees(currentStep + Self.hexagonStep)
+        return normalizedDegrees(previousStep)
     }
 
-    private func forwardDistance(from start: CGFloat, to end: CGFloat) -> CGFloat {
-        normalizedDegrees(end - start)
+    private func clockwiseDistance(from start: CGFloat, to end: CGFloat) -> CGFloat {
+        normalizedDegrees(start - end)
     }
 
     private func normalizedDegrees(_ degrees: CGFloat) -> CGFloat {
