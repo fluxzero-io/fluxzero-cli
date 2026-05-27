@@ -797,9 +797,8 @@ struct AgentLauncher: Sendable {
             return try launchCodex(projectPath: projectPath, prompt: prompt)
         case .claude:
             return try launchClaude(projectPath: projectPath, prompt: prompt)
-        case .both:
-            return try launchCodex(projectPath: projectPath, prompt: prompt)
-                .merged(with: launchClaude(projectPath: projectPath, prompt: prompt))
+        case .cursor:
+            return try launchCursor(projectPath: projectPath)
         }
     }
 
@@ -815,6 +814,25 @@ struct AgentLauncher: Sendable {
     func launchClaude(projectPath: String, prompt: String) throws -> AgentLaunchResult {
         NSWorkspace.shared.open(claudeDeepLink(projectPath: projectPath, prompt: prompt))
         return AgentLaunchResult(openedClaude: true)
+    }
+
+    func launchCursor(projectPath: String) throws -> AgentLaunchResult {
+        if let cursor = findExecutable("cursor") {
+            let result = try CommandRunner().run([cursor, projectPath], timeout: 15)
+            if result.successful {
+                return AgentLaunchResult(openedCursor: true)
+            }
+        }
+
+        let projectURL = URL(fileURLWithPath: projectPath)
+        if let appURL = cursorAppURL() {
+            let configuration = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.open([projectURL], withApplicationAt: appURL, configuration: configuration)
+            return AgentLaunchResult(openedCursor: true)
+        }
+
+        NSWorkspace.shared.open(cursorDownloadURL())
+        return AgentLaunchResult(openedCursorDownload: true)
     }
 
     func revealProject(projectPath: String) -> AgentLaunchResult {
@@ -841,10 +859,23 @@ struct AgentLauncher: Sendable {
     }
 
     private func findExecutable(_ name: String) -> String? {
-        (ProcessInfo.processInfo.environment["PATH"] ?? "")
+        var candidates = (ProcessInfo.processInfo.environment["PATH"] ?? "")
             .split(separator: ":")
             .map { URL(fileURLWithPath: String($0)).appending(path: name).fsPath }
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
+        candidates += [
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)"
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private func cursorAppURL() -> URL? {
+        [
+            "/Applications/Cursor.app",
+            "\(NSHomeDirectory())/Applications/Cursor.app"
+        ]
+        .map { URL(fileURLWithPath: $0) }
+        .first { FileManager.default.fileExists(atPath: $0.fsPath) }
     }
 
     private func codexDownloadURL() -> URL {
@@ -855,6 +886,10 @@ struct AgentLauncher: Sendable {
         #endif
     }
 
+    private func cursorDownloadURL() -> URL {
+        URL(string: "https://www.cursor.com/downloads")!
+    }
+
     private let defaultPrompt = "Open START_PROMPT.md and help me continue from there."
 }
 
@@ -862,6 +897,8 @@ struct AgentLaunchResult: Sendable {
     var openedCodex = false
     var openedCodexDownload = false
     var openedClaude = false
+    var openedCursor = false
+    var openedCursorDownload = false
     var openedFinder = false
 
     func merged(with other: AgentLaunchResult) -> AgentLaunchResult {
@@ -869,6 +906,8 @@ struct AgentLaunchResult: Sendable {
             openedCodex: openedCodex || other.openedCodex,
             openedCodexDownload: openedCodexDownload || other.openedCodexDownload,
             openedClaude: openedClaude || other.openedClaude,
+            openedCursor: openedCursor || other.openedCursor,
+            openedCursorDownload: openedCursorDownload || other.openedCursorDownload,
             openedFinder: openedFinder || other.openedFinder
         )
     }
@@ -977,11 +1016,12 @@ enum DeepLinkParser {
                     agentChoice: AgentChoice(urlValue: params["agent"])
                 )
             )
-        case "open", "codex", "claude", "claude-code":
+        case "open", "codex", "claude", "claude-code", "cursor":
             guard let path = params["path"] ?? params["location"] else { return nil }
             let agent: AgentChoice = switch command?.lowercased() {
             case "codex": .codex
             case "claude", "claude-code": .claude
+            case "cursor": .cursor
             default: AgentChoice(urlValue: params["agent"]) ?? .finder
             }
             return .direct(.open(path: path, prompt: params["prompt"], agentChoice: agent))
@@ -1013,7 +1053,7 @@ extension AgentChoice {
         case "finder", "folder", "open-folder", "reveal": self = .finder
         case "codex": self = .codex
         case "claude", "claude-code": self = .claude
-        case "both", "all": self = .both
+        case "cursor": self = .cursor
         case "none", "generate", "dont-open", "don't-open", "no-open": self = .none
         default: return nil
         }

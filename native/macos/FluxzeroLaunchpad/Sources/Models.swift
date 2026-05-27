@@ -19,9 +19,9 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
     case finder
     case codex
     case claude
-    case both
+    case cursor
 
-    static let openDestinations: [AgentChoice] = [.codex, .both, .finder, .claude, .none]
+    static let openDestinations: [AgentChoice] = [.codex, .claude, .cursor, .finder, .none]
 
     var id: String { rawValue }
 
@@ -31,7 +31,7 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
         case .finder: "Finder"
         case .codex: "Codex"
         case .claude: "Claude Code"
-        case .both: "Codex and Claude"
+        case .cursor: "Cursor"
         }
     }
 
@@ -41,14 +41,14 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
         case .finder: "folder"
         case .codex: "sparkles"
         case .claude: "terminal"
-        case .both: "rectangle.split.2x1"
+        case .cursor: "cursorarrow"
         }
     }
 
     var actionTitle: String {
         switch self {
         case .none: "Generate"
-        case .finder, .codex, .claude, .both: "Open"
+        case .finder, .codex, .claude, .cursor: "Open"
         }
     }
 }

@@ -347,14 +347,17 @@ extension AgentLaunchResult {
         if openedCodexDownload {
             return "Codex installer opened."
         }
-        if openedCodex && openedClaude {
-            return "Opened project in Codex and Claude Code."
+        if openedCursorDownload {
+            return "Cursor download page opened."
         }
         if openedCodex {
             return "Opened project in Codex."
         }
         if openedClaude {
             return "Opened project in Claude Code."
+        }
+        if openedCursor {
+            return "Opened project in Cursor."
         }
         if openedFinder {
             return "Opened project in Finder."

@@ -571,6 +571,9 @@ struct ProjectRow: View {
             ProjectActionButton(systemImage: "folder", help: "Open folder") {
                 model.openFolder(project)
             }
+            ProjectActionButton(systemImage: "cursorarrow", help: "Open in Cursor") {
+                model.openProject(project, agent: .cursor)
+            }
             ProjectActionButton(systemImage: "terminal", help: "Open in Claude Code") {
                 model.openProject(project, agent: .claude)
             }
