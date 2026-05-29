@@ -45,6 +45,15 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    var productIconAssetName: String? {
+        switch self {
+        case .codex: "CodexIcon"
+        case .claude: "ClaudeCodeMark"
+        case .cursor: "CursorCube"
+        case .finder, .none: nil
+        }
+    }
+
     var actionTitle: String {
         switch self {
         case .none: "Generate"

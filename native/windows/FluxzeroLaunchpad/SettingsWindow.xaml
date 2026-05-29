@@ -1,0 +1,46 @@
+<Window
+    x:Class="Fluxzero.Launchpad.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Settings">
+
+    <Grid Padding="32" RowDefinitions="Auto,*">
+        <StackPanel Spacing="4">
+            <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" />
+            <TextBlock Text="Project defaults" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="18" MaxWidth="620">
+            <Grid ColumnDefinitions="180,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="Location" VerticalAlignment="Center" />
+                <TextBox x:Name="LocationBox" Grid.Column="1" />
+                <Button Grid.Column="2" Content="Choose" Click="ChooseLocationButton_Click" />
+            </Grid>
+
+            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                <TextBlock Text="Template" VerticalAlignment="Center" />
+                <ComboBox x:Name="TemplateBox" Grid.Column="1" HorizontalAlignment="Right" MinWidth="220" SelectionChanged="Setting_Changed" />
+            </Grid>
+
+            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                <TextBlock Text="Build system" VerticalAlignment="Center" />
+                <ComboBox x:Name="BuildBox" Grid.Column="1" HorizontalAlignment="Right" MinWidth="220" SelectionChanged="Setting_Changed">
+                    <ComboBoxItem Content="Maven" Tag="maven" />
+                    <ComboBoxItem Content="Gradle" Tag="gradle" />
+                </ComboBox>
+            </Grid>
+
+            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                <TextBlock Text="Group ID" VerticalAlignment="Center" />
+                <TextBox x:Name="GroupBox" Grid.Column="1" HorizontalAlignment="Right" MinWidth="220" TextChanged="Setting_Changed" />
+            </Grid>
+
+            <CheckBox x:Name="GitBox" Content="Initialize Git repository" Checked="Setting_Changed" Unchecked="Setting_Changed" />
+
+            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                <TextBlock Text="Open project in" VerticalAlignment="Center" />
+                <ComboBox x:Name="AgentBox" Grid.Column="1" HorizontalAlignment="Right" MinWidth="220" SelectionChanged="Setting_Changed" />
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>

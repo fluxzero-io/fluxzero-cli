@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -13,6 +14,7 @@ public sealed class AppPaths
     public required string AppDataDir { get; init; }
     public required string BinDir { get; init; }
     public required string CliExecutable { get; init; }
+    public required string CliJar { get; init; }
     public required string RegistryFile { get; init; }
 
     public static AppPaths Detect()
@@ -27,6 +29,7 @@ public sealed class AppPaths
             AppDataDir = root,
             BinDir = bin,
             CliExecutable = Path.Combine(bin, "fz.exe"),
+            CliJar = Path.Combine(bin, "fluxzero-cli.jar"),
             RegistryFile = Path.Combine(root, "projects.json")
         };
     }
@@ -36,6 +39,11 @@ public sealed class CommandRunner
 {
     public async Task<CommandResult> RunAsync(IReadOnlyList<string> command, TimeSpan? timeout = null)
     {
+        if (command.Count == 0)
+        {
+            return new CommandResult { ExitCode = -2, Output = "No command was provided." };
+        }
+
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
@@ -55,7 +63,21 @@ public sealed class CommandRunner
         process.OutputDataReceived += (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); };
 
-        process.Start();
+        try
+        {
+            process.Start();
+        }
+        catch (Exception ex)
+        {
+            return new CommandResult
+            {
+                Command = command.ToList(),
+                ExitCode = -2,
+                Output = $"Could not start command: {FormatCommand(command)}{Environment.NewLine}{ex.Message}"
+            };
+        }
+
+        process.StandardInput.Close();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
@@ -67,11 +89,23 @@ public sealed class CommandRunner
         catch (OperationCanceledException)
         {
             process.Kill(entireProcessTree: true);
-            return new CommandResult { ExitCode = -1, Output = $"Command timed out: {string.Join(" ", command)}" };
+            return new CommandResult
+            {
+                Command = command.ToList(),
+                ExitCode = -1,
+                Output = $"Command timed out: {FormatCommand(command)}"
+            };
         }
 
-        return new CommandResult { ExitCode = process.ExitCode, Output = output.ToString() };
+        process.WaitForExit();
+        return new CommandResult { Command = command.ToList(), ExitCode = process.ExitCode, Output = output.ToString() };
     }
+
+    public static string FormatCommand(IReadOnlyList<string> command) =>
+        string.Join(" ", command.Select(QuoteArgument));
+
+    private static string QuoteArgument(string argument) =>
+        argument.Any(char.IsWhiteSpace) ? $"\"{argument.Replace("\"", "\\\"", StringComparison.Ordinal)}\"" : argument;
 }
 
 public sealed class GitHubRelease
@@ -82,9 +116,20 @@ public sealed class GitHubRelease
     [JsonPropertyName("assets")]
     public List<ReleaseAsset> Assets { get; set; } = [];
 
-    public Uri DownloadUri()
+    public Uri? NativeDownloadUri()
     {
-        const string assetName = "flux-windows-amd64.exe";
+        var assetNames = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+            ? new[] { "flux-windows-arm64.exe", "flux-windows-aarch64.exe" }
+            : new[] { "flux-windows-amd64.exe" };
+        var asset = assetNames
+            .Select(name => Assets.FirstOrDefault(candidate => candidate.Name == name))
+            .FirstOrDefault(candidate => candidate is not null);
+        return asset?.BrowserDownloadUrl;
+    }
+
+    public Uri JarDownloadUri()
+    {
+        const string assetName = "fluxzero-cli.jar";
         var asset = Assets.FirstOrDefault(candidate => candidate.Name == assetName);
         return asset?.BrowserDownloadUrl ?? new Uri($"https://github.com/fluxzero-io/fluxzero-cli/releases/download/{TagName}/{assetName}");
     }
@@ -99,51 +144,33 @@ public sealed class ReleaseAsset
     public Uri? BrowserDownloadUrl { get; set; }
 }
 
-public sealed class CliRuntimeService(AppPaths paths, CommandRunner? runner = null)
+public sealed class CliRuntimeService(AppPaths paths, DevelopmentDependencyService dependencies, CommandRunner? runner = null)
 {
     private static readonly Uri LatestReleaseUri = new("https://api.github.com/repos/fluxzero-io/fluxzero-cli/releases/latest");
     private readonly CommandRunner runner = runner ?? new CommandRunner();
     private readonly HttpClient http = new();
+    private IReadOnlyList<string>? commandPrefix;
 
     public async Task<CliStatus> EnsureLatestCliAsync()
     {
         Directory.CreateDirectory(paths.BinDir);
-        var installed = await InstalledVersionAsync();
 
         try
         {
             var release = await FetchLatestReleaseAsync();
-            if (File.Exists(paths.CliExecutable) && VersionsEqual(installed, release.TagName))
+            var nativeUri = release.NativeDownloadUri();
+            if (nativeUri is null)
             {
-                return new CliStatus
-                {
-                    ExecutablePath = paths.CliExecutable,
-                    Version = installed,
-                    LatestVersion = release.TagName,
-                    Message = "Fluxzero CLI is up to date."
-                };
+                return await EnsureJarCliAsync(release);
             }
 
-            await DownloadAsync(release.DownloadUri(), paths.CliExecutable);
-            return new CliStatus
-            {
-                ExecutablePath = paths.CliExecutable,
-                Version = await InstalledVersionAsync() ?? release.TagName,
-                LatestVersion = release.TagName,
-                Updated = true,
-                Message = $"Downloaded Fluxzero CLI {release.TagName}."
-            };
+            return await EnsureNativeCliAsync(release, nativeUri);
         }
         catch
         {
-            if (File.Exists(paths.CliExecutable))
+            if (await ExistingCliStatusAsync() is { } existing)
             {
-                return new CliStatus
-                {
-                    ExecutablePath = paths.CliExecutable,
-                    Version = installed,
-                    Message = "Using installed CLI; latest version check failed."
-                };
+                return existing;
             }
             throw;
         }
@@ -151,12 +178,12 @@ public sealed class CliRuntimeService(AppPaths paths, CommandRunner? runner = nu
 
     public async Task<List<string>> ListTemplatesAsync()
     {
-        if (!File.Exists(paths.CliExecutable))
+        if (commandPrefix is null)
         {
             return [];
         }
 
-        var result = await runner.RunAsync([paths.CliExecutable, "templates", "list"], TimeSpan.FromSeconds(20));
+        var result = await runner.RunAsync([.. commandPrefix, "templates", "list"], TimeSpan.FromSeconds(20));
         if (!result.Successful)
         {
             return [];
@@ -171,14 +198,108 @@ public sealed class CliRuntimeService(AppPaths paths, CommandRunner? runner = nu
             .ToList();
     }
 
-    private async Task<string?> InstalledVersionAsync()
+    private async Task<CliStatus> EnsureNativeCliAsync(GitHubRelease release, Uri nativeUri)
     {
-        if (!File.Exists(paths.CliExecutable))
+        var prefix = new[] { paths.CliExecutable };
+        var installed = File.Exists(paths.CliExecutable) ? await InstalledVersionAsync(prefix) : null;
+        if (File.Exists(paths.CliExecutable) && VersionsEqual(installed, release.TagName))
+        {
+            commandPrefix = prefix;
+            return new CliStatus
+            {
+                ExecutablePath = paths.CliExecutable,
+                CommandPrefix = prefix,
+                Version = installed,
+                LatestVersion = release.TagName,
+                Message = "Fluxzero Launchpad is up to date"
+            };
+        }
+
+        await DownloadAsync(nativeUri, paths.CliExecutable);
+        commandPrefix = prefix;
+        return new CliStatus
+        {
+            ExecutablePath = paths.CliExecutable,
+            CommandPrefix = prefix,
+            Version = await InstalledVersionAsync(prefix) ?? release.TagName,
+            LatestVersion = release.TagName,
+            Updated = true,
+            Message = $"Downloaded Fluxzero CLI {release.TagName}."
+        };
+    }
+
+    private async Task<CliStatus> EnsureJarCliAsync(GitHubRelease release)
+    {
+        var java = await dependencies.EnsureJava25Async();
+        var javaExecutable = Path.Combine(java.HomePath!, "bin", "java.exe");
+        var prefix = new[] { javaExecutable, "-jar", paths.CliJar };
+        var installed = File.Exists(paths.CliJar) ? await InstalledVersionAsync(prefix) : null;
+        if (File.Exists(paths.CliJar) && VersionsEqual(installed, release.TagName))
+        {
+            commandPrefix = prefix;
+            return new CliStatus
+            {
+                ExecutablePath = paths.CliJar,
+                CommandPrefix = prefix,
+                Version = installed,
+                LatestVersion = release.TagName,
+                Message = "Fluxzero Launchpad is up to date"
+            };
+        }
+
+        await DownloadAsync(release.JarDownloadUri(), paths.CliJar);
+        commandPrefix = prefix;
+        return new CliStatus
+        {
+            ExecutablePath = paths.CliJar,
+            CommandPrefix = prefix,
+            Version = await InstalledVersionAsync(prefix) ?? release.TagName,
+            LatestVersion = release.TagName,
+            Updated = true,
+            Message = $"Downloaded Fluxzero CLI {release.TagName}."
+        };
+    }
+
+    private async Task<CliStatus?> ExistingCliStatusAsync()
+    {
+        if (File.Exists(paths.CliJar))
+        {
+            var java = await dependencies.EnsureJava25Async();
+            var prefix = new[] { Path.Combine(java.HomePath!, "bin", "java.exe"), "-jar", paths.CliJar };
+            commandPrefix = prefix;
+            return new CliStatus
+            {
+                ExecutablePath = paths.CliJar,
+                CommandPrefix = prefix,
+                Version = await InstalledVersionAsync(prefix),
+                Message = "Using installed CLI; latest version check failed."
+            };
+        }
+
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
         {
             return null;
         }
 
-        var result = await runner.RunAsync([paths.CliExecutable, "version"], TimeSpan.FromSeconds(15));
+        if (File.Exists(paths.CliExecutable))
+        {
+            var prefix = new[] { paths.CliExecutable };
+            commandPrefix = prefix;
+            return new CliStatus
+            {
+                ExecutablePath = paths.CliExecutable,
+                CommandPrefix = prefix,
+                Version = await InstalledVersionAsync(prefix),
+                Message = "Using installed CLI; latest version check failed."
+            };
+        }
+
+        return null;
+    }
+
+    private async Task<string?> InstalledVersionAsync(IReadOnlyList<string> prefix)
+    {
+        var result = await runner.RunAsync([.. prefix, "version"], TimeSpan.FromSeconds(15));
         if (!result.Successful)
         {
             return null;
@@ -252,6 +373,15 @@ public sealed class ProjectRegistry(string registryFile)
         Directory.CreateDirectory(Path.GetDirectoryName(registryFile)!);
         File.WriteAllText(registryFile, JsonSerializer.Serialize(new RegistryState { Projects = projects }, JsonOptions));
     }
+
+    public void RemoveProject(GeneratedProject project)
+    {
+        var projects = ListProjects()
+            .Where(existing => existing.Path != project.Path)
+            .ToList();
+        Directory.CreateDirectory(Path.GetDirectoryName(registryFile)!);
+        File.WriteAllText(registryFile, JsonSerializer.Serialize(new RegistryState { Projects = projects }, JsonOptions));
+    }
 }
 
 public sealed class PromptWriter
@@ -290,7 +420,7 @@ public sealed class PromptWriter
     }
 }
 
-public sealed class ProjectGenerator(string cliExecutable, ProjectRegistry registry, CommandRunner? runner = null, PromptWriter? promptWriter = null)
+public sealed class ProjectGenerator(IReadOnlyList<string> cliCommandPrefix, ProjectRegistry registry, CommandRunner? runner = null, PromptWriter? promptWriter = null)
 {
     private readonly CommandRunner runner = runner ?? new CommandRunner();
     private readonly PromptWriter promptWriter = promptWriter ?? new PromptWriter();
@@ -308,11 +438,18 @@ public sealed class ProjectGenerator(string cliExecutable, ProjectRegistry regis
         var result = await runner.RunAsync(BuildCommand(request), TimeSpan.FromMinutes(10));
         if (!result.Successful)
         {
-            throw new InvalidOperationException($"Fluxzero CLI failed.{Environment.NewLine}{result.Output}");
+            throw new InvalidOperationException(
+                $"Fluxzero CLI failed with exit code {result.ExitCode}."
+                + $"{Environment.NewLine}{Environment.NewLine}Command:{Environment.NewLine}{CommandRunner.FormatCommand(result.Command)}"
+                + $"{Environment.NewLine}{Environment.NewLine}Output:{Environment.NewLine}{OutputOrFallback(result.Output)}");
         }
         if (!Directory.Exists(projectDir) || result.Output.Split(Environment.NewLine).Any(line => line.TrimStart().StartsWith("Error:", StringComparison.OrdinalIgnoreCase)))
         {
-            throw new InvalidOperationException($"Fluxzero CLI did not generate the expected project directory.{Environment.NewLine}{result.Output}");
+            throw new InvalidOperationException(
+                $"Fluxzero CLI did not generate the expected project directory."
+                + $"{Environment.NewLine}{Environment.NewLine}Expected:{Environment.NewLine}{projectDir}"
+                + $"{Environment.NewLine}{Environment.NewLine}Command:{Environment.NewLine}{CommandRunner.FormatCommand(result.Command)}"
+                + $"{Environment.NewLine}{Environment.NewLine}Output:{Environment.NewLine}{OutputOrFallback(result.Output)}");
         }
 
         var sdkVersion = SdkVersionDetector.Detect(projectDir);
@@ -336,9 +473,8 @@ public sealed class ProjectGenerator(string cliExecutable, ProjectRegistry regis
 
     private IReadOnlyList<string> BuildCommand(GenerateProjectRequest request)
     {
-        var command = new List<string>
+        var command = new List<string>(cliCommandPrefix)
         {
-            cliExecutable,
             "init",
             "--template", request.Template,
             "--name", request.Name,
@@ -365,26 +501,13 @@ public sealed class ProjectGenerator(string cliExecutable, ProjectRegistry regis
         return command;
     }
 
+    private static string OutputOrFallback(string output) =>
+        string.IsNullOrWhiteSpace(output) ? "(no output captured)" : output.Trim();
+
     private static string StableProjectId(string path)
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(path)));
         return Convert.ToHexString(hash)[..16].ToLowerInvariant();
-    }
-}
-
-public static class ProjectNameNormalizer
-{
-    public static string Normalize(string name)
-    {
-        var cleaned = System.Text.RegularExpressions.Regex.Replace(name.ToLowerInvariant(), @"[^a-z0-9\s_-]", "");
-        var dashed = System.Text.RegularExpressions.Regex.Replace(cleaned, @"[\s_]+", "-");
-        return System.Text.RegularExpressions.Regex.Replace(dashed, "-+", "-").Trim('-');
-    }
-
-    public static string PackageSuffix(string artifact)
-    {
-        var suffix = System.Text.RegularExpressions.Regex.Replace(artifact.ToLowerInvariant(), @"[^a-z0-9]", "");
-        return string.IsNullOrWhiteSpace(suffix) ? "app" : suffix;
     }
 }
 
@@ -420,35 +543,71 @@ public static class SdkVersionDetector
 
 public sealed class AgentLauncher
 {
-    public void Launch(AgentChoice choice, string projectPath, string prompt)
+    public AgentLaunchResult Launch(AgentChoice choice, string projectPath, string prompt)
     {
         switch (choice)
         {
             case AgentChoice.None:
-                return;
+                return new AgentLaunchResult();
+            case AgentChoice.Explorer:
+                return OpenFolder(projectPath);
             case AgentChoice.Codex:
-                LaunchCodex(projectPath, prompt);
-                return;
+                return LaunchCodex(projectPath, prompt);
             case AgentChoice.Claude:
                 OpenUri(ClaudeDeepLink(projectPath, prompt));
-                return;
-            case AgentChoice.Both:
-                LaunchCodex(projectPath, prompt);
-                OpenUri(ClaudeDeepLink(projectPath, prompt));
-                return;
+                return new AgentLaunchResult { OpenedClaude = true };
+            case AgentChoice.Cursor:
+                return LaunchCursor(projectPath);
         }
+
+        return new AgentLaunchResult();
     }
 
-    public void OpenFolder(string path) => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    public AgentLaunchResult OpenFolder(string path)
+    {
+        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        return new AgentLaunchResult { OpenedExplorer = true };
+    }
 
-    private void LaunchCodex(string projectPath, string prompt)
+    private AgentLaunchResult LaunchCodex(string projectPath, string prompt)
     {
         if (!IsCodexInstalled())
         {
             OpenUri(new Uri("https://openai.com/codex/"));
-            return;
+            return new AgentLaunchResult { OpenedCodexDownload = true };
         }
         OpenUri(CodexDeepLink(projectPath, prompt));
+        return new AgentLaunchResult { OpenedCodex = true };
+    }
+
+    private AgentLaunchResult LaunchCursor(string projectPath)
+    {
+        if (FindExecutable("cursor.exe") is { } cursor)
+        {
+            var startInfo = new ProcessStartInfo(cursor)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add(projectPath);
+            Process.Start(startInfo);
+            return new AgentLaunchResult { OpenedCursor = true };
+        }
+
+        if (CursorExecutable() is { } appPath)
+        {
+            var startInfo = new ProcessStartInfo(appPath)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add(projectPath);
+            Process.Start(startInfo);
+            return new AgentLaunchResult { OpenedCursor = true };
+        }
+
+        OpenUri(new Uri("https://www.cursor.com/downloads"));
+        return new AgentLaunchResult { OpenedCursorDownload = true };
     }
 
     private static Uri CodexDeepLink(string projectPath, string prompt) =>
@@ -467,6 +626,15 @@ public sealed class AgentLauncher
         || File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Codex", "Codex.exe"))
         || File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Codex", "Codex.exe"));
 
+    private static string? CursorExecutable() =>
+        new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Cursor", "Cursor.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Cursor", "Cursor.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Cursor", "Cursor.exe")
+        }
+        .FirstOrDefault(File.Exists);
+
     private static string? FindExecutable(string name)
     {
         return (Environment.GetEnvironmentVariable("PATH") ?? "")
@@ -476,18 +644,39 @@ public sealed class AgentLauncher
     }
 }
 
-public sealed class DeepLinkActionRunner(AppPaths paths, CliRuntimeService cliRuntime, ProjectRegistry registry, AgentLauncher agentLauncher)
+public sealed class AgentLaunchResult
 {
-    public async Task RunAsync(FluxzeroDirectLink link)
+    public bool OpenedExplorer { get; init; }
+    public bool OpenedCodex { get; init; }
+    public bool OpenedCodexDownload { get; init; }
+    public bool OpenedClaude { get; init; }
+    public bool OpenedCursor { get; init; }
+    public bool OpenedCursorDownload { get; init; }
+
+    public string StatusMessage => this switch
+    {
+        { OpenedCodexDownload: true } => "Codex download page opened.",
+        { OpenedCursorDownload: true } => "Cursor download page opened.",
+        { OpenedCodex: true } => "Opened project in Codex.",
+        { OpenedClaude: true } => "Opened project in Claude Code.",
+        { OpenedCursor: true } => "Opened project in Cursor.",
+        { OpenedExplorer: true } => "Opened project in File Explorer.",
+        _ => "Project generated."
+    };
+}
+
+public sealed class DeepLinkActionRunner(CliRuntimeService cliRuntime, ProjectRegistry registry, AgentLauncher agentLauncher, DevelopmentDependencyService dependencies)
+{
+    public async Task<string> RunAsync(FluxzeroDirectLink link)
     {
         if (link.Command == "open" && !string.IsNullOrWhiteSpace(link.Path))
         {
-            agentLauncher.Launch(link.AgentChoice, link.Path, link.Prompt ?? "");
-            return;
+            return agentLauncher.Launch(link.AgentChoice, link.Path, link.Prompt ?? "").StatusMessage;
         }
 
         if (link.Command == "create")
         {
+            await dependencies.EnsureJava25Async();
             var name = string.IsNullOrWhiteSpace(link.Name) ? throw new InvalidOperationException("Project name is required.") : link.Name;
             var location = string.IsNullOrWhiteSpace(link.Location) ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "FluxzeroProjects") : link.Location;
             var normalized = ProjectNameNormalizer.Normalize(name);
@@ -495,8 +684,7 @@ public sealed class DeepLinkActionRunner(AppPaths paths, CliRuntimeService cliRu
             if (Directory.Exists(projectDir) && Directory.EnumerateFileSystemEntries(projectDir).Any())
             {
                 var prompt = link.Prompt ?? TryReadStartPrompt(projectDir) ?? "";
-                agentLauncher.Launch(link.AgentChoice, projectDir, prompt);
-                return;
+                return agentLauncher.Launch(link.AgentChoice, projectDir, prompt).StatusMessage;
             }
 
             var artifact = string.IsNullOrWhiteSpace(link.ArtifactId) ? ProjectNameNormalizer.Normalize(name) : link.ArtifactId;
@@ -512,16 +700,18 @@ public sealed class DeepLinkActionRunner(AppPaths paths, CliRuntimeService cliRu
                 PackageName = string.IsNullOrWhiteSpace(link.PackageName) ? $"{group}.{ProjectNameNormalizer.PackageSuffix(artifact)}" : link.PackageName,
                 Description = string.IsNullOrWhiteSpace(link.Description) ? "A Fluxzero application" : link.Description,
                 BuildSystem = link.BuildSystem ?? (template.Contains("kotlin", StringComparison.OrdinalIgnoreCase) ? BuildSystem.Gradle : BuildSystem.Maven),
-                InitGit = link.InitGit,
+                InitGit = link.InitGit && dependencies.IsGitAvailable(),
                 FirstPrompt = link.Prompt ?? "",
                 AgentChoice = link.AgentChoice
             };
             var status = await cliRuntime.EnsureLatestCliAsync();
-            var generator = new ProjectGenerator(status.ExecutablePath, registry);
+            var generator = new ProjectGenerator(status.CommandPrefix, registry);
             var project = await generator.GenerateAsync(request, status.Version);
             var projectPrompt = project.PromptPath is null ? request.FirstPrompt : await File.ReadAllTextAsync(project.PromptPath);
-            agentLauncher.Launch(link.AgentChoice, project.Path, projectPrompt);
+            return agentLauncher.Launch(link.AgentChoice, project.Path, projectPrompt).StatusMessage;
         }
+
+        return "No Fluxzero action was run.";
     }
 
     private static string? TryReadStartPrompt(string projectDir)
@@ -529,110 +719,6 @@ public sealed class DeepLinkActionRunner(AppPaths paths, CliRuntimeService cliRu
         var path = Path.Combine(projectDir, PromptWriter.FileName);
         return File.Exists(path) ? File.ReadAllText(path) : null;
     }
-}
-
-public static class DeepLinkParser
-{
-    public static FluxzeroDeepLink? Parse(Uri uri)
-    {
-        if (!uri.Scheme.Equals("fluxzero", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-        var command = uri.Host.ToLowerInvariant();
-        var parameters = ParseQuery(uri.Query);
-        if (command == "new")
-        {
-            return new FluxzeroDeepLink
-            {
-                NewProject = new FluxzeroNewProjectLink
-                {
-                    Name = Get(parameters, "name"),
-                    Prompt = Get(parameters, "prompt"),
-                    Template = Get(parameters, "template"),
-                    Location = Get(parameters, "location") ?? Get(parameters, "path"),
-                    AgentChoice = ParseAgent(Get(parameters, "agent"))
-                }
-            };
-        }
-        if (command is "open" or "codex" or "claude" or "claude-code")
-        {
-            return new FluxzeroDeepLink
-            {
-                Direct = new FluxzeroDirectLink
-                {
-                    Command = "open",
-                    Path = Get(parameters, "path") ?? Get(parameters, "location"),
-                    Prompt = Get(parameters, "prompt"),
-                    AgentChoice = command switch
-                    {
-                        "codex" => AgentChoice.Codex,
-                        "claude" or "claude-code" => AgentChoice.Claude,
-                        _ => ParseAgent(Get(parameters, "agent")) ?? AgentChoice.Codex
-                    }
-                }
-            };
-        }
-        if (command == "create")
-        {
-            return new FluxzeroDeepLink
-            {
-                Direct = new FluxzeroDirectLink
-                {
-                    Command = "create",
-                    Name = Get(parameters, "name"),
-                    Template = Get(parameters, "template"),
-                    Location = Get(parameters, "location") ?? Get(parameters, "path"),
-                    GroupId = Get(parameters, "groupId") ?? Get(parameters, "group"),
-                    ArtifactId = Get(parameters, "artifactId") ?? Get(parameters, "artifact"),
-                    PackageName = Get(parameters, "packageName") ?? Get(parameters, "package"),
-                    Description = Get(parameters, "description"),
-                    BuildSystem = ParseBuild(Get(parameters, "build") ?? Get(parameters, "buildSystem")),
-                    InitGit = ParseBool(Get(parameters, "git")) ?? true,
-                    Prompt = Get(parameters, "prompt"),
-                    AgentChoice = ParseAgent(Get(parameters, "agent")) ?? AgentChoice.Codex
-                }
-            };
-        }
-        return null;
-    }
-
-    private static Dictionary<string, string> ParseQuery(string query)
-    {
-        return query.TrimStart('?')
-            .Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Select(part => part.Split('=', 2))
-            .ToDictionary(
-                pair => Uri.UnescapeDataString(pair[0]),
-                pair => pair.Length > 1 ? Uri.UnescapeDataString(pair[1].Replace("+", " ")) : "",
-                StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string? Get(Dictionary<string, string> parameters, string key) =>
-        parameters.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
-
-    private static AgentChoice? ParseAgent(string? value) => value?.ToLowerInvariant().Replace("_", "-") switch
-    {
-        "codex" => AgentChoice.Codex,
-        "claude" or "claude-code" => AgentChoice.Claude,
-        "both" or "all" => AgentChoice.Both,
-        "none" or "generate" => AgentChoice.None,
-        _ => null
-    };
-
-    private static BuildSystem? ParseBuild(string? value) => value?.ToLowerInvariant() switch
-    {
-        "maven" or "mvn" => BuildSystem.Maven,
-        "gradle" => BuildSystem.Gradle,
-        _ => null
-    };
-
-    private static bool? ParseBool(string? value) => value?.ToLowerInvariant() switch
-    {
-        "1" or "true" or "yes" or "y" => true,
-        "0" or "false" or "no" or "n" => false,
-        _ => null
-    };
 }
 
 public static class ProtocolRegistrationService

@@ -4,10 +4,14 @@
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>Fluxzero.Launchpad</RootNamespace>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\..\desktop\src\main\resources\icons\fluxzero.ico</ApplicationIcon>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
@@ -16,10 +20,20 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.1.3" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxzeroLaunchpad.Core\FluxzeroLaunchpad.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="..\..\..\desktop\src\main\resources\icons\fluxzero.ico" Link="Assets\fluxzero.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\..\desktop\src\main\resources\icons\fluxzero.png" Link="Assets\fluxzero.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\FluxzeroMenuBarTemplate.png" Link="Assets\FluxzeroMenuBarTemplate.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\CursorCube.svg" Link="Assets\CursorCube.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\ClaudeCodeMark.svg" Link="Assets\ClaudeCodeMark.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\CodexIcon.svg" Link="Assets\CodexIcon.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\CodexIcon.png" Link="Assets\CodexIcon.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

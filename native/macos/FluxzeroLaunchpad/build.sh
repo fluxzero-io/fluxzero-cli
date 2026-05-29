@@ -142,6 +142,10 @@ cp "$INFO_PLIST" "$CONTENTS_DIR/Info.plist"
 cp "$ICON_SOURCE" "$RESOURCES_DIR/Fluxzero.icns"
 cp "$ASSET_DIR/FluxzeroMenuBar.svg" "$RESOURCES_DIR/FluxzeroMenuBar.svg"
 cp "$ASSET_DIR/FluxzeroMenuBarTemplate.png" "$RESOURCES_DIR/FluxzeroMenuBarTemplate.png"
+cp "$ASSET_DIR/CursorCube.svg" "$RESOURCES_DIR/CursorCube.svg"
+cp "$ASSET_DIR/ClaudeCodeMark.svg" "$RESOURCES_DIR/ClaudeCodeMark.svg"
+cp "$ASSET_DIR/CodexIcon.svg" "$RESOURCES_DIR/CodexIcon.svg"
+cp "$ASSET_DIR/CodexIcon.png" "$RESOURCES_DIR/CodexIcon.png"
 chmod 755 "$MACOS_DIR/$EXECUTABLE_NAME"
 
 COPIED_ARM64_CLI=0

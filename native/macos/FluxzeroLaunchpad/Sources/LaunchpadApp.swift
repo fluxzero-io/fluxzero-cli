@@ -337,7 +337,7 @@ struct GeneratorPanel: View {
                 TrailingControlColumn(width: destinationControlWidth) {
                     Picker("Open project in", selection: $model.selectedAgent) {
                         ForEach(AgentChoice.openDestinations) { option in
-                            Label(option.label, systemImage: option.systemImage).tag(option)
+                            AgentChoiceMenuLabel(option: option).tag(option)
                         }
                     }
                     .labelsHidden()
@@ -560,6 +560,7 @@ struct ProjectRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
             }
             Spacer()
             ProjectActionButton(systemImage: "trash", help: "Delete project", isDestructive: true) {
@@ -571,15 +572,110 @@ struct ProjectRow: View {
             ProjectActionButton(systemImage: "folder", help: "Open folder") {
                 model.openFolder(project)
             }
-            ProjectActionButton(systemImage: "cursorarrow", help: "Open in Cursor") {
+            ProductIconProjectActionButton(assetName: "CursorCube", help: "Open in Cursor", size: 16) {
                 model.openProject(project, agent: .cursor)
             }
-            ProjectActionButton(systemImage: "terminal", help: "Open in Claude Code") {
+            ProductIconProjectActionButton(assetName: "ClaudeCodeMark", help: "Open in Claude Code", size: 16) {
                 model.openProject(project, agent: .claude)
             }
-            ProjectActionButton(systemImage: "sparkles", help: "Open in Codex") {
+            ProductIconProjectActionButton(assetName: "CodexIcon", help: "Open in Codex", size: 18) {
                 model.openProject(project, agent: .codex)
             }
+        }
+    }
+}
+
+struct ProductIconProjectActionButton: View {
+    let assetName: String
+    let help: String
+    let size: CGFloat
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            ProductIconImage(assetName: assetName, fallbackSystemImage: fallbackSystemImage, size: size)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isHovering ? Color(nsColor: .selectedControlColor).opacity(0.18) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(help)
+        .help(help)
+        .onHover { isHovering = $0 }
+    }
+
+    private var fallbackSystemImage: String {
+        if assetName == "ClaudeCodeMark" {
+            return "terminal"
+        }
+        if assetName == "CodexIcon" {
+            return "sparkles"
+        }
+        return "cursorarrow"
+    }
+}
+
+struct ProductIconImage: View {
+    let assetName: String
+    let fallbackSystemImage: String
+    let size: CGFloat
+
+    var body: some View {
+        if let image {
+            if assetName == "CodexIcon" {
+                Image(nsImage: image)
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+            } else {
+                Image(nsImage: image)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .foregroundStyle(Color(nsColor: .labelColor))
+            }
+        } else {
+            Image(systemName: fallbackSystemImage)
+                .frame(width: size, height: size)
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+        }
+    }
+
+    private var image: NSImage? {
+        for fileExtension in ["svg", "png"] {
+            guard
+                let url = Bundle.main.url(forResource: assetName, withExtension: fileExtension),
+                let image = NSImage(contentsOf: url)
+            else {
+                continue
+            }
+            image.isTemplate = true
+            return image
+        }
+        return nil
+    }
+}
+
+struct AgentChoiceMenuLabel: View {
+    let option: AgentChoice
+    private var iconSize: CGFloat {
+        option == .codex ? 16 : 14
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let assetName = option.productIconAssetName {
+                ProductIconImage(assetName: assetName, fallbackSystemImage: option.systemImage, size: iconSize)
+            } else {
+                Image(systemName: option.systemImage)
+                    .frame(width: iconSize, height: iconSize)
+            }
+            Text(option.label)
         }
     }
 }

@@ -1,0 +1,27 @@
+<Window
+    x:Class="Fluxzero.Launchpad.AboutWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="About Fluxzero Launchpad">
+
+    <Grid Padding="30" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <StackPanel
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="8">
+            <Image
+                Width="64"
+                Height="64"
+                Source="Assets/fluxzero.png" />
+            <TextBlock
+                Text="Fluxzero Launchpad"
+                Style="{ThemeResource SubtitleTextBlockStyle}"
+                TextAlignment="Center" />
+            <TextBlock
+                x:Name="VersionText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextAlignment="Center"
+                TextWrapping="NoWrap" />
+        </StackPanel>
+    </Grid>
+</Window>

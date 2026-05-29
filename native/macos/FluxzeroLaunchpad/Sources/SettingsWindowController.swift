@@ -108,7 +108,7 @@ struct ProjectDefaultsSettingsView: View {
                     TrailingControlColumn(width: controlWidth) {
                         Picker("Open Project In", selection: binding(\.agentChoice)) {
                             ForEach(AgentChoice.openDestinations) { option in
-                                Label(option.label, systemImage: option.systemImage).tag(option)
+                                AgentChoiceMenuLabel(option: option).tag(option)
                             }
                         }
                         .labelsHidden()
