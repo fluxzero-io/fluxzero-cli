@@ -56,7 +56,7 @@ abstract class SyncProjectFilesTask : DefaultTask() {
     abstract val forceUpdate: Property<Boolean>
 
     /**
-     * The output directory for project files (.fluxzero/).
+     * The output directory for project files (.fluxzero/agents/).
      * Using this as the output ensures Gradle tracks file changes.
      */
     @get:OutputDirectory

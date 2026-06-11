@@ -72,7 +72,7 @@ class FluxzeroPlugin : Plugin<Project> {
             projectDir.set(project.layout.projectDirectory)
 
             // Set up output directory for tracking changes
-            projectFilesDir.set(project.layout.projectDirectory.dir(".fluxzero"))
+            projectFilesDir.set(project.layout.projectDirectory.dir(".fluxzero/agents"))
 
             // Configure version - use override value or auto-detect
             sdkVersion.set(project.provider {

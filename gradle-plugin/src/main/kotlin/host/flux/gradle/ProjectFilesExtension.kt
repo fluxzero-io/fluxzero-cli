@@ -6,7 +6,7 @@ import org.gradle.api.provider.Property
  * Configuration for the project files sync feature.
  *
  * This feature automatically syncs AI assistant instruction files
- * (AGENTS.md, CLAUDE.md, .aiassistant/, .junie/) from GitHub releases.
+ * (AGENTS.md, CLAUDE.md, .aiassistant/, .junie/) from GitHub releases to .fluxzero/agents.
  *
  * By default, the SDK version and language are auto-detected from your project.
  * Use the override properties only when auto-detection doesn't work correctly.

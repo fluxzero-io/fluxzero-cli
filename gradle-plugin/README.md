@@ -113,7 +113,7 @@ The plugin automatically:
 
 3. **Downloads Agent Files** from GitHub releases matching your SDK version
 
-4. **Extracts to `.fluxzero/` directory** in your project root
+4. **Extracts to `.fluxzero/agents/` directory** in your project root. The plugin creates `.fluxzero` when it does not exist, and updates only the `agents` subdirectory.
 
 ### Lifecycle Integration
 
@@ -269,7 +269,7 @@ Synchronizes AI agent instruction files for the project.
 - Language (auto-detected or overridden)
 
 **Outputs**:
-- `.fluxzero/` directory with agent files
+- `.fluxzero/agents/` directory with agent files
 
 **Task Properties**:
 - `enabled`: Whether the task should run

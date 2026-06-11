@@ -21,9 +21,23 @@ object ProjectFilesExtractor {
     const val PROJECT_FILES_DIR = ".fluxzero"
 
     /**
+     * Subdirectory owned by the project files sync.
+     */
+    const val AGENT_FILES_DIR = "agents"
+
+    /**
      * Prefixes to strip from ZIP entries (language-specific folders).
      */
     private val LANGUAGE_PREFIXES = listOf("java/", "kotlin/")
+
+    /**
+     * Prefixes to strip from ZIP entries before writing them to .fluxzero/agents.
+     */
+    private val AGENT_FILE_PREFIXES = listOf(
+        "$PROJECT_FILES_DIR/$AGENT_FILES_DIR/",
+        "$PROJECT_FILES_DIR/",
+        "$AGENT_FILES_DIR/"
+    )
 
     /**
      * Files/directories that are expected in project files archives.
@@ -48,15 +62,15 @@ object ProjectFilesExtractor {
 
     /**
      * Extracts project files from a ZIP input stream to the project directory.
-     * Files are extracted to the .fluxzero/ subdirectory, with language prefixes stripped.
+     * Files are extracted to the .fluxzero/agents subdirectory, with known wrapper prefixes stripped.
      *
      * @param zipStream The ZIP input stream
      * @param projectDir The target project directory
-     * @return List of files that were extracted (relative to .fluxzero/)
+     * @return List of files that were extracted (relative to .fluxzero/agents/)
      */
     fun extract(zipStream: InputStream, projectDir: Path): List<String> {
         val extractedFiles = mutableListOf<String>()
-        val targetDir = projectDir.resolve(PROJECT_FILES_DIR)
+        val targetDir = agentFilesDir(projectDir)
         logger.debug { "Extracting project files to $targetDir" }
 
         // Ensure target directory exists
@@ -65,8 +79,8 @@ object ProjectFilesExtractor {
         ZipInputStream(zipStream).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
-                // Strip language prefix (java/ or kotlin/) from entry name
-                val strippedName = stripLanguagePrefix(entry.name)
+                // Strip known wrapper prefixes (java/, kotlin/, agents/, .fluxzero/) from entry name
+                val strippedName = stripKnownPrefixes(entry.name)
 
                 // Skip if entry is just the language folder itself
                 if (strippedName.isEmpty()) {
@@ -106,19 +120,29 @@ object ProjectFilesExtractor {
     }
 
     /**
-     * Strips language prefix (java/ or kotlin/) from a ZIP entry name.
+     * Strips known wrapper prefixes from a ZIP entry name.
      */
-    private fun stripLanguagePrefix(entryName: String): String {
+    private fun stripKnownPrefixes(entryName: String): String {
+        var strippedName = entryName
+
         for (prefix in LANGUAGE_PREFIXES) {
-            if (entryName.startsWith(prefix)) {
-                return entryName.removePrefix(prefix)
+            if (strippedName.startsWith(prefix)) {
+                strippedName = strippedName.removePrefix(prefix)
+                break
             }
         }
-        return entryName
+
+        for (prefix in AGENT_FILE_PREFIXES) {
+            if (strippedName.startsWith(prefix)) {
+                return strippedName.removePrefix(prefix)
+            }
+        }
+
+        return strippedName
     }
 
     /**
-     * Cleans existing project files from the .fluxzero directory.
+     * Cleans existing agent files from the .fluxzero/agents directory.
      * This ensures we don't have stale files from previous versions.
      *
      * @param projectDir The project directory containing .fluxzero
@@ -126,19 +150,27 @@ object ProjectFilesExtractor {
      */
     fun cleanExistingFiles(projectDir: Path): List<String> {
         val removedFiles = mutableListOf<String>()
-        val targetDir = projectDir.resolve(PROJECT_FILES_DIR)
+        val targetDir = agentFilesDir(projectDir)
 
-        // If .fluxzero doesn't exist, nothing to clean
+        // If .fluxzero/agents doesn't exist, nothing to clean
         if (!Files.exists(targetDir)) {
             return removedFiles
         }
 
-        // Remove the entire .fluxzero directory and recreate it fresh
+        // Remove only the agent files directory and leave the rest of .fluxzero intact.
         deleteRecursively(targetDir)
-        removedFiles.add(PROJECT_FILES_DIR)
-        logger.info { "Cleaned existing $PROJECT_FILES_DIR directory" }
+        removedFiles.add("$PROJECT_FILES_DIR/$AGENT_FILES_DIR")
+        logger.info { "Cleaned existing $PROJECT_FILES_DIR/$AGENT_FILES_DIR directory" }
 
         return removedFiles
+    }
+
+    fun agentFilesDir(projectDir: Path): Path {
+        return projectDir.resolve(PROJECT_FILES_DIR).resolve(AGENT_FILES_DIR)
+    }
+
+    fun syncVersionFile(projectDir: Path): Path {
+        return agentFilesDir(projectDir).resolve(".sync-version")
     }
 
     private fun deleteRecursively(path: Path) {

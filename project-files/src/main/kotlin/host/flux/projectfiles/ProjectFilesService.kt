@@ -103,7 +103,7 @@ class DefaultProjectFilesService(
 
             // Check if already up-to-date
             if (!forceUpdate) {
-                val syncVersionFile = projectDir.resolve(ProjectFilesExtractor.PROJECT_FILES_DIR).resolve(".sync-version")
+                val syncVersionFile = ProjectFilesExtractor.syncVersionFile(projectDir)
                 if (Files.exists(syncVersionFile)) {
                     val savedState = Files.readString(syncVersionFile).trim()
                     val currentState = "$sdkVersion:${projectLanguage.name.lowercase()}"
@@ -125,7 +125,7 @@ class DefaultProjectFilesService(
             val extractedFiles = ProjectFilesExtractor.extract(zipData, projectDir)
 
             // Record synced version for up-to-date checking
-            val syncVersionFile = projectDir.resolve(ProjectFilesExtractor.PROJECT_FILES_DIR).resolve(".sync-version")
+            val syncVersionFile = ProjectFilesExtractor.syncVersionFile(projectDir)
             Files.writeString(syncVersionFile, "$sdkVersion:${projectLanguage.name.lowercase()}")
 
             logger.info { "Successfully synced ${extractedFiles.size} project files" }

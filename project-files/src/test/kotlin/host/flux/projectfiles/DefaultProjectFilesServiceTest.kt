@@ -14,7 +14,9 @@ import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class DefaultProjectFilesServiceTest {
 
@@ -23,6 +25,12 @@ class DefaultProjectFilesServiceTest {
 
     private val gitHubClient = mockk<GitHubReleaseClient>()
     private val service = DefaultProjectFilesService(gitHubClient)
+
+    private val fluxzeroDir: Path
+        get() = tempDir.resolve(".fluxzero")
+
+    private val agentsDir: Path
+        get() = fluxzeroDir.resolve("agents")
 
     @Test
     fun `returns Skipped when SDK version cannot be detected`() {
@@ -154,9 +162,8 @@ class DefaultProjectFilesServiceTest {
 
     @Test
     fun `returns UpToDate when version file matches`() {
-        val fluxzeroDir = tempDir.resolve(".fluxzero")
-        Files.createDirectories(fluxzeroDir)
-        Files.writeString(fluxzeroDir.resolve(".sync-version"), "1.75.1:kotlin")
+        Files.createDirectories(agentsDir)
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.75.1:kotlin")
 
         val result = service.syncProjectFiles(
             projectDir = tempDir,
@@ -171,9 +178,8 @@ class DefaultProjectFilesServiceTest {
 
     @Test
     fun `downloads when version file has different version`() {
-        val fluxzeroDir = tempDir.resolve(".fluxzero")
-        Files.createDirectories(fluxzeroDir)
-        Files.writeString(fluxzeroDir.resolve(".sync-version"), "1.74.0:kotlin")
+        Files.createDirectories(agentsDir)
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.74.0:kotlin")
 
         every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns
             buildProjectFilesZip("kotlin")
@@ -190,9 +196,8 @@ class DefaultProjectFilesServiceTest {
 
     @Test
     fun `downloads when version file has different language`() {
-        val fluxzeroDir = tempDir.resolve(".fluxzero")
-        Files.createDirectories(fluxzeroDir)
-        Files.writeString(fluxzeroDir.resolve(".sync-version"), "1.75.1:java")
+        Files.createDirectories(agentsDir)
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.75.1:java")
 
         every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns
             buildProjectFilesZip("kotlin")
@@ -220,13 +225,14 @@ class DefaultProjectFilesServiceTest {
 
         assertIs<SyncResult.Updated>(result)
         assertEquals("1.75.1", result.version)
+        assertTrue(Files.exists(fluxzeroDir))
+        assertTrue(Files.exists(agentsDir.resolve("AGENTS.md")))
     }
 
     @Test
     fun `downloads when forceUpdate is true despite matching version`() {
-        val fluxzeroDir = tempDir.resolve(".fluxzero")
-        Files.createDirectories(fluxzeroDir)
-        Files.writeString(fluxzeroDir.resolve(".sync-version"), "1.75.1:kotlin")
+        Files.createDirectories(agentsDir)
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.75.1:kotlin")
 
         every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns
             buildProjectFilesZip("kotlin")
@@ -243,6 +249,29 @@ class DefaultProjectFilesServiceTest {
     }
 
     @Test
+    fun `updates agents directory without deleting other fluxzero files`() {
+        Files.createDirectories(agentsDir)
+        Files.writeString(fluxzeroDir.resolve("config.yaml"), "customer config")
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.74.0:kotlin")
+        Files.writeString(agentsDir.resolve("stale.md"), "stale")
+
+        every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns
+            buildProjectFilesZip("kotlin")
+
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = "1.75.1"
+        )
+
+        assertIs<SyncResult.Updated>(result)
+        assertTrue(Files.exists(fluxzeroDir.resolve("config.yaml")))
+        assertEquals("customer config", Files.readString(fluxzeroDir.resolve("config.yaml")))
+        assertFalse(Files.exists(agentsDir.resolve("stale.md")))
+        assertTrue(Files.exists(agentsDir.resolve("AGENTS.md")))
+    }
+
+    @Test
     fun `writes version file after successful sync`() {
         every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns
             buildProjectFilesZip("kotlin")
@@ -253,7 +282,7 @@ class DefaultProjectFilesServiceTest {
             version = "1.75.1"
         )
 
-        val syncVersionFile = tempDir.resolve(".fluxzero/.sync-version")
+        val syncVersionFile = tempDir.resolve(".fluxzero/agents/.sync-version")
         assert(Files.exists(syncVersionFile)) { "Expected .sync-version file to exist" }
         assertEquals("1.75.1:kotlin", Files.readString(syncVersionFile))
     }
