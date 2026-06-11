@@ -43,7 +43,10 @@ jobs:
             runner: macos-14
             artifact-name: flux-macos-arm64
           - os: windows-amd64
-            runner: windows-latest
+            # GraalVM Native Image 21 expects the Visual Studio 2022 toolchain on Windows.
+            # windows-latest currently resolves to Windows 2025/VS2026 where native-image
+            # fails to locate vcvarsall.bat.
+            runner: windows-2022
             artifact-name: flux-windows-amd64
     
     steps:
