@@ -43,10 +43,10 @@ jobs:
             runner: macos-14
             artifact-name: flux-macos-arm64
           - os: windows-amd64
-            # Pin the Windows image instead of following windows-latest. The
-            # windows-2025-vs2026 image fails GraalVM Native Image 21 toolchain
-            # detection because native-image cannot locate vcvarsall.bat.
-            runner: windows-2025
+            # Pin the Windows image to a Visual Studio 2022 runner. GitHub now
+            # resolves windows-2025 to the VS2026 image, where GraalVM Native
+            # Image 21 cannot locate vcvarsall.bat.
+            runner: windows-2022
             artifact-name: flux-windows-amd64
     
     steps:
