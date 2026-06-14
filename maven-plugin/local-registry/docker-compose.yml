@@ -1,0 +1,51 @@
+name: fluxzero-local-registry
+
+services:
+  certs:
+    image: eclipse-temurin:25-jdk
+    working_dir: /work
+    volumes:
+      - ../../.local-registry/certs:/certs
+    command: >
+      sh -c '
+        set -eu;
+        mkdir -p /certs;
+        rm -f /certs/server.p12 /certs/server.crt /certs/truststore-with-defaults.jks;
+        keytool -genkeypair -alias fluxzero-local-registry -keyalg RSA -keysize 2048 -validity 2 -dname "CN=127.0.0.1" -ext "SAN=IP:127.0.0.1,DNS:localhost" -keystore /certs/server.p12 -storetype PKCS12 -storepass changeit -keypass changeit -noprompt;
+        keytool -exportcert -rfc -alias fluxzero-local-registry -keystore /certs/server.p12 -storepass changeit -file /certs/server.crt;
+        cp /opt/java/openjdk/lib/security/cacerts /certs/truststore-with-defaults.jks;
+        keytool -importcert -noprompt -alias fluxzero-local-registry -file /certs/server.crt -keystore /certs/truststore-with-defaults.jks -storepass changeit;
+      '
+
+  zot:
+    image: ghcr.io/project-zot/zot:v2.1.17
+    ports:
+      - "127.0.0.1:5100:5000"
+    volumes:
+      - zot-data:/var/lib/registry
+
+  registry-proxy:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["node", "/app/local-registry-proxy.js"]
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      zot:
+        condition: service_started
+    environment:
+      FLUXZERO_LOCAL_BACKEND_HOST: zot
+      FLUXZERO_LOCAL_BACKEND_PORT: "5000"
+      FLUXZERO_LOCAL_CERT_PASSPHRASE: changeit
+      FLUXZERO_LOCAL_CERT_PFX: /certs/server.p12
+      FLUXZERO_LOCAL_CI_TOKEN_SECRET: local-dev-ci-token-secret
+      FLUXZERO_LOCAL_PROXY_METRICS: /metrics/proxy-metrics.ndjson
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./local-registry-proxy.js:/app/local-registry-proxy.js:ro
+      - ../../.local-registry/certs:/certs:ro
+      - ../../.local-registry:/metrics
+
+volumes:
+  zot-data:

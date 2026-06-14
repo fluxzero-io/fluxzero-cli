@@ -18,6 +18,7 @@ data class ScaffoldProject(
     val packageName: String = "com.example.app",
     val groupId: String? = null,
     val artifactId: String? = null,
+    val applicationId: String? = null,
     val description: String? = null,
     val buildSystem: BuildSystem? = null
 )

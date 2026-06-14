@@ -46,3 +46,5 @@ bin/
 ### Mac OS ###
 .DS_Storeapi/node_modules/
 maven-plugin/target/
+.local-registry/
+maven-plugin/examples/*/target/

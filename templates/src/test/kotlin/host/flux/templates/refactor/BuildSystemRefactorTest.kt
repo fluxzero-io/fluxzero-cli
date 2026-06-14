@@ -144,6 +144,47 @@ class BuildSystemRefactorTest {
         assertTrue(result.operationsExecuted >= 4, "Expected at least 4 operations, got ${result.operationsExecuted}")
     }
 
+    @Test
+    fun `should configure Fluxzero Maven plugin image settings when Maven is selected`() {
+        Files.writeString(tempDir.resolve("pom.xml"), """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project>
+                <groupId>com.example.test</groupId>
+                <artifactId>test-project</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>io.fluxzero.tools</groupId>
+                            <artifactId>fluxzero-maven-plugin</artifactId>
+                            <version>1.1.67</version>
+                            <configuration>
+                                <forceUpdate>true</forceUpdate>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """.trimIndent())
+        createSimpleRefactorYaml()
+
+        val variables = TemplateVariables(
+            packageName = "com.maven.test",
+            projectName = "maven-test",
+            artifactId = "customer-app",
+            applicationId = "app-123",
+            buildSystem = BuildSystem.MAVEN
+        )
+
+        val result = templateRefactor.refactorTemplate(tempDir, variables)
+        val pom = Files.readString(tempDir.resolve("pom.xml"))
+
+        assertTrue(result.success)
+        assertTrue(pom.contains("<imageName>customer-app</imageName>"))
+        assertTrue(pom.contains("<applicationId>app-123</applicationId>"))
+        assertFalse(pom.contains("registryToken"))
+    }
+
     private fun createBothBuildFiles() {
         Files.writeString(tempDir.resolve("pom.xml"), """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -151,6 +192,15 @@ class BuildSystemRefactorTest {
                 <groupId>com.example.test</groupId>
                 <artifactId>test-project</artifactId>
                 <version>1.0-SNAPSHOT</version>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>io.fluxzero.tools</groupId>
+                            <artifactId>fluxzero-maven-plugin</artifactId>
+                            <version>1.1.67</version>
+                        </plugin>
+                    </plugins>
+                </build>
             </project>
         """.trimIndent())
 

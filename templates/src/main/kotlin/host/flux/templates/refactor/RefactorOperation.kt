@@ -104,6 +104,8 @@ private fun expandVariables(template: String, variables: TemplateVariables): Str
     result = result.replace("{{groupId}}", variables.finalGroupId)
     result = result.replace("\${artifactId}", variables.finalArtifactId)
     result = result.replace("{{artifactId}}", variables.finalArtifactId)
+    result = result.replace("\${applicationId}", variables.applicationId ?: "")
+    result = result.replace("{{applicationId}}", variables.applicationId ?: "")
     result = result.replace("\${description}", variables.finalDescription)
     result = result.replace("{{description}}", variables.finalDescription)
     

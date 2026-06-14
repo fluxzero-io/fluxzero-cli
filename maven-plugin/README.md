@@ -1,14 +1,11 @@
 # Fluxzero Maven Plugin
 
-Maven plugin for Fluxzero projects that automatically synchronizes AI agent instruction files from GitHub releases.
+Maven plugin for Fluxzero project setup and Java image publishing.
 
-## Features
+## Goals
 
-- **Automatic SDK Version Detection**: Detects Fluxzero SDK version from your dependencies
-- **Automatic Language Detection**: Identifies project language (Kotlin or Java)
-- **Lifecycle Integration**: Runs automatically during the INITIALIZE phase
-- **Multi-Module Support**: Configurable to run only on root project or all modules
-- **Smart Caching**: Only downloads when version changes
+- `sync-project-files`: updates `.fluxzero/agents/` for the project's Fluxzero SDK version.
+- `push-image`: builds and pushes a Java OCI image from Maven output.
 
 ## Quick Start
 
@@ -35,136 +32,106 @@ Add the plugin to your `pom.xml`:
 </build>
 ```
 
-That's it! The plugin will automatically detect your SDK version and language, then sync agent files during the INITIALIZE phase.
+This configuration runs `sync-project-files` during the Maven `initialize` phase.
 
 ## Configuration
 
-### Minimal Configuration (Recommended)
+### `sync-project-files`
 
-Everything is auto-detected by default:
-
-```xml
-<build>
-    <plugins>
-        <plugin>
-            <groupId>io.fluxzero.tools</groupId>
-            <artifactId>fluxzero-maven-plugin</artifactId>
-            <version>1.0.0</version>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>sync-project-files</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
-```
-
-### All Configuration Options
-
-```xml
-<plugin>
-    <groupId>io.fluxzero.tools</groupId>
-    <artifactId>fluxzero-maven-plugin</artifactId>
-    <version>1.0.0</version>
-    <configuration>
-        <!-- Master switch. Set to false to keep the plugin configured but skip syncing (default: true). -->
-        <enabled>true</enabled>
-
-        <!-- Multi-module guard. Keep true to sync once from the Maven execution root (default: true). -->
-        <rootProjectOnly>true</rootProjectOnly>
-
-        <!-- Re-download and rewrite files even when the local sync metadata is current (default: false). -->
-        <forceUpdate>false</forceUpdate>
-
-        <!-- Use only when language detection is wrong or unavailable. Accepted values: "kotlin" or "java". -->
-        <overrideLanguage>kotlin</overrideLanguage> <!-- or "java" -->
-
-        <!-- Use only when the Fluxzero SDK version cannot be inferred from dependencies, BOMs, or properties. -->
-        <overrideSdkVersion>1.75.1</overrideSdkVersion>
-    </configuration>
-    <executions>
-        <execution>
-            <goals>
-                <goal>sync-project-files</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
-```
-
-Every setting is optional. The plugin auto-detects the language and SDK version in the common case.
-
-| Setting | Command-line property | Default | When to use it |
-|---------|-----------------------|---------|----------------|
-| `enabled` | `fluxzero.projectFiles.enabled` | `true` | Disable all plugin work without removing the plugin from the POM. Prefer this over `skip` for new configurations. |
-| `rootProjectOnly` | `fluxzero.projectFiles.rootProjectOnly` | `true` | Sync only from the execution root. Set `false` if every module needs its own files. |
-| `forceUpdate` | `fluxzero.projectFiles.forceUpdate` | `false` | Force a fresh download when files look stale or you want to refresh local generated files. |
-| `overrideLanguage` | `fluxzero.projectFiles.overrideLanguage` | auto-detected | Set to `kotlin` or `java` only when automatic language detection picks the wrong target. |
-| `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected | Pin the SDK version when dependencies, BOMs, or properties do not expose it. |
-| `skip` | `fluxzero.projectFiles.skip` | `false` | Legacy opt-out flag for older builds. Use `enabled=false` in new setups. |
-
-### Disabling the Plugin
-
-Using `enabled` (recommended):
-
-```xml
-<configuration>
-    <enabled>false</enabled>
-</configuration>
-```
-
-Using `skip` (backward compatibility):
-
-```xml
-<configuration>
-    <skip>true</skip>
-</configuration>
-```
-
-Via command line:
-
-```bash
-mvn clean install -Dfluxzero.projectFiles.enabled=false
-```
-
-Or:
-
-```bash
-mvn clean install -Dfluxzero.projectFiles.skip=true
-```
-
-## How It Works
-
-### Automatic Detection
-
-The plugin automatically:
-
-1. **Detects SDK Version** from:
-   - `<fluxzero.version>` property in pom.xml
-   - `<fluxzero-sdk.version>` property in pom.xml
-   - Direct `io.fluxzero:fluxzero-sdk` dependency version
-   - `io.fluxzero:fluxzero-bom` dependency version (in dependencyManagement)
-
-2. **Detects Language** by checking for:
-   - `kotlin-maven-plugin` → Kotlin
-   - `maven-compiler-plugin` → Java
-
-3. **Downloads Agent Files** from GitHub releases matching your SDK version
-
-4. **Extracts to `.fluxzero/agents/` directory** in your project root. The plugin creates `.fluxzero` when it does not exist, and updates only the `agents` subdirectory.
-
-### Lifecycle Integration
-
-The plugin runs during the `INITIALIZE` phase, which means it executes before compilation.
-
-You can also run it manually:
+`sync-project-files` updates `.fluxzero/agents/` for the SDK version used by the Maven project. It runs in the
+`initialize` phase when configured as an execution, and it can also be run manually:
 
 ```bash
 mvn fluxzero:sync-project-files
 ```
+
+| Setting | Command-line property | Default |
+|---------|-----------------------|---------|
+| `enabled` | `fluxzero.projectFiles.enabled` | `true` |
+| `rootProjectOnly` | `fluxzero.projectFiles.rootProjectOnly` | `true` |
+| `forceUpdate` | `fluxzero.projectFiles.forceUpdate` | `false` |
+| `overrideLanguage` | `fluxzero.projectFiles.overrideLanguage` | auto-detected |
+| `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected |
+| `skip` | `fluxzero.projectFiles.skip` | `false` |
+
+### `push-image`
+
+`push-image` builds and pushes a Java OCI image from compiled classes and Maven runtime dependency artifacts.
+
+```bash
+mvn -B package fluxzero:push-image \
+  -Dfluxzero.image.registryToken="$FLUXZERO_REGISTRY_TOKEN" \
+  -Dfluxzero.image.name="my-service"
+```
+
+Generated Fluxzero projects put stable image settings in the POM:
+
+```xml
+<configuration>
+  <imageName>my-service</imageName>
+  <applicationId>...</applicationId>
+</configuration>
+```
+
+Keep registry tokens and user credentials out of the POM.
+
+| Setting | Command-line property | Environment fallback | Default |
+|---------|-----------------------|----------------------|---------|
+| Registry host | `fluxzero.image.registryHost` | `FLUXZERO_REGISTRY_HOST` | `registry.fluxzero.io` |
+| Registry token | `fluxzero.image.registryToken` | `FLUXZERO_REGISTRY_TOKEN` | required |
+| Image name | `fluxzero.image.name` | `FLUXZERO_IMAGE_NAME` | required |
+| Image tag | `fluxzero.image.version` | `FLUXZERO_IMAGE_VERSION` | generated git/time-based tag |
+| Allow dirty worktree | `fluxzero.image.allowDirty` | — | `false` |
+| Application id | `fluxzero.image.applicationId` | `FLUXZERO_APPLICATION_ID` | omitted |
+| Main class | `fluxzero.image.mainClass` | `FLUXZERO_IMAGE_MAIN_CLASS` | `Start-Class` or `Main-Class` from built artifact manifest |
+| Base image | `fluxzero.image.baseImage` | `FLUXZERO_IMAGE_BASE_IMAGE` | Fluxzero Java distroless runtime |
+| Skip push | `fluxzero.image.skip` | — | `false` |
+
+The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.image.allowDirty=true` for local experiments; dirty
+pushes get a `-dirty` tag suffix.
+
+The image contains these labels:
+
+- `org.opencontainers.image.title`
+- `org.opencontainers.image.version`
+- `io.fluxzero.maven.group-id`
+- `io.fluxzero.maven.artifact-id`
+- `io.fluxzero.maven.version`
+- `io.fluxzero.image.metadata-version`
+- `io.fluxzero.application-id`, when configured
+
+## Local OCI Registry Test Chain
+
+The `local-registry` directory contains a Docker Compose harness with Zot and a small local Fluxzero registry proxy.
+
+```bash
+docker compose -f maven-plugin/local-registry/docker-compose.yml up
+```
+
+In another terminal:
+
+```bash
+./gradlew :maven-plugin:publishToMavenLocal
+
+export MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/.local-registry/certs/truststore-with-defaults.jks -Djavax.net.ssl.trustStorePassword=changeit"
+export FLUXZERO_REGISTRY_HOST="https://127.0.0.1:8443"
+export FLUXZERO_REGISTRY_TOKEN="$(node maven-plugin/local-registry/generate-token.js team-a plain-java)"
+export FLUXZERO_IMAGE_VERSION="local-dev"
+
+mvn -B -f maven-plugin/examples/plain-java/pom.xml package fluxzero:push-image
+```
+
+If the checkout has uncommitted changes, add `-Dfluxzero.image.allowDirty=true`; the pushed tag becomes
+`local-dev-dirty`.
+
+Inspect the backend image directly in Zot:
+
+```bash
+docker pull 127.0.0.1:5100/team-a/plain-java:local-dev
+docker run --rm 127.0.0.1:5100/team-a/plain-java:local-dev codex
+```
+
+Request metrics are written to `.local-registry/proxy-metrics.ndjson`.
 
 ## Multi-Module Projects
 
@@ -209,27 +176,6 @@ To sync in every module:
 <configuration>
     <rootProjectOnly>false</rootProjectOnly>
 </configuration>
-```
-
-## Command Line Properties
-
-All configuration options can be set via command line properties:
-
-```bash
-# Disable the plugin
-mvn clean install -Dfluxzero.projectFiles.enabled=false
-
-# Override language
-mvn clean install -Dfluxzero.projectFiles.overrideLanguage=kotlin
-
-# Override SDK version
-mvn clean install -Dfluxzero.projectFiles.overrideSdkVersion=1.75.1
-
-# Force update
-mvn clean install -Dfluxzero.projectFiles.forceUpdate=true
-
-# Run in all modules (not just root)
-mvn clean install -Dfluxzero.projectFiles.rootProjectOnly=false
 ```
 
 ## Troubleshooting

@@ -42,6 +42,12 @@ class TemplateRefactor {
                 allWarnings.addAll(messages.warnings)
                 allInfo.addAll(messages.info)
             }
+
+            if (variables.buildSystem == BuildSystem.MAVEN) {
+                val messages = MavenFluxzeroPluginConfigurator.configure(templateRoot, variables)
+                allWarnings.addAll(messages.warnings)
+                allInfo.addAll(messages.info)
+            }
             
             // Always run cleanup of empty directories after all other operations
             val cleanupOperation = CleanupEmptyDirectoriesOperation()
@@ -52,7 +58,7 @@ class TemplateRefactor {
             // Clean up the refactor.yaml file after processing
             Files.deleteIfExists(refactorConfigFile)
             
-            val totalOperations = config.operations.size + buildSystemOperations.size + 1 // +1 for cleanup
+            val totalOperations = config.operations.size + buildSystemOperations.size + 1 + if (variables.buildSystem == BuildSystem.MAVEN) 1 else 0
             RefactorResult.success(
                 "Successfully applied template refactoring", 
                 operationsExecuted = totalOperations,

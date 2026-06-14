@@ -57,6 +57,7 @@ class ScaffoldService(
                 projectName = normalizedName,
                 groupId = request.groupId,
                 artifactId = request.artifactId,
+                applicationId = request.applicationId,
                 description = request.description,
                 buildSystem = request.buildSystem
             )

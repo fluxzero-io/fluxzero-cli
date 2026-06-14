@@ -49,6 +49,8 @@ class Init(
 
     val artifactId by option("--artifact-id", help = "Maven/Gradle artifact ID (defaults to project name)")
 
+    val applicationId by option("--application-id", help = "Fluxzero application ID to configure for image publishing")
+
     val description by option("--description", help = "Project description (defaults to 'A Flux application')")
 
     val buildSystem by option("--build", help = "Build system to use").choice("maven", "gradle")
@@ -89,6 +91,7 @@ class Init(
             packageName = finalPackage,
             groupId = groupId,
             artifactId = artifactId,
+            applicationId = applicationId,
             description = description,
             buildSystem = finalBuildSystem
         )

@@ -87,6 +87,9 @@ fz init my-project
 # List available templates
 fz templates list
 
+# Build and publish the current Maven project as a Fluxzero image
+FLUXZERO_REGISTRY_TOKEN=... fz publish
+
 # Show version
 fz version
 
@@ -114,11 +117,39 @@ fz init [OPTIONS]
 | `--package` | Java package name | `--package com.example.myapp` |
 | `--group-id` | Maven/Gradle group ID | `--group-id com.example` |
 | `--artifact-id` | Maven/Gradle artifact ID | `--artifact-id my-app` |
+| `--application-id` | Fluxzero application ID to configure for image publishing | `--application-id app-...` |
 | `--description` | Project description | `--description "My application"` |
 | `--build` | Build system (`maven` or `gradle`) | `--build gradle` |
 | `--git` | Initialize Git repository | `--git` |
 
-**Examples:**
+#### `fz publish` - Build and publish a Java application image
+
+`fz publish` currently supports Maven Java projects. It runs Maven to build the project and collect runtime
+dependencies, then uses the shared Fluxzero publisher to build and push a layered Java OCI image. The registry host
+defaults to `registry.fluxzero.io`; override it only for local development or non-standard environments.
+
+```bash
+FLUXZERO_REGISTRY_TOKEN=... fz publish --image-name my-app
+```
+
+When no image tag is configured, `fz publish` generates one from git branch, UTC timestamp, and commit SHA. Dirty
+worktrees are refused unless `--allow-dirty` is set; dirty pushes get a `-dirty` tag suffix.
+
+Useful options:
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `--project-dir` | Project directory | `--project-dir ./my-app` |
+| `--registry-host` | Registry host override | `--registry-host https://registry.example.com` |
+| `--registry-token` | Registry token, usually provided through `FLUXZERO_REGISTRY_TOKEN` | `--registry-token ...` |
+| `--image-name` | Image name, required unless `FLUXZERO_IMAGE_NAME` is set | `--image-name my-app` |
+| `--image-version` | Image tag override, defaults to a generated git/time-based tag | `--image-version run-123-abc1234` |
+| `--allow-dirty` | Allow publishing uncommitted local changes and mark the tag with `-dirty` | `--allow-dirty` |
+| `--application-id` | Fluxzero application id stored as OCI metadata | `--application-id ...` |
+| `--main-class` | Main class override when the JAR manifest does not expose one | `--main-class com.example.Application` |
+| `--skip-build` | Publish existing `target/classes` and `target/fluxzero-dependencies` output | `--skip-build` |
+
+**`fz init` examples:**
 
 ```bash
 # Interactive mode (prompts for all options)

@@ -15,6 +15,33 @@ class MojoConfigurationTest {
     }
 
     @Test
+    fun testPushImageMetadataParameterExists() {
+        val mojoClass = PushImageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val applicationIdField = fields.find { it.name == "applicationId" }
+        assertNotNull("applicationId parameter should exist for image metadata", applicationIdField)
+    }
+
+    @Test
+    fun testPushImageRegistryHostParameterExists() {
+        val mojoClass = PushImageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val registryHostField = fields.find { it.name == "registryHost" }
+        assertNotNull("registryHost parameter should exist for registry override", registryHostField)
+    }
+
+    @Test
+    fun testPushImageAllowDirtyParameterExists() {
+        val mojoClass = PushImageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val allowDirtyField = fields.find { it.name == "allowDirty" }
+        assertNotNull("allowDirty parameter should exist for intentional dirty publishes", allowDirtyField)
+    }
+
+    @Test
     fun testEnabledParameterExists() {
         val mojoClass = SyncProjectFilesMojo::class.java
         val fields = mojoClass.declaredFields

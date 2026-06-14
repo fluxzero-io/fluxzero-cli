@@ -19,18 +19,29 @@ plugins {
 group = "io.fluxzero.tools"
 
 val mavenPluginMojoDescriptions = mapOf(
-    "sync-project-files" to "Syncs Fluxzero AI agent instruction files for a Maven project."
+    "sync-project-files" to "Syncs Fluxzero AI agent instruction files for a Maven project.",
+    "push-image" to "Builds and pushes a layered Java OCI image to the Fluxzero registry."
 )
 
 val mavenPluginParameterDescriptions = mapOf(
+    "baseImage" to "Java runtime base image for push-image. Property: fluxzero.image.baseImage.",
     "enabled" to "Enable or disable sync-project-files. Property: fluxzero.projectFiles.enabled.",
     "forceUpdate" to "Force project files to be downloaded and rewritten. Property: fluxzero.projectFiles.forceUpdate.",
+    "allowDirty" to "Allow push-image to publish from a dirty git worktree. Property: fluxzero.image.allowDirty.",
+    "applicationId" to "Optional Fluxzero application id stored as OCI image metadata. Property: fluxzero.image.applicationId.",
+    "imageName" to "Required public image name for push-image. Property: fluxzero.image.name.",
+    "imageVersion" to "Image tag for push-image. Defaults to a generated git/time-based tag. Property: fluxzero.image.version.",
+    "mainClass" to "Application main class for push-image. Property: fluxzero.image.mainClass.",
     "overrideLanguage" to "Override language detection with kotlin or java. Property: fluxzero.projectFiles.overrideLanguage.",
     "overrideSdkVersion" to "Override Fluxzero SDK version detection. Property: fluxzero.projectFiles.overrideSdkVersion.",
+    "project" to "Read-only Maven project metadata for push-image.",
     "projectDir" to "Read-only Maven project base directory where Fluxzero project files are synced.",
+    "registryHost" to "Fluxzero registry host for push-image. Defaults to registry.fluxzero.io. Property: fluxzero.image.registryHost.",
+    "registryToken" to "Fluxzero registry token for push-image. Property: fluxzero.image.registryToken.",
     "rootProjectOnly" to "Run only in the Maven execution root. Property: fluxzero.projectFiles.rootProjectOnly.",
     "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
-    "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip."
+    "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip.",
+    "skipImagePush" to "Skip push-image execution. Property: fluxzero.image.skip."
 )
 
 fun Element.firstDirectChild(tagName: String): Element? =
@@ -77,6 +88,9 @@ dependencies {
     // Reuse shared core library (shade into fat JAR, compileOnly to keep out of published POM)
     shade(project(":project-files"))
     compileOnly(project(":project-files"))
+
+    shade(project(":publishing"))
+    compileOnly(project(":publishing"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
@@ -200,7 +214,7 @@ mavenPublishing {
     pom {
         packaging = "maven-plugin"
         name.set("Fluxzero Maven Plugin")
-        description.set("Maven plugin for Fluxzero projects - syncs project files")
+        description.set("Maven plugin for Fluxzero projects - syncs project files and pushes layered Java images")
         url.set("https://fluxzero.io")
         inceptionYear.set("2025")
 

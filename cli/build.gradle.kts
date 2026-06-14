@@ -10,6 +10,7 @@ plugins {
 
 dependencies {
     implementation(project(":templates"))
+    implementation(project(":publishing"))
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
     implementation("org.jline:jline:3.30.4")
 }
@@ -28,6 +29,7 @@ graalvmNative {
                 "--no-fallback",
                 "--install-exit-handlers",
                 "--enable-url-protocols=https",
+                "--enable-native-access=ALL-UNNAMED",
                 "--report-unsupported-elements-at-runtime",
                 "--initialize-at-build-time=kotlin",
                 "--initialize-at-run-time=org.jline",

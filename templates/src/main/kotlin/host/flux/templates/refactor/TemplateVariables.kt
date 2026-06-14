@@ -7,6 +7,7 @@ data class TemplateVariables(
     val projectName: String,
     val groupId: String? = null,
     val artifactId: String? = null,
+    val applicationId: String? = null,
     val description: String? = null,
     val buildSystem: BuildSystem? = null
 ) {
@@ -40,6 +41,7 @@ data class TemplateVariables(
             projectName: String,
             groupId: String? = null,
             artifactId: String? = null,
+            applicationId: String? = null,
             description: String? = null,
             buildSystem: BuildSystem? = null
         ): TemplateVariables {
@@ -48,6 +50,7 @@ data class TemplateVariables(
                 projectName = projectName,
                 groupId = groupId,
                 artifactId = artifactId,
+                applicationId = applicationId,
                 description = description,
                 buildSystem = buildSystem
             )
