@@ -4,6 +4,7 @@ import host.flux.publishing.ImageNameSupport
 import host.flux.publishing.JavaImagePublishSpec
 import host.flux.publishing.JavaImagePublisher
 import org.apache.maven.artifact.Artifact
+import org.apache.maven.execution.MavenSession
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugin.MojoFailureException
@@ -36,6 +37,9 @@ class PushImageMojo : AbstractMojo() {
 
     @Parameter(defaultValue = "\${project}", readonly = true)
     private lateinit var project: MavenProject
+
+    @Parameter(defaultValue = "\${session}", readonly = true)
+    private var session: MavenSession? = null
 
     @Parameter(property = "fluxzero.image.registryHost")
     private var registryHost: String? = null
@@ -98,9 +102,9 @@ class PushImageMojo : AbstractMojo() {
             return
         }
 
-        val resolvedRegistryHost = ImageNameSupport.firstConfigured(registryHost, "FLUXZERO_REGISTRY_HOST")
+        val resolvedRegistryHost = configured("fluxzero.image.registryHost", "FLUXZERO_REGISTRY_HOST", registryHost)
             ?: ImageNameSupport.DEFAULT_REGISTRY_HOST
-        val resolvedToken = ImageNameSupport.firstConfigured(registryToken, "FLUXZERO_REGISTRY_TOKEN")
+        val resolvedToken = configured("fluxzero.image.registryToken", "FLUXZERO_REGISTRY_TOKEN", registryToken)
         if (resolvedRegistryHost.isNullOrBlank()) {
             throw MojoFailureException("Missing registry host. Set -Dfluxzero.image.registryHost or FLUXZERO_REGISTRY_HOST.")
         }
@@ -114,17 +118,17 @@ class PushImageMojo : AbstractMojo() {
             )
         }
 
-        val resolvedImageName = ImageNameSupport.firstConfigured(imageName, "FLUXZERO_IMAGE_NAME")
+        val resolvedImageName = configured("fluxzero.image.name", "FLUXZERO_IMAGE_NAME", imageName)
             ?: throw MojoFailureException(
                 "Missing image name. Configure <imageName> in the fluxzero-maven-plugin, " +
                     "set -Dfluxzero.image.name, or set FLUXZERO_IMAGE_NAME."
             )
         val gitInfo = ImageNameSupport.gitInfo(project.basedir.toPath())
         ensureCleanGitWorktree(gitInfo)
-        val resolvedVersion = ImageNameSupport.firstConfigured(imageVersion, "FLUXZERO_IMAGE_VERSION")
+        val resolvedVersion = configured("fluxzero.image.version", "FLUXZERO_IMAGE_VERSION", imageVersion)
             ?.let { markDirtyImageVersion(it, gitInfo) }
             ?: automaticImageVersion()
-        val resolvedApplicationId = ImageNameSupport.firstConfigured(applicationId, "FLUXZERO_APPLICATION_ID")
+        val resolvedApplicationId = configured("fluxzero.image.applicationId", "FLUXZERO_APPLICATION_ID", applicationId)
         if (!ImageNameSupport.isValidImageName(resolvedImageName)) {
             throw MojoFailureException("Invalid image name '$resolvedImageName'.")
         }
@@ -137,10 +141,10 @@ class PushImageMojo : AbstractMojo() {
             throw MojoFailureException("Project output directory does not exist: ${outputDirectory.absolutePath}. Run package before push-image.")
         }
 
-        val resolvedMainClass = ImageNameSupport.firstConfigured(mainClass, "FLUXZERO_IMAGE_MAIN_CLASS")
+        val resolvedMainClass = configured("fluxzero.image.mainClass", "FLUXZERO_IMAGE_MAIN_CLASS", mainClass)
             ?: mainClassFromManifest(project.artifact?.file)
             ?: throw MojoFailureException("Missing application main class. Set -Dfluxzero.image.mainClass.")
-        val resolvedBaseImage = ImageNameSupport.firstConfigured(baseImage, "FLUXZERO_IMAGE_BASE_IMAGE")
+        val resolvedBaseImage = configured("fluxzero.image.baseImage", "FLUXZERO_IMAGE_BASE_IMAGE", baseImage)
             ?: JavaImagePublishSpec.DEFAULT_BASE_IMAGE
 
         val imageReference = ImageNameSupport.imageReference(resolvedRegistryHost, resolvedImageName, resolvedVersion)
@@ -177,6 +181,9 @@ class PushImageMojo : AbstractMojo() {
             throw MojoFailureException(e.message)
         }
     }
+
+    private fun configured(propertyName: String, environmentVariable: String, configuredValue: String?): String? =
+        MavenParameterSupport.firstConfigured(session?.userProperties, propertyName, environmentVariable, configuredValue)
 
     private fun markDirtyImageVersion(imageVersion: String, gitInfo: ImageNameSupport.GitInfo?): String =
         try {
