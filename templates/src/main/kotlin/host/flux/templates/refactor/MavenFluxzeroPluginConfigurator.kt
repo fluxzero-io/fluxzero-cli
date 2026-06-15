@@ -12,7 +12,7 @@ import org.w3c.dom.Element
 import org.w3c.dom.Node
 
 object MavenFluxzeroPluginConfigurator {
-    private const val DEFAULT_OUTPUT_TIMESTAMP = "1980-01-01T00:00:00Z"
+    private const val DEFAULT_OUTPUT_TIMESTAMP = "2000-01-01T00:00:00Z"
 
     fun configure(templateRoot: Path, variables: TemplateVariables): OperationMessages {
         val messages = OperationMessages()

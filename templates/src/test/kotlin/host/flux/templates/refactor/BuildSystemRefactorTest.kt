@@ -180,7 +180,7 @@ class BuildSystemRefactorTest {
         val pom = Files.readString(tempDir.resolve("pom.xml"))
 
         assertTrue(result.success)
-        assertTrue(pom.contains("<project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>"))
+        assertTrue(pom.contains("<project.build.outputTimestamp>2000-01-01T00:00:00Z</project.build.outputTimestamp>"))
         assertTrue(pom.contains("<packageName>customer-app</packageName>"))
         assertTrue(pom.contains("<applicationId>app-123</applicationId>"))
         assertFalse(pom.contains("registryToken"))
