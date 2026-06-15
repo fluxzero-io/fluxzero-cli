@@ -99,6 +99,9 @@ Custom base images must provide `/usr/bin/java`.
 `javaToolOptions` is written to the package as `JAVA_TOOL_OPTIONS`. If the property is omitted, the plugin uses the
 process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM defaults.
 
+Generated Maven projects set `project.build.outputTimestamp` to `1980-01-01T00:00:00Z` unless the POM already has a
+value. The package publisher also uses deterministic OCI creation and file modification timestamps for Fluxzero layers.
+
 The package contains these labels:
 
 - `org.opencontainers.image.title`

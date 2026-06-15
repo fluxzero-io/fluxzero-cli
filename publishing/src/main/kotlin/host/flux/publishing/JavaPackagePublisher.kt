@@ -3,10 +3,15 @@ package host.flux.publishing
 import com.google.cloud.tools.jib.api.Containerizer
 import com.google.cloud.tools.jib.api.DockerDaemonImage
 import com.google.cloud.tools.jib.api.Jib
+import com.google.cloud.tools.jib.api.JibContainerBuilder
 import com.google.cloud.tools.jib.api.RegistryImage
 import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
+import com.google.cloud.tools.jib.api.buildplan.ContainerBuildPlan
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
+import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
+import kotlin.streams.asSequence
 
 fun interface PackagePublisher {
     fun publish(spec: JavaPackagePublishSpec): PackagePublishResult
@@ -17,10 +22,28 @@ class JavaPackagePublisher : PackagePublisher {
         spec.validate()
 
         val packageReference = PackageNameSupport.packageReference(spec.registryHost, spec.packageName, spec.packageVersion)
+        val builder = createContainerBuilder(spec)
+
+        val targetImage = RegistryImage.named(packageReference)
+            .addCredential("fluxzero", spec.registryToken)
+        val containerizer = Containerizer.to(targetImage)
+            .setToolName(spec.toolName)
+
+        val container = builder.containerize(containerizer)
+        return PackagePublishResult(packageReference, container.digest.toString())
+    }
+
+    internal fun buildPlan(spec: JavaPackagePublishSpec): ContainerBuildPlan {
+        spec.validate()
+        return createContainerBuilder(spec).toContainerBuildPlan()
+    }
+
+    private fun createContainerBuilder(spec: JavaPackagePublishSpec): JibContainerBuilder {
         val builder = when (spec.baseImageSource) {
             BaseImageSource.REGISTRY -> Jib.from(spec.baseImage)
             BaseImageSource.DOCKER_DAEMON -> Jib.from(DockerDaemonImage.named(spec.baseImage))
         }
+            .setCreationTime(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP)
             .setWorkingDirectory(AbsoluteUnixPath.get("/app"))
             .setEntrypoint("/usr/bin/java", "-cp", "/app/classes:/app/libs/*", spec.mainClass)
             .addLabel("org.opencontainers.image.title", spec.packageName)
@@ -40,24 +63,12 @@ class JavaPackagePublisher : PackagePublisher {
 
         addDependencyLayer(builder, "dependencies", spec.releaseDependencies)
         addDependencyLayer(builder, "snapshot-dependencies", spec.snapshotDependencies)
-        builder.addFileEntriesLayer(
-            FileEntriesLayer.builder()
-                .setName("application")
-                .addEntryRecursive(spec.classesDirectory, AbsoluteUnixPath.get("/app/classes"))
-                .build()
-        )
-
-        val targetImage = RegistryImage.named(packageReference)
-            .addCredential("fluxzero", spec.registryToken)
-        val containerizer = Containerizer.to(targetImage)
-            .setToolName(spec.toolName)
-
-        val container = builder.containerize(containerizer)
-        return PackagePublishResult(packageReference, container.digest.toString())
+        addApplicationLayer(builder, spec.classesDirectory)
+        return builder
     }
 
     private fun addDependencyLayer(
-        builder: com.google.cloud.tools.jib.api.JibContainerBuilder,
+        builder: JibContainerBuilder,
         name: String,
         dependencies: List<Path>
     ) {
@@ -66,10 +77,38 @@ class JavaPackagePublisher : PackagePublisher {
         }
         val layerBuilder = FileEntriesLayer.builder().setName(name)
         dependencies.forEach { dependency ->
-            layerBuilder.addEntry(dependency, AbsoluteUnixPath.get("/app/libs/${dependency.fileName}"))
+            layerBuilder.addEntry(
+                dependency,
+                AbsoluteUnixPath.get("/app/libs/${dependency.fileName}"),
+                JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP
+            )
         }
         builder.addFileEntriesLayer(layerBuilder.build())
     }
+
+    private fun addApplicationLayer(
+        builder: JibContainerBuilder,
+        classesDirectory: Path
+    ) {
+        val targetRoot = AbsoluteUnixPath.get("/app/classes")
+        val layerBuilder = FileEntriesLayer.builder().setName("application")
+        Files.walk(classesDirectory).use { paths ->
+            paths.asSequence()
+                .filter { Files.isRegularFile(it) }
+                .sortedBy { normalizedRelativePath(classesDirectory, it) }
+                .forEach { file ->
+                    layerBuilder.addEntry(
+                        file,
+                        targetRoot.resolve(normalizedRelativePath(classesDirectory, file)),
+                        JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP
+                    )
+                }
+        }
+        builder.addFileEntriesLayer(layerBuilder.build())
+    }
+
+    private fun normalizedRelativePath(root: Path, file: Path): String =
+        root.relativize(file).joinToString("/")
 }
 
 enum class BaseImageSource {
@@ -105,6 +144,9 @@ data class JavaPackagePublishSpec(
     val toolName: String = "fluxzero-publishing"
 ) {
     companion object {
+        val REPRODUCIBLE_CONTAINER_TIMESTAMP: Instant = Instant.EPOCH
+        val REPRODUCIBLE_FILE_TIMESTAMP: Instant = Instant.EPOCH
+
         const val DEFAULT_BASE_IMAGE =
             "gcr.io/distroless/java25-debian13:nonroot@sha256:f25ab728deeafec63d7176a473536f4f4347d42db7e24b3bb0fb7b05ff84d248"
 

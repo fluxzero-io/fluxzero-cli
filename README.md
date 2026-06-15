@@ -159,6 +159,9 @@ base images must provide `/usr/bin/java`.
 `--java-tool-options` is written to the package as `JAVA_TOOL_OPTIONS`. If the option is omitted, `fz publish` uses the
 process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM defaults.
 
+Generated Maven projects set `project.build.outputTimestamp` to a fixed ZIP-safe timestamp. The publisher also writes
+deterministic OCI creation and file modification timestamps so unchanged layers are more likely to keep the same digest.
+
 **`fz init` examples:**
 
 ```bash
