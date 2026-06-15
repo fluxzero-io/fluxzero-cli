@@ -8,12 +8,11 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.tag_version.outputs.new_tag }}
     steps:
@@ -21,13 +20,29 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Bump version and push tag
-        uses: mathieudutour/github-tag-action@v6.2
         id: tag_version
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release_branches: main
-          default_bump: patch
-          tag_prefix: ""
+        shell: bash
+        run: |
+          git fetch --tags --force
+
+          latest_tag="$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
+          if [ -z "$latest_tag" ]; then
+            new_tag="0.0.1"
+          else
+            IFS=. read -r major minor patch <<< "$latest_tag"
+            new_tag="${major}.${minor}.$((patch + 1))"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${new_tag}" >/dev/null; then
+            echo "Tag ${new_tag} already exists" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$new_tag"
+          git push origin "refs/tags/${new_tag}"
+          echo "new_tag=${new_tag}" >> "$GITHUB_OUTPUT"
 
   build-and-test:
     runs-on: ubuntu-latest
