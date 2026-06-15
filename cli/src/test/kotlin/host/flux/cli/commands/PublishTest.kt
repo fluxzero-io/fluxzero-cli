@@ -1,10 +1,12 @@
 package host.flux.cli.commands
 
 import com.github.ajalt.clikt.testing.test
-import host.flux.publishing.ImagePublisher
-import host.flux.publishing.ImagePublishResult
-import host.flux.publishing.JavaImagePublishSpec
+import host.flux.publishing.BaseImageSource
+import host.flux.publishing.PackagePublisher
+import host.flux.publishing.PackagePublishResult
+import host.flux.publishing.JavaPackagePublishSpec
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
@@ -33,8 +35,8 @@ class PublishTest {
                 "--project-dir", projectDir.toString(),
                 "--skip-build",
                 "--registry-token", "test-token",
-                "--image-name", "demo-app",
-                "--image-version", "1.0.0",
+                "--package-name", "demo-app",
+                "--package-version", "1.0.0",
                 "--application-id", "app-123"
             )
         )
@@ -42,15 +44,99 @@ class PublishTest {
         val spec = publisher.spec ?: error("Expected publish spec")
         assertEquals("registry.fluxzero.io", spec.registryHost)
         assertEquals("test-token", spec.registryToken)
-        assertEquals("demo-app", spec.imageName)
-        assertEquals("1.0.0", spec.imageVersion)
+        assertEquals("demo-app", spec.packageName)
+        assertEquals("1.0.0", spec.packageVersion)
         assertEquals("app-123", spec.applicationId)
         assertEquals("com.example.Application", spec.mainClass)
+        assertEquals(JavaPackagePublishSpec.DEFAULT_BASE_IMAGE, spec.baseImage)
+        assertEquals(BaseImageSource.REGISTRY, spec.baseImageSource)
+        val expectedJavaToolOptions = System.getenv("JAVA_TOOL_OPTIONS") ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
+        assertEquals(expectedJavaToolOptions, spec.javaToolOptions)
         assertEquals(projectDir.resolve("target/classes"), spec.classesDirectory)
         assertEquals(listOf(projectDir.resolve("target/fluxzero-dependencies/commons-lang3-3.14.0.jar")), spec.releaseDependencies)
         assertEquals("com.example", spec.labels["io.fluxzero.maven.group-id"])
         assertEquals("demo-app", spec.labels["io.fluxzero.maven.artifact-id"])
         assertTrue(result.stdout.contains("Published registry.fluxzero.io/demo-app:1.0.0"))
+    }
+
+    @Test
+    fun `publishes Maven project with docker daemon base image source`() {
+        val projectDir = Files.createTempDirectory("fluxzero-cli-publish-local-base")
+        writePom(projectDir)
+        Files.createDirectories(projectDir.resolve("target/classes"))
+        Files.writeString(projectDir.resolve("target/classes/App.class"), "compiled")
+        writeJarWithManifest(projectDir.resolve("target/demo-app-1.0.0.jar"))
+
+        val publisher = CapturingPublisher()
+        val command = Publish(publisher = publisher, processRunner = NoopProcessRunner)
+
+        command.test(
+            listOf(
+                "--project-dir", projectDir.toString(),
+                "--skip-build",
+                "--registry-token", "test-token",
+                "--package-name", "demo-app",
+                "--package-version", "1.0.0",
+                "--base-image", "local-base:dev",
+                "--base-image-source", "docker-daemon"
+            )
+        )
+
+        val spec = publisher.spec ?: error("Expected publish spec")
+        assertEquals("local-base:dev", spec.baseImage)
+        assertEquals(BaseImageSource.DOCKER_DAEMON, spec.baseImageSource)
+    }
+
+    @Test
+    fun `publishes Maven project with custom Java tool options`() {
+        val projectDir = Files.createTempDirectory("fluxzero-cli-publish-java-tool-options")
+        writePom(projectDir)
+        Files.createDirectories(projectDir.resolve("target/classes"))
+        Files.writeString(projectDir.resolve("target/classes/App.class"), "compiled")
+        writeJarWithManifest(projectDir.resolve("target/demo-app-1.0.0.jar"))
+
+        val publisher = CapturingPublisher()
+        val command = Publish(publisher = publisher, processRunner = NoopProcessRunner)
+
+        command.test(
+            listOf(
+                "--project-dir", projectDir.toString(),
+                "--skip-build",
+                "--registry-token", "test-token",
+                "--package-name", "demo-app",
+                "--package-version", "1.0.0",
+                "--java-tool-options", ""
+            )
+        )
+
+        val spec = publisher.spec ?: error("Expected publish spec")
+        assertEquals("", spec.javaToolOptions)
+    }
+
+    @Test
+    fun `rejects docker daemon base image source without explicit base image`() {
+        val projectDir = Files.createTempDirectory("fluxzero-cli-publish-local-base-missing")
+        writePom(projectDir)
+        Files.createDirectories(projectDir.resolve("target/classes"))
+        Files.writeString(projectDir.resolve("target/classes/App.class"), "compiled")
+        writeJarWithManifest(projectDir.resolve("target/demo-app-1.0.0.jar"))
+
+        val command = Publish(publisher = CapturingPublisher(), processRunner = NoopProcessRunner)
+
+        val exception = assertThrows(IllegalStateException::class.java) {
+            command.test(
+                listOf(
+                    "--project-dir", projectDir.toString(),
+                    "--skip-build",
+                    "--registry-token", "test-token",
+                    "--package-name", "demo-app",
+                    "--package-version", "1.0.0",
+                    "--base-image-source", "docker-daemon"
+                )
+            )
+        }
+
+        assertTrue(exception.message?.contains("Set --base-image") == true)
     }
 
     private fun writePom(projectDir: Path) {
@@ -76,12 +162,12 @@ class PublishTest {
         Files.write(jar, outputStream.toByteArray())
     }
 
-    private class CapturingPublisher : ImagePublisher {
-        var spec: JavaImagePublishSpec? = null
+    private class CapturingPublisher : PackagePublisher {
+        var spec: JavaPackagePublishSpec? = null
 
-        override fun publish(spec: JavaImagePublishSpec): ImagePublishResult {
+        override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
             this.spec = spec
-            return ImagePublishResult("registry.fluxzero.io/demo-app:1.0.0", "sha256:test")
+            return PackagePublishResult("registry.fluxzero.io/demo-app:1.0.0", "sha256:test")
         }
     }
 

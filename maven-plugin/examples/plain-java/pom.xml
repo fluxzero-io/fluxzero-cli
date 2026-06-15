@@ -53,7 +53,7 @@
         <artifactId>fluxzero-maven-plugin</artifactId>
         <version>${fluxzero.maven.plugin.version}</version>
         <configuration>
-          <imageName>plain-java</imageName>
+          <packageName>plain-java</packageName>
           <applicationId>local-plain-app</applicationId>
         </configuration>
       </plugin>

@@ -1,32 +1,33 @@
 package host.flux.publishing
 
 import com.google.cloud.tools.jib.api.Containerizer
+import com.google.cloud.tools.jib.api.DockerDaemonImage
 import com.google.cloud.tools.jib.api.Jib
 import com.google.cloud.tools.jib.api.RegistryImage
 import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
 import java.nio.file.Path
 
-fun interface ImagePublisher {
-    fun publish(spec: JavaImagePublishSpec): ImagePublishResult
+fun interface PackagePublisher {
+    fun publish(spec: JavaPackagePublishSpec): PackagePublishResult
 }
 
-class JavaImagePublisher : ImagePublisher {
-    override fun publish(spec: JavaImagePublishSpec): ImagePublishResult {
+class JavaPackagePublisher : PackagePublisher {
+    override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
         spec.validate()
 
-        val imageReference = ImageNameSupport.imageReference(spec.registryHost, spec.imageName, spec.imageVersion)
-        val builder = Jib.from(spec.baseImage)
+        val packageReference = PackageNameSupport.packageReference(spec.registryHost, spec.packageName, spec.packageVersion)
+        val builder = when (spec.baseImageSource) {
+            BaseImageSource.REGISTRY -> Jib.from(spec.baseImage)
+            BaseImageSource.DOCKER_DAEMON -> Jib.from(DockerDaemonImage.named(spec.baseImage))
+        }
             .setWorkingDirectory(AbsoluteUnixPath.get("/app"))
             .setEntrypoint("/usr/bin/java", "-cp", "/app/classes:/app/libs/*", spec.mainClass)
-            .addEnvironmentVariable(
-                "JAVA_TOOL_OPTIONS",
-                "-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom " +
-                    "-XX:+ExitOnOutOfMemoryError -XX:SoftRefLRUPolicyMSPerMB=2500"
-            )
-            .addLabel("org.opencontainers.image.title", spec.imageName)
-            .addLabel("org.opencontainers.image.version", spec.imageVersion)
-            .addLabel("io.fluxzero.image.metadata-version", "1")
+            .addLabel("org.opencontainers.image.title", spec.packageName)
+            .addLabel("org.opencontainers.image.version", spec.packageVersion)
+            .addLabel("io.fluxzero.package.metadata-version", "1")
+
+        builder.addEnvironmentVariable("JAVA_TOOL_OPTIONS", spec.javaToolOptions)
 
         spec.applicationId?.takeIf { it.isNotBlank() }?.let {
             builder.addLabel("io.fluxzero.application-id", it)
@@ -46,13 +47,13 @@ class JavaImagePublisher : ImagePublisher {
                 .build()
         )
 
-        val targetImage = RegistryImage.named(imageReference)
+        val targetImage = RegistryImage.named(packageReference)
             .addCredential("fluxzero", spec.registryToken)
         val containerizer = Containerizer.to(targetImage)
             .setToolName(spec.toolName)
 
         val container = builder.containerize(containerizer)
-        return ImagePublishResult(imageReference, container.digest.toString())
+        return PackagePublishResult(packageReference, container.digest.toString())
     }
 
     private fun addDependencyLayer(
@@ -71,14 +72,32 @@ class JavaImagePublisher : ImagePublisher {
     }
 }
 
-data class JavaImagePublishSpec(
-    val registryHost: String = ImageNameSupport.DEFAULT_REGISTRY_HOST,
+enum class BaseImageSource {
+    REGISTRY,
+    DOCKER_DAEMON;
+
+    companion object {
+        fun parse(value: String): BaseImageSource =
+            when (value.trim().lowercase().replace("_", "-")) {
+                "registry" -> REGISTRY
+                "docker-daemon", "docker" -> DOCKER_DAEMON
+                else -> throw IllegalArgumentException(
+                    "Invalid base image source '$value'. Expected 'registry' or 'docker-daemon'."
+                )
+            }
+    }
+}
+
+data class JavaPackagePublishSpec(
+    val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
     val registryToken: String,
-    val imageName: String,
-    val imageVersion: String,
+    val packageName: String,
+    val packageVersion: String,
     val applicationId: String? = null,
     val mainClass: String,
     val baseImage: String = DEFAULT_BASE_IMAGE,
+    val baseImageSource: BaseImageSource = BaseImageSource.REGISTRY,
+    val javaToolOptions: String = DEFAULT_JAVA_TOOL_OPTIONS,
     val classesDirectory: Path,
     val releaseDependencies: List<Path> = emptyList(),
     val snapshotDependencies: List<Path> = emptyList(),
@@ -88,25 +107,29 @@ data class JavaImagePublishSpec(
     companion object {
         const val DEFAULT_BASE_IMAGE =
             "gcr.io/distroless/java25-debian13:nonroot@sha256:f25ab728deeafec63d7176a473536f4f4347d42db7e24b3bb0fb7b05ff84d248"
+
+        const val DEFAULT_JAVA_TOOL_OPTIONS =
+            "-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -XX:+ExitOnOutOfMemoryError -XX:SoftRefLRUPolicyMSPerMB=2500"
     }
 
     fun validate() {
         require(registryHost.isNotBlank()) { "Missing registry host." }
         require(registryToken.isNotBlank()) { "Missing registry token." }
-        require(!ImageNameSupport.isPlainHttpRegistryHost(registryHost)) {
-            "Fluxzero image registry host must use HTTPS when a registry token is sent. " +
+        require(!PackageNameSupport.isPlainHttpRegistryHost(registryHost)) {
+            "Fluxzero registry host must use HTTPS when a registry token is sent. " +
                 "Use an https:// registry host or the local TLS proxy for end-to-end tests."
         }
-        require(ImageNameSupport.isValidImageName(imageName)) { "Invalid image name '$imageName'." }
-        require(ImageNameSupport.isValidTag(imageVersion)) { "Invalid image version '$imageVersion'." }
+        require(PackageNameSupport.isValidPackageName(packageName)) { "Invalid package name '$packageName'." }
+        require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }
         require(mainClass.isNotBlank()) { "Missing application main class." }
+        require(baseImage.isNotBlank()) { "Missing Java runtime base image." }
         require(classesDirectory.toFile().isDirectory) {
             "Project output directory does not exist: ${classesDirectory.toAbsolutePath()}."
         }
     }
 }
 
-data class ImagePublishResult(
-    val imageReference: String,
+data class PackagePublishResult(
+    val packageReference: String,
     val digest: String
 )

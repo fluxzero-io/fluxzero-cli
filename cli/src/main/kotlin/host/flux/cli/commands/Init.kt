@@ -49,7 +49,7 @@ class Init(
 
     val artifactId by option("--artifact-id", help = "Maven/Gradle artifact ID (defaults to project name)")
 
-    val applicationId by option("--application-id", help = "Fluxzero application ID to configure for image publishing")
+    val applicationId by option("--application-id", help = "Fluxzero application ID to configure for package publishing")
 
     val description by option("--description", help = "Project description (defaults to 'A Flux application')")
 

@@ -6,11 +6,12 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
-import host.flux.publishing.ImageNameSupport
-import host.flux.publishing.ImagePublisher
-import host.flux.publishing.ImagePublishResult
-import host.flux.publishing.JavaImagePublishSpec
-import host.flux.publishing.JavaImagePublisher
+import host.flux.publishing.BaseImageSource
+import host.flux.publishing.PackageNameSupport
+import host.flux.publishing.PackagePublisher
+import host.flux.publishing.PackagePublishResult
+import host.flux.publishing.JavaPackagePublishSpec
+import host.flux.publishing.JavaPackagePublisher
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -21,12 +22,12 @@ import kotlin.streams.asSequence
 import org.w3c.dom.Element
 
 class Publish(
-    private val publisher: ImagePublisher = JavaImagePublisher(),
+    private val publisher: PackagePublisher = JavaPackagePublisher(),
     private val processRunner: ProcessRunner = DefaultProcessRunner()
 ) : CliktCommand() {
 
     override fun help(context: Context): String =
-        "Build and publish a Fluxzero Java application image"
+        "Build and publish a Fluxzero Java application package"
 
     private val projectDir by option(
         "--project-dir",
@@ -46,9 +47,9 @@ class Publish(
         help = "Fluxzero registry token. Can also be set with FLUXZERO_REGISTRY_TOKEN."
     )
 
-    private val imageName by option("--image-name", help = "Image name. Required unless FLUXZERO_IMAGE_NAME is set.")
+    private val packageName by option("--package-name", help = "Package name. Required unless FLUXZERO_PACKAGE_NAME is set.")
 
-    private val imageVersion by option("--image-version", help = "Image tag. Defaults to a generated git/time-based tag.")
+    private val packageVersion by option("--package-version", help = "Package version. Defaults to a generated git/time-based tag.")
 
     private val allowDirty by option(
         "--allow-dirty",
@@ -57,7 +58,7 @@ class Publish(
 
     private val applicationId by option(
         "--application-id",
-        help = "Optional Fluxzero application id stored as image metadata."
+        help = "Optional Fluxzero application id stored as package metadata."
     )
 
     private val mainClass by option(
@@ -66,6 +67,16 @@ class Publish(
     )
 
     private val baseImage by option("--base-image", help = "Java runtime base image override.")
+
+    private val baseImageSource by option(
+        "--base-image-source",
+        help = "Where to read the base image from: registry or docker-daemon."
+    )
+
+    private val javaToolOptions by option(
+        "--java-tool-options",
+        help = "Value for JAVA_TOOL_OPTIONS. Defaults to the process JAVA_TOOL_OPTIONS or Fluxzero JVM options."
+    )
 
     private val skipBuild by option(
         "--skip-build",
@@ -96,32 +107,42 @@ class Publish(
         }
 
         val classesDirectory = root.resolve("target/classes")
-        val resolvedRegistryHost = ImageNameSupport.firstConfigured(registryHost, "FLUXZERO_REGISTRY_HOST")
-            ?: ImageNameSupport.DEFAULT_REGISTRY_HOST
-        val resolvedRegistryToken = ImageNameSupport.firstConfigured(registryToken, "FLUXZERO_REGISTRY_TOKEN")
+        val resolvedRegistryHost = PackageNameSupport.firstConfigured(registryHost, "FLUXZERO_REGISTRY_HOST")
+            ?: PackageNameSupport.DEFAULT_REGISTRY_HOST
+        val resolvedRegistryToken = PackageNameSupport.firstConfigured(registryToken, "FLUXZERO_REGISTRY_TOKEN")
             ?: throw IllegalStateException("Missing registry token. Set --registry-token or FLUXZERO_REGISTRY_TOKEN.")
-        val resolvedImageName = ImageNameSupport.firstConfigured(imageName, "FLUXZERO_IMAGE_NAME")
-            ?: throw IllegalStateException("Missing image name. Set --image-name or FLUXZERO_IMAGE_NAME.")
-        val gitInfo = ImageNameSupport.gitInfo(root)
-        ImageNameSupport.ensureCleanGitWorktree(gitInfo, allowDirty)
-        val resolvedImageVersion = ImageNameSupport.firstConfigured(imageVersion, "FLUXZERO_IMAGE_VERSION")
-            ?.let { ImageNameSupport.markDirtyImageVersion(it, gitInfo, allowDirty) }
-            ?: ImageNameSupport.automaticImageVersion(Clock.systemUTC(), gitInfo, allowDirty = allowDirty)
-        val resolvedApplicationId = ImageNameSupport.firstConfigured(applicationId, "FLUXZERO_APPLICATION_ID")
-        val resolvedMainClass = ImageNameSupport.firstConfigured(mainClass, "FLUXZERO_IMAGE_MAIN_CLASS")
+        val resolvedPackageName = PackageNameSupport.firstConfigured(packageName, "FLUXZERO_PACKAGE_NAME")
+            ?: throw IllegalStateException("Missing package name. Set --package-name or FLUXZERO_PACKAGE_NAME.")
+        val gitInfo = PackageNameSupport.gitInfo(root)
+        PackageNameSupport.ensureCleanGitWorktree(gitInfo, allowDirty)
+        val resolvedPackageVersion = PackageNameSupport.firstConfigured(packageVersion, "FLUXZERO_PACKAGE_VERSION")
+            ?.let { PackageNameSupport.markDirtyPackageVersion(it, gitInfo, allowDirty) }
+            ?: PackageNameSupport.automaticPackageVersion(Clock.systemUTC(), gitInfo, allowDirty = allowDirty)
+        val resolvedApplicationId = PackageNameSupport.firstConfigured(applicationId, "FLUXZERO_PACKAGE_ID")
+        val resolvedMainClass = PackageNameSupport.firstConfigured(mainClass, "FLUXZERO_MAIN_CLASS")
             ?: mainClassFromBuiltArtifact(root.resolve("target"), project)
-            ?: throw IllegalStateException("Missing application main class. Set --main-class or FLUXZERO_IMAGE_MAIN_CLASS.")
-        val resolvedBaseImage = ImageNameSupport.firstConfigured(baseImage, "FLUXZERO_IMAGE_BASE_IMAGE")
-            ?: JavaImagePublishSpec.DEFAULT_BASE_IMAGE
+            ?: throw IllegalStateException("Missing application main class. Set --main-class or FLUXZERO_MAIN_CLASS.")
+        val configuredBaseImage = PackageNameSupport.firstConfigured(baseImage, "FLUXZERO_BASE_IMAGE")
+        val resolvedBaseImage = configuredBaseImage ?: JavaPackagePublishSpec.DEFAULT_BASE_IMAGE
+        val resolvedBaseImageSource = PackageNameSupport.firstConfigured(baseImageSource, "FLUXZERO_BASE_IMAGE_SOURCE")
+            ?.let(BaseImageSource::parse)
+            ?: BaseImageSource.REGISTRY
+        if (resolvedBaseImageSource == BaseImageSource.DOCKER_DAEMON && configuredBaseImage == null) {
+            throw IllegalStateException("Set --base-image or FLUXZERO_BASE_IMAGE when --base-image-source is docker-daemon.")
+        }
+        val resolvedJavaToolOptions = PackageNameSupport.firstConfiguredValue(javaToolOptions, "JAVA_TOOL_OPTIONS")
+            ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
 
-        val spec = JavaImagePublishSpec(
+        val spec = JavaPackagePublishSpec(
             registryHost = resolvedRegistryHost,
             registryToken = resolvedRegistryToken,
-            imageName = resolvedImageName,
-            imageVersion = resolvedImageVersion,
+            packageName = resolvedPackageName,
+            packageVersion = resolvedPackageVersion,
             applicationId = resolvedApplicationId,
             mainClass = resolvedMainClass,
             baseImage = resolvedBaseImage,
+            baseImageSource = resolvedBaseImageSource,
+            javaToolOptions = resolvedJavaToolOptions,
             classesDirectory = classesDirectory,
             releaseDependencies = runtimeDependencies(dependenciesDirectory, snapshot = false),
             snapshotDependencies = runtimeDependencies(dependenciesDirectory, snapshot = true),
@@ -134,9 +155,9 @@ class Publish(
         )
         spec.validate()
 
-        echo("Publishing ${ImageNameSupport.imageReference(resolvedRegistryHost, resolvedImageName, resolvedImageVersion)}...")
+        echo("Publishing ${PackageNameSupport.packageReference(resolvedRegistryHost, resolvedPackageName, resolvedPackageVersion)}...")
         val result = publisher.publish(spec)
-        echo("Published ${result.imageReference}")
+        echo("Published ${result.packageReference}")
         echo("Digest: ${result.digest}")
     }
 
@@ -183,7 +204,7 @@ class Publish(
                 .toList()
         }
         return jars.firstNotNullOfOrNull { jar ->
-            JarFile(jar.toFile()).use { ImageNameSupport.mainClassFromManifest(it.manifest?.mainAttributes) }
+            JarFile(jar.toFile()).use { PackageNameSupport.mainClassFromManifest(it.manifest?.mainAttributes) }
         }
     }
 }

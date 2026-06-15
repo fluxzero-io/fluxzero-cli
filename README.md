@@ -87,7 +87,7 @@ fz init my-project
 # List available templates
 fz templates list
 
-# Build and publish the current Maven project as a Fluxzero image
+# Build and publish the current Maven project as a Fluxzero package
 FLUXZERO_REGISTRY_TOKEN=... fz publish
 
 # Show version
@@ -117,22 +117,22 @@ fz init [OPTIONS]
 | `--package` | Java package name | `--package com.example.myapp` |
 | `--group-id` | Maven/Gradle group ID | `--group-id com.example` |
 | `--artifact-id` | Maven/Gradle artifact ID | `--artifact-id my-app` |
-| `--application-id` | Fluxzero application ID to configure for image publishing | `--application-id app-...` |
+| `--application-id` | Fluxzero application ID to configure for package publishing | `--application-id app-...` |
 | `--description` | Project description | `--description "My application"` |
 | `--build` | Build system (`maven` or `gradle`) | `--build gradle` |
 | `--git` | Initialize Git repository | `--git` |
 
-#### `fz publish` - Build and publish a Java application image
+#### `fz publish` - Build and publish a Java application package
 
 `fz publish` currently supports Maven Java projects. It runs Maven to build the project and collect runtime
-dependencies, then uses the shared Fluxzero publisher to build and push a layered Java OCI image. The registry host
+dependencies, then uses the shared Fluxzero publisher to build and publish a layered Java OCI package. The registry host
 defaults to `registry.fluxzero.io`; override it only for local development or non-standard environments.
 
 ```bash
-FLUXZERO_REGISTRY_TOKEN=... fz publish --image-name my-app
+FLUXZERO_REGISTRY_TOKEN=... fz publish --package-name my-app
 ```
 
-When no image tag is configured, `fz publish` generates one from git branch, UTC timestamp, and commit SHA. Dirty
+When no package version is configured, `fz publish` generates one from git branch, UTC timestamp, and commit SHA. Dirty
 worktrees are refused unless `--allow-dirty` is set; dirty pushes get a `-dirty` tag suffix.
 
 Useful options:
@@ -142,12 +142,22 @@ Useful options:
 | `--project-dir` | Project directory | `--project-dir ./my-app` |
 | `--registry-host` | Registry host override | `--registry-host https://registry.example.com` |
 | `--registry-token` | Registry token, usually provided through `FLUXZERO_REGISTRY_TOKEN` | `--registry-token ...` |
-| `--image-name` | Image name, required unless `FLUXZERO_IMAGE_NAME` is set | `--image-name my-app` |
-| `--image-version` | Image tag override, defaults to a generated git/time-based tag | `--image-version run-123-abc1234` |
+| `--package-name` | Package name, required unless `FLUXZERO_PACKAGE_NAME` is set | `--package-name my-app` |
+| `--package-version` | Package version override, defaults to a generated git/time-based tag | `--package-version run-123-abc1234` |
 | `--allow-dirty` | Allow publishing uncommitted local changes and mark the tag with `-dirty` | `--allow-dirty` |
 | `--application-id` | Fluxzero application id stored as OCI metadata | `--application-id ...` |
 | `--main-class` | Main class override when the JAR manifest does not expose one | `--main-class com.example.Application` |
+| `--base-image` | Java runtime base image override | `--base-image eclipse-temurin:21-jre` |
+| `--base-image-source` | Base image source: `registry` or `docker-daemon` | `--base-image-source docker-daemon` |
+| `--java-tool-options` | Value for `JAVA_TOOL_OPTIONS`; defaults to the process env var or Fluxzero JVM defaults | `--java-tool-options "-Xmx2g"` |
 | `--skip-build` | Publish existing `target/classes` and `target/fluxzero-dependencies` output | `--skip-build` |
+
+If a custom Dockerfile is needed, build it before `fz publish`, tag it as a base image, and pass that tag with
+`--base-image`. Use `--base-image-source docker-daemon` when that tag only exists in the local Docker daemon. Custom
+base images must provide `/usr/bin/java`.
+
+`--java-tool-options` is written to the package as `JAVA_TOOL_OPTIONS`. If the option is omitted, `fz publish` uses the
+process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM defaults.
 
 **`fz init` examples:**
 

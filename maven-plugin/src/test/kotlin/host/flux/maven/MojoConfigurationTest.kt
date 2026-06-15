@@ -15,17 +15,17 @@ class MojoConfigurationTest {
     }
 
     @Test
-    fun testPushImageMetadataParameterExists() {
-        val mojoClass = PushImageMojo::class.java
+    fun testPublishPackageMetadataParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
 
         val applicationIdField = fields.find { it.name == "applicationId" }
-        assertNotNull("applicationId parameter should exist for image metadata", applicationIdField)
+        assertNotNull("applicationId parameter should exist for package metadata", applicationIdField)
     }
 
     @Test
-    fun testPushImageRegistryHostParameterExists() {
-        val mojoClass = PushImageMojo::class.java
+    fun testPublishPackageRegistryHostParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
 
         val registryHostField = fields.find { it.name == "registryHost" }
@@ -33,8 +33,26 @@ class MojoConfigurationTest {
     }
 
     @Test
-    fun testPushImageAllowDirtyParameterExists() {
-        val mojoClass = PushImageMojo::class.java
+    fun testPublishPackageBaseImageSourceParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val baseImageSourceField = fields.find { it.name == "baseImageSource" }
+        assertNotNull("baseImageSource parameter should exist for local base image builds", baseImageSourceField)
+    }
+
+    @Test
+    fun testPublishPackageJavaToolOptionsParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val javaToolOptionsField = fields.find { it.name == "javaToolOptions" }
+        assertNotNull("javaToolOptions parameter should exist for JVM option overrides", javaToolOptionsField)
+    }
+
+    @Test
+    fun testPublishPackageAllowDirtyParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
 
         val allowDirtyField = fields.find { it.name == "allowDirty" }

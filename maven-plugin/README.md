@@ -1,11 +1,11 @@
 # Fluxzero Maven Plugin
 
-Maven plugin for Fluxzero project setup and Java image publishing.
+Maven plugin for Fluxzero project setup and Java package publishing.
 
 ## Goals
 
 - `sync-project-files`: updates `.fluxzero/agents/` for the project's Fluxzero SDK version.
-- `push-image`: builds and pushes a Java OCI image from Maven output.
+- `publish-package`: builds and publishes a Java OCI package from Maven output.
 
 ## Quick Start
 
@@ -54,21 +54,21 @@ mvn fluxzero:sync-project-files
 | `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected |
 | `skip` | `fluxzero.projectFiles.skip` | `false` |
 
-### `push-image`
+### `publish-package`
 
-`push-image` builds and pushes a Java OCI image from compiled classes and Maven runtime dependency artifacts.
+`publish-package` builds and publishes a Java OCI package from compiled classes and Maven runtime dependency artifacts.
 
 ```bash
-mvn -B package fluxzero:push-image \
-  -Dfluxzero.image.registryToken="$FLUXZERO_REGISTRY_TOKEN" \
-  -Dfluxzero.image.name="my-service"
+mvn -B package fluxzero:publish-package \
+  -Dfluxzero.package.registryToken="$FLUXZERO_REGISTRY_TOKEN" \
+  -Dfluxzero.package.name="my-service"
 ```
 
-Generated Fluxzero projects put stable image settings in the POM:
+Generated Fluxzero projects put stable package settings in the POM:
 
 ```xml
 <configuration>
-  <imageName>my-service</imageName>
+  <packageName>my-service</packageName>
   <applicationId>...</applicationId>
 </configuration>
 ```
@@ -77,27 +77,36 @@ Keep registry tokens and user credentials out of the POM.
 
 | Setting | Command-line property | Environment fallback | Default |
 |---------|-----------------------|----------------------|---------|
-| Registry host | `fluxzero.image.registryHost` | `FLUXZERO_REGISTRY_HOST` | `registry.fluxzero.io` |
-| Registry token | `fluxzero.image.registryToken` | `FLUXZERO_REGISTRY_TOKEN` | required |
-| Image name | `fluxzero.image.name` | `FLUXZERO_IMAGE_NAME` | required |
-| Image tag | `fluxzero.image.version` | `FLUXZERO_IMAGE_VERSION` | generated git/time-based tag |
-| Allow dirty worktree | `fluxzero.image.allowDirty` | — | `false` |
-| Application id | `fluxzero.image.applicationId` | `FLUXZERO_APPLICATION_ID` | omitted |
-| Main class | `fluxzero.image.mainClass` | `FLUXZERO_IMAGE_MAIN_CLASS` | `Start-Class` or `Main-Class` from built artifact manifest |
-| Base image | `fluxzero.image.baseImage` | `FLUXZERO_IMAGE_BASE_IMAGE` | Fluxzero Java distroless runtime |
-| Skip push | `fluxzero.image.skip` | — | `false` |
+| Registry host | `fluxzero.package.registryHost` | `FLUXZERO_REGISTRY_HOST` | `registry.fluxzero.io` |
+| Registry token | `fluxzero.package.registryToken` | `FLUXZERO_REGISTRY_TOKEN` | required |
+| Package name | `fluxzero.package.name` | `FLUXZERO_PACKAGE_NAME` | required |
+| Package version | `fluxzero.package.version` | `FLUXZERO_PACKAGE_VERSION` | generated git/time-based tag |
+| Allow dirty worktree | `fluxzero.package.allowDirty` | — | `false` |
+| Application id | `fluxzero.package.applicationId` | `FLUXZERO_PACKAGE_ID` | omitted |
+| Main class | `fluxzero.package.mainClass` | `FLUXZERO_MAIN_CLASS` | `Start-Class` or `Main-Class` from built artifact manifest |
+| Base image | `fluxzero.package.baseImage` | `FLUXZERO_BASE_IMAGE` | Fluxzero Java distroless runtime |
+| Base image source | `fluxzero.package.baseImageSource` | `FLUXZERO_BASE_IMAGE_SOURCE` | `registry` |
+| Skip publish | `fluxzero.package.skip` | — | `false` |
+| Java tool options | `fluxzero.package.javaToolOptions` | `JAVA_TOOL_OPTIONS` | process env var, then Fluxzero JVM defaults |
 
-The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.image.allowDirty=true` for local experiments; dirty
+The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.package.allowDirty=true` for local experiments; dirty
 pushes get a `-dirty` tag suffix.
 
-The image contains these labels:
+Use `baseImage` for a different Java runtime image. If that image was built locally in the Docker daemon during the
+same build, also set `baseImageSource` to `docker-daemon`; otherwise the plugin reads the base image from a registry.
+Custom base images must provide `/usr/bin/java`.
+
+`javaToolOptions` is written to the package as `JAVA_TOOL_OPTIONS`. If the property is omitted, the plugin uses the
+process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM defaults.
+
+The package contains these labels:
 
 - `org.opencontainers.image.title`
 - `org.opencontainers.image.version`
 - `io.fluxzero.maven.group-id`
 - `io.fluxzero.maven.artifact-id`
 - `io.fluxzero.maven.version`
-- `io.fluxzero.image.metadata-version`
+- `io.fluxzero.package.metadata-version`
 - `io.fluxzero.application-id`, when configured
 
 ## Local OCI Registry Test Chain
@@ -116,15 +125,15 @@ In another terminal:
 export MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/.local-registry/certs/truststore-with-defaults.jks -Djavax.net.ssl.trustStorePassword=changeit"
 export FLUXZERO_REGISTRY_HOST="https://127.0.0.1:8443"
 export FLUXZERO_REGISTRY_TOKEN="$(node maven-plugin/local-registry/generate-token.js team-a plain-java)"
-export FLUXZERO_IMAGE_VERSION="local-dev"
+export FLUXZERO_PACKAGE_VERSION="local-dev"
 
-mvn -B -f maven-plugin/examples/plain-java/pom.xml package fluxzero:push-image
+mvn -B -f maven-plugin/examples/plain-java/pom.xml package fluxzero:publish-package
 ```
 
-If the checkout has uncommitted changes, add `-Dfluxzero.image.allowDirty=true`; the pushed tag becomes
+If the checkout has uncommitted changes, add `-Dfluxzero.package.allowDirty=true`; the pushed tag becomes
 `local-dev-dirty`.
 
-Inspect the backend image directly in Zot:
+Inspect the backend package directly in Zot:
 
 ```bash
 docker pull 127.0.0.1:5100/team-a/plain-java:local-dev

@@ -20,28 +20,30 @@ group = "io.fluxzero.tools"
 
 val mavenPluginMojoDescriptions = mapOf(
     "sync-project-files" to "Syncs Fluxzero AI agent instruction files for a Maven project.",
-    "push-image" to "Builds and pushes a layered Java OCI image to the Fluxzero registry."
+    "publish-package" to "Builds and publishes a layered Java OCI package to the Fluxzero registry."
 )
 
 val mavenPluginParameterDescriptions = mapOf(
-    "baseImage" to "Java runtime base image for push-image. Property: fluxzero.image.baseImage.",
+    "baseImage" to "Java runtime base image for publish-package. Property: fluxzero.package.baseImage.",
+    "baseImageSource" to "Where publish-package reads the base image from: registry or docker-daemon. Property: fluxzero.package.baseImageSource.",
     "enabled" to "Enable or disable sync-project-files. Property: fluxzero.projectFiles.enabled.",
     "forceUpdate" to "Force project files to be downloaded and rewritten. Property: fluxzero.projectFiles.forceUpdate.",
-    "allowDirty" to "Allow push-image to publish from a dirty git worktree. Property: fluxzero.image.allowDirty.",
-    "applicationId" to "Optional Fluxzero application id stored as OCI image metadata. Property: fluxzero.image.applicationId.",
-    "imageName" to "Required public image name for push-image. Property: fluxzero.image.name.",
-    "imageVersion" to "Image tag for push-image. Defaults to a generated git/time-based tag. Property: fluxzero.image.version.",
-    "mainClass" to "Application main class for push-image. Property: fluxzero.image.mainClass.",
+    "allowDirty" to "Allow publish-package to publish from a dirty git worktree. Property: fluxzero.package.allowDirty.",
+    "applicationId" to "Optional Fluxzero application id stored as OCI package metadata. Property: fluxzero.package.applicationId.",
+    "packageName" to "Required public package name for publish-package. Property: fluxzero.package.name.",
+    "packageVersion" to "Package version for publish-package. Defaults to a generated git/time-based tag. Property: fluxzero.package.version.",
+    "mainClass" to "Application main class for publish-package. Property: fluxzero.package.mainClass.",
+    "javaToolOptions" to "Value written to JAVA_TOOL_OPTIONS for publish-package. Property: fluxzero.package.javaToolOptions.",
     "overrideLanguage" to "Override language detection with kotlin or java. Property: fluxzero.projectFiles.overrideLanguage.",
     "overrideSdkVersion" to "Override Fluxzero SDK version detection. Property: fluxzero.projectFiles.overrideSdkVersion.",
-    "project" to "Read-only Maven project metadata for push-image.",
+    "project" to "Read-only Maven project metadata for publish-package.",
     "projectDir" to "Read-only Maven project base directory where Fluxzero project files are synced.",
-    "registryHost" to "Fluxzero registry host for push-image. Defaults to registry.fluxzero.io. Property: fluxzero.image.registryHost.",
-    "registryToken" to "Fluxzero registry token for push-image. Property: fluxzero.image.registryToken.",
+    "registryHost" to "Fluxzero registry host for publish-package. Defaults to registry.fluxzero.io. Property: fluxzero.package.registryHost.",
+    "registryToken" to "Fluxzero registry token for publish-package. Property: fluxzero.package.registryToken.",
     "rootProjectOnly" to "Run only in the Maven execution root. Property: fluxzero.projectFiles.rootProjectOnly.",
     "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
     "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip.",
-    "skipImagePush" to "Skip push-image execution. Property: fluxzero.image.skip."
+    "skipPackagePublish" to "Skip publish-package execution. Property: fluxzero.package.skip."
 )
 
 fun Element.firstDirectChild(tagName: String): Element? =
@@ -214,7 +216,7 @@ mavenPublishing {
     pom {
         packaging = "maven-plugin"
         name.set("Fluxzero Maven Plugin")
-        description.set("Maven plugin for Fluxzero projects - syncs project files and pushes layered Java images")
+        description.set("Maven plugin for Fluxzero projects - syncs project files and publishes layered Java packages")
         url.set("https://fluxzero.io")
         inceptionYear.set("2025")
 

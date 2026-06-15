@@ -41,7 +41,7 @@
         <artifactId>fluxzero-maven-plugin</artifactId>
         <version>${fluxzero.maven.plugin.version}</version>
         <configuration>
-          <imageName>spring-boot-app</imageName>
+          <packageName>spring-boot-app</packageName>
           <applicationId>local-spring-boot-app</applicationId>
         </configuration>
       </plugin>

@@ -2,7 +2,7 @@
 const crypto = require("crypto");
 
 const teamId = process.argv[2] || process.env.FLUXZERO_LOCAL_TEAM_ID || "team-a";
-const imageName = process.argv[3] || process.env.FLUXZERO_LOCAL_IMAGE_NAME || "plain-java";
+const packageName = process.argv[3] || process.env.FLUXZERO_LOCAL_PACKAGE_NAME || "plain-java";
 const secret = process.env.FLUXZERO_LOCAL_CI_TOKEN_SECRET || "local-dev-ci-token-secret";
 const organisationId = process.env.FLUXZERO_LOCAL_ORGANISATION_ID || "local-org";
 const installationId = Number(process.env.FLUXZERO_LOCAL_INSTALLATION_ID || "1");
@@ -19,7 +19,7 @@ const payload = {
   installationId,
   teamId,
   organisationId,
-  imageName,
+  packageName,
   iat: now,
   exp: now + 3600,
 };

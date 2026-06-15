@@ -145,7 +145,7 @@ class BuildSystemRefactorTest {
     }
 
     @Test
-    fun `should configure Fluxzero Maven plugin image settings when Maven is selected`() {
+    fun `should configure Fluxzero Maven plugin package settings when Maven is selected`() {
         Files.writeString(tempDir.resolve("pom.xml"), """
             <?xml version="1.0" encoding="UTF-8"?>
             <project>
@@ -180,7 +180,7 @@ class BuildSystemRefactorTest {
         val pom = Files.readString(tempDir.resolve("pom.xml"))
 
         assertTrue(result.success)
-        assertTrue(pom.contains("<imageName>customer-app</imageName>"))
+        assertTrue(pom.contains("<packageName>customer-app</packageName>"))
         assertTrue(pom.contains("<applicationId>app-123</applicationId>"))
         assertFalse(pom.contains("registryToken"))
     }

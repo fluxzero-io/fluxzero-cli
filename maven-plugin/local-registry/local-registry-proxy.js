@@ -44,8 +44,8 @@ function verifyToken(token) {
   if (!payload.exp || payload.exp < now) {
     throw new Error("token expired");
   }
-  if (!payload.teamId || !payload.imageName) {
-    throw new Error("token must include teamId and imageName");
+  if (!payload.teamId || !payload.packageName) {
+    throw new Error("token must include teamId and packageName");
   }
   return payload;
 }
@@ -74,9 +74,9 @@ function targetPath(originalUrl, payload) {
 
   const segments = pathOnly.substring("/v2/".length).split("/");
   const clientUsesTeamPrefix = segments[0] === payload.teamId;
-  const imageName = clientUsesTeamPrefix ? segments[1] : segments[0];
-  if (imageName !== payload.imageName) {
-    throw new Error(`token is for image '${payload.imageName}', not '${imageName}'`);
+  const packageName = clientUsesTeamPrefix ? segments[1] : segments[0];
+  if (packageName !== payload.packageName) {
+    throw new Error(`token is for package '${payload.packageName}', not '${packageName}'`);
   }
 
   const backendSegments = clientUsesTeamPrefix ? segments : [payload.teamId, ...segments];
@@ -165,7 +165,7 @@ const server = https.createServer({
       path: clientReq.url,
       targetPath: requestTarget.path,
       teamId: payload.teamId,
-      imageName: payload.imageName,
+      packageName: payload.packageName,
       requestBytes,
     });
   });

@@ -31,7 +31,7 @@ object MavenFluxzeroPluginConfigurator {
 
             val configuration = plugin.firstDirectChild("configuration")
                 ?: plugin.appendElement(document, "configuration")
-            configuration.setDirectChildText(document, "imageName", variables.finalArtifactId)
+            configuration.setDirectChildText(document, "packageName", variables.finalArtifactId)
             variables.applicationId?.takeIf { it.isNotBlank() }?.let {
                 configuration.setDirectChildText(document, "applicationId", it)
             }
