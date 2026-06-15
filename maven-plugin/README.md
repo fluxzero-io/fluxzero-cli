@@ -94,7 +94,7 @@ pushes get a `-dirty` tag suffix.
 
 Use `baseImage` for a different Java runtime image. If that image was built locally in the Docker daemon during the
 same build, also set `baseImageSource` to `docker-daemon`; otherwise the plugin reads the base image from a registry.
-Custom base images must provide `/usr/bin/java`.
+Custom base images must provide `java` on `PATH`.
 
 `javaToolOptions` is written to the package as `JAVA_TOOL_OPTIONS`. If the property is omitted, the plugin uses the
 process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM defaults.

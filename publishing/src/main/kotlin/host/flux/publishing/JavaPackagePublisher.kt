@@ -45,7 +45,7 @@ class JavaPackagePublisher : PackagePublisher {
         }
             .setCreationTime(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP)
             .setWorkingDirectory(AbsoluteUnixPath.get("/app"))
-            .setEntrypoint("/usr/bin/java", "-cp", "/app/classes:/app/libs/*", spec.mainClass)
+            .setEntrypoint("java", "-cp", "/app/classes:/app/libs/*", spec.mainClass)
             .addLabel("org.opencontainers.image.title", spec.packageName)
             .addLabel("org.opencontainers.image.version", spec.packageVersion)
             .addLabel("io.fluxzero.package.metadata-version", "1")

@@ -77,6 +77,7 @@ class JavaPackagePublishSpecTest {
         )
 
         val fileEntriesLayers = plan.layers.filterIsInstance<FileEntriesLayer>()
+        val entrypoint = plan.entrypoint
         val applicationEntries = fileEntriesLayers
             .first { it.name == "application" }
             .entries
@@ -87,5 +88,6 @@ class JavaPackagePublishSpecTest {
             listOf("/app/classes/a/A.class", "/app/classes/z/Z.class"),
             applicationEntries.map { it.extractionPath.toString() }
         )
+        assertEquals(listOf("java", "-cp", "/app/classes:/app/libs/*", "com.example.Application"), entrypoint)
     }
 }
