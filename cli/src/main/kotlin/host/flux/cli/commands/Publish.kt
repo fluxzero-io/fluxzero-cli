@@ -49,6 +49,11 @@ class Publish(
 
     private val packageName by option("--package-name", help = "Package name. Required unless FLUXZERO_PACKAGE_NAME is set.")
 
+    private val teamId by option(
+        "--team-id",
+        help = "Fluxzero team id used as the first registry path segment."
+    )
+
     private val packageVersion by option("--package-version", help = "Package version. Defaults to a generated git/time-based tag.")
 
     private val allowDirty by option(
@@ -113,6 +118,7 @@ class Publish(
             ?: throw IllegalStateException("Missing registry token. Set --registry-token or FLUXZERO_REGISTRY_TOKEN.")
         val resolvedPackageName = PackageNameSupport.firstConfigured(packageName, "FLUXZERO_PACKAGE_NAME")
             ?: throw IllegalStateException("Missing package name. Set --package-name or FLUXZERO_PACKAGE_NAME.")
+        val resolvedTeamId = PackageNameSupport.firstConfigured(teamId, "FLUXZERO_TEAM_ID")
         val gitInfo = PackageNameSupport.gitInfo(root)
         PackageNameSupport.ensureCleanGitWorktree(gitInfo, allowDirty)
         val resolvedPackageVersion = PackageNameSupport.firstConfigured(packageVersion, "FLUXZERO_PACKAGE_VERSION")
@@ -136,6 +142,7 @@ class Publish(
         val spec = JavaPackagePublishSpec(
             registryHost = resolvedRegistryHost,
             registryToken = resolvedRegistryToken,
+            teamId = resolvedTeamId,
             packageName = resolvedPackageName,
             packageVersion = resolvedPackageVersion,
             applicationId = resolvedApplicationId,
@@ -155,7 +162,13 @@ class Publish(
         )
         spec.validate()
 
-        echo("Publishing ${PackageNameSupport.packageReference(resolvedRegistryHost, resolvedPackageName, resolvedPackageVersion)}...")
+        val packageReference = PackageNameSupport.packageReference(
+            resolvedRegistryHost,
+            resolvedTeamId,
+            resolvedPackageName,
+            resolvedPackageVersion
+        )
+        echo("Publishing $packageReference...")
         val result = publisher.publish(spec)
         echo("Published ${result.packageReference}")
         echo("Digest: ${result.digest}")

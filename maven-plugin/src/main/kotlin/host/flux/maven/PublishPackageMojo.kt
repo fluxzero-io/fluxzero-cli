@@ -52,10 +52,16 @@ class PublishPackageMojo : AbstractMojo() {
     private var registryToken: String? = null
 
     /**
-     * Public package name. The registry proxy inserts the Fluxzero team prefix before forwarding to the backing registry.
+     * Public package name.
      */
     @Parameter(property = "fluxzero.package.name")
     private var packageName: String? = null
+
+    /**
+     * Fluxzero team id used as the first registry path segment.
+     */
+    @Parameter(property = "fluxzero.team.id")
+    private var teamId: String? = null
 
     /**
      * Package version to push. When omitted, a git/time-based tag is generated.
@@ -136,6 +142,7 @@ class PublishPackageMojo : AbstractMojo() {
                 "Missing package name. Configure <packageName> in the fluxzero-maven-plugin, " +
                     "set -Dfluxzero.package.name, or set FLUXZERO_PACKAGE_NAME."
             )
+        val resolvedTeamId = configured("fluxzero.team.id", "FLUXZERO_TEAM_ID", teamId)
         val gitInfo = PackageNameSupport.gitInfo(project.basedir.toPath())
         ensureCleanGitWorktree(gitInfo)
         val resolvedVersion = configured("fluxzero.package.version", "FLUXZERO_PACKAGE_VERSION", packageVersion)
@@ -144,6 +151,9 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedApplicationId = configured("fluxzero.package.applicationId", "FLUXZERO_PACKAGE_ID", applicationId)
         if (!PackageNameSupport.isValidPackageName(resolvedPackageName)) {
             throw MojoFailureException("Invalid package name '$resolvedPackageName'.")
+        }
+        if (resolvedTeamId != null && !PackageNameSupport.isValidTeamId(resolvedTeamId)) {
+            throw MojoFailureException("Invalid team id '$resolvedTeamId'.")
         }
         if (!PackageNameSupport.isValidTag(resolvedVersion)) {
             throw MojoFailureException("Invalid package version '$resolvedVersion'.")
@@ -170,7 +180,12 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedJavaToolOptions = configuredValue("fluxzero.package.javaToolOptions", "JAVA_TOOL_OPTIONS", javaToolOptions)
             ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
 
-        val packageReference = PackageNameSupport.packageReference(resolvedRegistryHost, resolvedPackageName, resolvedVersion)
+        val packageReference = PackageNameSupport.packageReference(
+            resolvedRegistryHost,
+            resolvedTeamId,
+            resolvedPackageName,
+            resolvedVersion
+        )
         log.info("Building Fluxzero Java package $packageReference")
 
         try {
@@ -178,6 +193,7 @@ class PublishPackageMojo : AbstractMojo() {
                 JavaPackagePublishSpec(
                     registryHost = resolvedRegistryHost,
                     registryToken = resolvedToken,
+                    teamId = resolvedTeamId,
                     packageName = resolvedPackageName,
                     packageVersion = resolvedVersion,
                     applicationId = resolvedApplicationId,

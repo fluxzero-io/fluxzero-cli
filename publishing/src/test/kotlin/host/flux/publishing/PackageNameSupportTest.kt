@@ -21,6 +21,14 @@ class PackageNameSupportTest {
     }
 
     @Test
+    fun buildsPackageReferenceWithTeamId() {
+        assertEquals(
+            "registry.fluxzero.io/team-a/service:1.2.3",
+            PackageNameSupport.packageReference("https://registry.fluxzero.io", "team-a", "service", "1.2.3")
+        )
+    }
+
+    @Test
     fun preservesRegistryPortAndDetectsPlainHttpRegistryHost() {
         assertEquals(
             "localhost:8443/service:dev",
@@ -34,9 +42,11 @@ class PackageNameSupportTest {
     @Test
     fun validatesPackageNamesAndSanitizesDefaultPackageVersion() {
         assertTrue(PackageNameSupport.isValidPackageName("my-service-1"))
+        assertTrue(PackageNameSupport.isValidTeamId("team-a"))
         assertEquals("1.0-SNAPSHOT", PackageNameSupport.defaultPackageVersion("1.0-SNAPSHOT"))
         assertEquals("rc1", PackageNameSupport.defaultPackageVersion(".rc1"))
         assertFalse(PackageNameSupport.isValidPackageName("My-Service-1"))
+        assertFalse(PackageNameSupport.isValidTeamId("team-a/service"))
     }
 
     @Test

@@ -142,6 +142,7 @@ Useful options:
 | `--project-dir` | Project directory | `--project-dir ./my-app` |
 | `--registry-host` | Registry host override | `--registry-host https://registry.example.com` |
 | `--registry-token` | Registry token, usually provided through `FLUXZERO_REGISTRY_TOKEN` | `--registry-token ...` |
+| `--team-id` | Fluxzero team id used as the first registry path segment | `--team-id team-a` |
 | `--package-name` | Package name, required unless `FLUXZERO_PACKAGE_NAME` is set | `--package-name my-app` |
 | `--package-version` | Package version override, defaults to a generated git/time-based tag | `--package-version run-123-abc1234` |
 | `--allow-dirty` | Allow publishing uncommitted local changes and mark the tag with `-dirty` | `--allow-dirty` |

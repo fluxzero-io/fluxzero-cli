@@ -31,6 +31,7 @@ val mavenPluginParameterDescriptions = mapOf(
     "allowDirty" to "Allow publish-package to publish from a dirty git worktree. Property: fluxzero.package.allowDirty.",
     "applicationId" to "Optional Fluxzero application id stored as OCI package metadata. Property: fluxzero.package.applicationId.",
     "packageName" to "Required public package name for publish-package. Property: fluxzero.package.name.",
+    "teamId" to "Fluxzero team id for publish-package. Property: fluxzero.team.id.",
     "packageVersion" to "Package version for publish-package. Defaults to a generated git/time-based tag. Property: fluxzero.package.version.",
     "mainClass" to "Application main class for publish-package. Property: fluxzero.package.mainClass.",
     "javaToolOptions" to "Value written to JAVA_TOOL_OPTIONS for publish-package. Property: fluxzero.package.javaToolOptions.",

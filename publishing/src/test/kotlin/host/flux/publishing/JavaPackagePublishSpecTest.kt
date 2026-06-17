@@ -42,6 +42,23 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun rejectsInvalidTeamId() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            JavaPackagePublishSpec(
+                registryHost = "registry.fluxzero.io",
+                registryToken = "token",
+                teamId = "team-a/service",
+                packageName = "service",
+                packageVersion = "1.0.0",
+                mainClass = "com.example.Application",
+                classesDirectory = classesDirectory
+            ).validate()
+        }
+    }
+
+    @Test
     fun parsesBaseImageSourceAliases() {
         assertEquals(BaseImageSource.REGISTRY, BaseImageSource.parse("registry"))
         assertEquals(BaseImageSource.DOCKER_DAEMON, BaseImageSource.parse("docker-daemon"))

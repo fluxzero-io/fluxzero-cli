@@ -21,7 +21,12 @@ class JavaPackagePublisher : PackagePublisher {
     override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
         spec.validate()
 
-        val packageReference = PackageNameSupport.packageReference(spec.registryHost, spec.packageName, spec.packageVersion)
+        val packageReference = PackageNameSupport.packageReference(
+            spec.registryHost,
+            spec.teamId,
+            spec.packageName,
+            spec.packageVersion
+        )
         val builder = createContainerBuilder(spec)
 
         val targetImage = RegistryImage.named(packageReference)
@@ -130,6 +135,7 @@ enum class BaseImageSource {
 data class JavaPackagePublishSpec(
     val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
     val registryToken: String,
+    val teamId: String? = null,
     val packageName: String,
     val packageVersion: String,
     val applicationId: String? = null,
@@ -160,6 +166,9 @@ data class JavaPackagePublishSpec(
         require(!PackageNameSupport.isPlainHttpRegistryHost(registryHost)) {
             "Fluxzero registry host must use HTTPS when a registry token is sent. " +
                 "Use an https:// registry host or the local TLS proxy for end-to-end tests."
+        }
+        teamId?.takeIf { it.isNotBlank() }?.let {
+            require(PackageNameSupport.isValidTeamId(it)) { "Invalid team id '$it'." }
         }
         require(PackageNameSupport.isValidPackageName(packageName)) { "Invalid package name '$packageName'." }
         require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }

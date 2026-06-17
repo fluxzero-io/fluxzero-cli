@@ -21,9 +21,17 @@ object PackageNameSupport {
         val dirty: Boolean
     )
 
-    fun packageReference(registryHost: String, packageName: String, version: String): String {
+    fun packageReference(registryHost: String, packageName: String, version: String): String =
+        packageReference(registryHost, null, packageName, version)
+
+    fun packageReference(registryHost: String, teamId: String?, packageName: String, version: String): String {
         val registry = registryAuthority(registryHost)
-        return "$registry/$packageName:$version"
+        val teamPath = teamId?.trim('/')?.takeIf { it.isNotBlank() }
+        return if (teamPath == null) {
+            "$registry/$packageName:$version"
+        } else {
+            "$registry/$teamPath/$packageName:$version"
+        }
     }
 
     fun registryAuthority(registryHost: String): String {
@@ -112,6 +120,9 @@ object PackageNameSupport {
 
     fun isValidPackageName(packageName: String): Boolean =
         packageName.length in 1..63 && packageNamePattern.matches(packageName)
+
+    fun isValidTeamId(teamId: String): Boolean =
+        isValidPackageName(teamId)
 
     fun isValidTag(version: String): Boolean = tagPattern.matches(version)
 

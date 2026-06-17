@@ -79,6 +79,7 @@ Keep registry tokens and user credentials out of the POM.
 |---------|-----------------------|----------------------|---------|
 | Registry host | `fluxzero.package.registryHost` | `FLUXZERO_REGISTRY_HOST` | `registry.fluxzero.io` |
 | Registry token | `fluxzero.package.registryToken` | `FLUXZERO_REGISTRY_TOKEN` | required |
+| Team id | `fluxzero.team.id` | `FLUXZERO_TEAM_ID` | omitted |
 | Package name | `fluxzero.package.name` | `FLUXZERO_PACKAGE_NAME` | required |
 | Package version | `fluxzero.package.version` | `FLUXZERO_PACKAGE_VERSION` | generated git/time-based tag |
 | Allow dirty worktree | `fluxzero.package.allowDirty` | — | `false` |

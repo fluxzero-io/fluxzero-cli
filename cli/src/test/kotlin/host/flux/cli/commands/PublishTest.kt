@@ -5,6 +5,7 @@ import host.flux.publishing.BaseImageSource
 import host.flux.publishing.PackagePublisher
 import host.flux.publishing.PackagePublishResult
 import host.flux.publishing.JavaPackagePublishSpec
+import host.flux.publishing.PackageNameSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -44,6 +45,7 @@ class PublishTest {
         val spec = publisher.spec ?: error("Expected publish spec")
         assertEquals("registry.fluxzero.io", spec.registryHost)
         assertEquals("test-token", spec.registryToken)
+        assertEquals(null, spec.teamId)
         assertEquals("demo-app", spec.packageName)
         assertEquals("1.0.0", spec.packageVersion)
         assertEquals("app-123", spec.applicationId)
@@ -57,6 +59,33 @@ class PublishTest {
         assertEquals("com.example", spec.labels["io.fluxzero.maven.group-id"])
         assertEquals("demo-app", spec.labels["io.fluxzero.maven.artifact-id"])
         assertTrue(result.stdout.contains("Published registry.fluxzero.io/demo-app:1.0.0"))
+    }
+
+    @Test
+    fun `publishes Maven project with team id`() {
+        val projectDir = Files.createTempDirectory("fluxzero-cli-publish-team")
+        writePom(projectDir)
+        Files.createDirectories(projectDir.resolve("target/classes"))
+        Files.writeString(projectDir.resolve("target/classes/App.class"), "compiled")
+        writeJarWithManifest(projectDir.resolve("target/demo-app-1.0.0.jar"))
+
+        val publisher = CapturingPublisher()
+        val command = Publish(publisher = publisher, processRunner = NoopProcessRunner)
+
+        val result = command.test(
+            listOf(
+                "--project-dir", projectDir.toString(),
+                "--skip-build",
+                "--registry-token", "test-token",
+                "--team-id", "team-a",
+                "--package-name", "demo-app",
+                "--package-version", "1.0.0"
+            )
+        )
+
+        val spec = publisher.spec ?: error("Expected publish spec")
+        assertEquals("team-a", spec.teamId)
+        assertTrue(result.stdout.contains("Published registry.fluxzero.io/team-a/demo-app:1.0.0"))
     }
 
     @Test
@@ -167,7 +196,15 @@ class PublishTest {
 
         override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
             this.spec = spec
-            return PackagePublishResult("registry.fluxzero.io/demo-app:1.0.0", "sha256:test")
+            return PackagePublishResult(
+                PackageNameSupport.packageReference(
+                    spec.registryHost,
+                    spec.teamId,
+                    spec.packageName,
+                    spec.packageVersion
+                ),
+                "sha256:test"
+            )
         }
     }
 

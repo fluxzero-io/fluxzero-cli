@@ -33,6 +33,15 @@ class MojoConfigurationTest {
     }
 
     @Test
+    fun testPublishPackageTeamIdParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val teamIdField = fields.find { it.name == "teamId" }
+        assertNotNull("teamId parameter should exist for team-prefixed package paths", teamIdField)
+    }
+
+    @Test
     fun testPublishPackageBaseImageSourceParameterExists() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
