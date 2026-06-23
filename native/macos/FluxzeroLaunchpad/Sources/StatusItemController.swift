@@ -18,7 +18,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     init(model: LaunchpadModel = .shared) {
         self.model = model
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: 28)
         super.init()
         configureStatusItem()
         bindModel()
@@ -36,7 +36,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if let button = statusItem.button {
             button.image = FluxzeroMenuBarAssets.templateImage
             button.imagePosition = .imageOnly
-            button.imageScaling = .scaleNone
+            button.imageScaling = .scaleProportionallyDown
             button.toolTip = "Fluxzero Launchpad"
             button.setAccessibilityLabel("Fluxzero Launchpad")
             button.setAccessibilityValue("Ready")
