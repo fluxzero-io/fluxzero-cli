@@ -232,31 +232,6 @@ struct CreateScreen: View {
     }
 }
 
-struct ProjectsScreen: View {
-    var body: some View {
-        SettingsForm {
-            RecentProjectsPanel(limit: nil)
-        }
-    }
-}
-
-struct UpgradesScreen: View {
-    var body: some View {
-        SettingsForm {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Upgrade support is coming", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.headline)
-                    Text("The native app already tracks generated projects. The actual SDK upgrade flow stays disabled until the CLI upgrade contract is ready.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-}
-
 struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
 

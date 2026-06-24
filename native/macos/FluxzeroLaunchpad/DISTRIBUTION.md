@@ -106,12 +106,6 @@ For an App Store Connect API key, encode the `.p8` file the same way:
 base64 -i AuthKey_ABC123DEFG.p8 | pbcopy
 ```
 
-## App Store/Sandboxing Prep
-
-The app is not sandboxed yet. A sandboxed build should grant the app access to one user-selected project root, store that access as a security-scoped bookmark, and only generate projects under that root. The bundled CLI then inherits the app sandbox, so the CLI must only read bundled resources, use network access declared by entitlement, and write inside the security-scoped project location.
-
-A starter entitlement file is included at `AppBundle/FluxzeroLaunchpad.sandbox.entitlements`, but do not enable it for release until security-scoped bookmark storage is implemented and verified.
-
 ## Dependency Simulation
 
 The native app has dependency test overrides for Git and Java:

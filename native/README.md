@@ -2,11 +2,9 @@
 
 This directory contains platform-native Fluxzero Launchpad implementations.
 
-The existing Compose Desktop app remains the reference implementation for behavior while these
-native shells replace the Java-like feel with platform-native UX:
-
 - macOS: SwiftUI/AppKit, system materials, Liquid Glass where available, standard controls, native URL handling, and app-bundle packaging.
-- Windows: WinUI 3, Fluent controls, Mica as the foundation layer, notification-area operation, per-user protocol registration for unpackaged builds, and MSIX-ready metadata.
+- Windows: WinUI 3, Fluent controls, Mica as the foundation layer, notification-area operation, per-user protocol registration for unpackaged builds, and MSIX-ready metadata. This implementation is present in the repo but is not published by the release workflow yet.
+- Linux: planned, not implemented yet.
 
 ## Design Direction
 

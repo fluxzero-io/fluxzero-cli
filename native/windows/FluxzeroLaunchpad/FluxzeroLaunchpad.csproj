@@ -8,7 +8,7 @@
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.0</FileVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\..\..\desktop\src\main\resources\icons\fluxzero.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\assets\icons\fluxzero.ico</ApplicationIcon>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
@@ -28,8 +28,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\..\desktop\src\main\resources\icons\fluxzero.ico" Link="Assets\fluxzero.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\..\desktop\src\main\resources\icons\fluxzero.png" Link="Assets\fluxzero.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\icons\fluxzero.ico" Link="Assets\fluxzero.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\icons\fluxzero.png" Link="Assets\fluxzero.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\FluxzeroMenuBarTemplate.png" Link="Assets\FluxzeroMenuBarTemplate.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\CursorCube.svg" Link="Assets\CursorCube.svg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\macos\FluxzeroLaunchpad\Assets\ClaudeCodeMark.svg" Link="Assets\ClaudeCodeMark.svg" CopyToOutputDirectory="PreserveNewest" />

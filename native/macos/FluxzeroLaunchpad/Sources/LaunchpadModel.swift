@@ -18,7 +18,6 @@ final class LaunchpadModel: ObservableObject {
     @Published var initGit = true
     @Published var advancedExpanded = false
     @Published var selectedAgent: AgentChoice = .codex
-    @Published var selectedSection: LaunchpadSection = .create
     @Published var templates = ["flux-basic-java", "flux-basic-kotlin", "gamerental"]
     @Published var projects: [GeneratedProject] = []
     @Published var cliStatus: CliStatus?
@@ -181,7 +180,6 @@ final class LaunchpadModel: ObservableObject {
         guard let link = DeepLinkParser.parse(url) else { return }
         switch link {
         case .new(let link):
-            selectedSection = .create
             apply(link)
             if presentationMode == .background {
                 Task {

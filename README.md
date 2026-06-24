@@ -47,18 +47,19 @@ sudo mv fz /usr/local/bin/fz
 
 ### Option 3: Fluxzero Launchpad
 
-Fluxzero also ships a desktop app, Fluxzero Launchpad, for generating projects locally and opening them in coding agents.
+Fluxzero also ships a macOS app, Fluxzero Launchpad, for generating projects locally and opening them in coding agents.
 
-Desktop artifacts are published with each release:
+The signed and notarized macOS DMG is published with each release:
 
-- **macOS Intel / Apple Silicon**: `Fluxzero Launchpad-*.dmg`
-- **Windows x64**: `Fluxzero Launchpad-*.msi` or `Fluxzero Launchpad-*.exe`
+- **macOS Intel / Apple Silicon**: [`Fluxzero-Launchpad.dmg`](https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/Fluxzero-Launchpad.dmg)
 
-The app manages its own `fz` binary, checks for the latest CLI release on launch, writes a `START_PROMPT.md` into generated projects, opens Codex through `codex://new` with the generated project path and prompt, and keeps a local history of generated projects for future SDK and agent-file upgrades. Installed macOS builds and launched Windows builds register experimental Fluxzero URL schemes:
+Windows and Linux Launchpad apps are planned, but are not published yet.
+
+The app manages its own `fz` binary, checks for the latest CLI release on launch, writes a `START_PROMPT.md` into generated projects, opens local coding agents with the generated project path and prompt, and keeps a local history of generated projects for future SDK and agent-file upgrades. Installed macOS builds register experimental Fluxzero URL schemes:
 
 - `fluxzero://new?...` opens Launchpad and pre-fills the generator.
-- `fluxzero://open?path=...&prompt=...&agent=codex|claude|both` opens an existing project directly in an agent.
-- `fluxzero://create?name=...&prompt=...&agent=codex|claude|both` creates a project with defaults and opens it directly in an agent.
+- `fluxzero://open?path=...&prompt=...&agent=codex|claude|cursor|finder|none` opens an existing project directly.
+- `fluxzero://create?name=...&prompt=...&agent=codex|claude|cursor|finder|none` creates a project with defaults and opens it directly.
 
 ### Option 4: Manual JAR Installation (Legacy)
 

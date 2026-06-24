@@ -62,30 +62,6 @@ enum AgentChoice: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
-enum LaunchpadSection: String, CaseIterable, Identifiable, Sendable {
-    case create
-    case projects
-    case upgrades
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .create: "Create Project"
-        case .projects: "Projects"
-        case .upgrades: "Upgrades"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .create: "wand.and.stars"
-        case .projects: "folder"
-        case .upgrades: "arrow.triangle.2.circlepath"
-        }
-    }
-}
-
 enum DeepLinkPresentationMode: Sendable {
     case interactive
     case background
