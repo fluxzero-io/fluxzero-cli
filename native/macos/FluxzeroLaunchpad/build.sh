@@ -16,6 +16,8 @@ EXECUTABLE_NAME="FluxzeroLaunchpad"
 CONFIGURATION="${CONFIGURATION:-release}"
 MACOS_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 BUILD_UNIVERSAL="${BUILD_UNIVERSAL:-1}"
+APP_VERSION="${APP_VERSION:-${VERSION:-}}"
+APP_BUILD="${APP_BUILD:-}"
 CLI_BUNDLE_DIR="$RESOURCES_DIR/FluxzeroCLI"
 FLUXZERO_CLI_DIR="${FLUXZERO_CLI_DIR:-}"
 FLUXZERO_CLI_UNIVERSAL="${FLUXZERO_CLI_UNIVERSAL:-}"
@@ -139,6 +141,12 @@ else
     cp "$BINARY_SOURCE" "$MACOS_DIR/$EXECUTABLE_NAME"
 fi
 cp "$INFO_PLIST" "$CONTENTS_DIR/Info.plist"
+if [[ -n "$APP_VERSION" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" "$CONTENTS_DIR/Info.plist"
+fi
+if [[ -n "$APP_BUILD" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $APP_BUILD" "$CONTENTS_DIR/Info.plist"
+fi
 cp "$ICON_SOURCE" "$RESOURCES_DIR/Fluxzero.icns"
 cp "$ASSET_DIR/FluxzeroMenuBar.svg" "$RESOURCES_DIR/FluxzeroMenuBar.svg"
 cp "$ASSET_DIR/FluxzeroMenuBarTemplate.png" "$RESOURCES_DIR/FluxzeroMenuBarTemplate.png"

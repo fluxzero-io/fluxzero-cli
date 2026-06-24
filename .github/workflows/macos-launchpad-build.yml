@@ -1,0 +1,217 @@
+name: macOS Launchpad Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        type: string
+        default: 'dev'
+      notarize:
+        description: 'Submit the DMG to Apple notarization and staple the ticket'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      MACOS_DEVELOPER_ID_APPLICATION:
+        required: false
+      MACOS_DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64:
+        required: false
+      MACOS_CERTIFICATE_PASSWORD:
+        required: false
+      MACOS_KEYCHAIN_PASSWORD:
+        required: false
+      APPLE_NOTARY_KEY_ID:
+        required: false
+      APPLE_NOTARY_ISSUER_ID:
+        required: false
+      APPLE_NOTARY_KEY_BASE64:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        type: string
+        default: 'dev'
+      notarize:
+        description: 'Submit the DMG to Apple notarization and staple the ticket'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  macos-launchpad-build:
+    name: Build signed macOS Launchpad DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup tools from .tool-versions
+        uses: jdx/mise-action@v4
+
+      - name: Download macOS arm64 CLI
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: actions/download-artifact@v7
+        with:
+          name: flux-macos-arm64
+          path: build/launchpad-cli/arm64
+
+      - name: Download macOS amd64 CLI
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: actions/download-artifact@v7
+        with:
+          name: flux-macos-amd64
+          path: build/launchpad-cli/amd64
+
+      - name: Download latest release CLI for manual build
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          mkdir -p build/launchpad-cli/arm64 build/launchpad-cli/amd64
+          curl -fsSL \
+            -o build/launchpad-cli/arm64/flux \
+            https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/flux-macos-arm64
+          curl -fsSL \
+            -o build/launchpad-cli/amd64/flux \
+            https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/flux-macos-amd64
+          chmod 755 build/launchpad-cli/arm64/flux build/launchpad-cli/amd64/flux
+
+      - name: Validate signing configuration
+        shell: bash
+        env:
+          NOTARIZE: ${{ inputs.notarize }}
+          CODE_SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          missing=0
+          require_secret() {
+            local variable_name="$1"
+            local secret_name="$2"
+            if [[ -z "${!variable_name}" ]]; then
+              echo "::error::Missing GitHub secret ${secret_name}"
+              missing=1
+            fi
+          }
+
+          require_secret CODE_SIGN_IDENTITY MACOS_DEVELOPER_ID_APPLICATION
+          require_secret CERTIFICATE_BASE64 MACOS_DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64
+          require_secret CERTIFICATE_PASSWORD MACOS_CERTIFICATE_PASSWORD
+          require_secret KEYCHAIN_PASSWORD MACOS_KEYCHAIN_PASSWORD
+
+          if [[ "$NOTARIZE" == "true" ]]; then
+            has_api_key=0
+            if [[ -n "$APPLE_NOTARY_KEY_ID" && -n "$APPLE_NOTARY_ISSUER_ID" && -n "$APPLE_NOTARY_KEY_BASE64" ]]; then
+              has_api_key=1
+            fi
+
+            has_apple_id=0
+            if [[ -n "$APPLE_ID" && -n "$APPLE_TEAM_ID" && -n "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+              has_apple_id=1
+            fi
+
+            if [[ "$has_api_key" != "1" && "$has_apple_id" != "1" ]]; then
+              echo "::error::Configure either APPLE_NOTARY_KEY_ID, APPLE_NOTARY_ISSUER_ID, APPLE_NOTARY_KEY_BASE64 or APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD"
+              missing=1
+            fi
+          else
+            echo "::warning::Notarization is disabled for this build. The DMG is signed but not suitable for public distribution."
+          fi
+
+          exit "$missing"
+
+      - name: Import Developer ID Application certificate
+        shell: bash
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id-application.p12"
+          INTERMEDIATE_CERTIFICATE_PATH="$RUNNER_TEMP/developer-id-g2-ca.cer"
+          KEYCHAIN_PATH="$RUNNER_TEMP/fluxzero-signing.keychain-db"
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+          curl -L -o "$INTERMEDIATE_CERTIFICATE_PATH" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security add-certificates -k "$KEYCHAIN_PATH" "$INTERMEDIATE_CERTIFICATE_PATH"
+          security import "$CERTIFICATE_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Build signed DMG
+        shell: bash
+        env:
+          APP_VERSION: ${{ inputs.version }}
+          APP_BUILD: ${{ github.run_number }}
+          DMG_NAME: Fluxzero-Launchpad.dmg
+          FLUXZERO_CLI_ARM64: ${{ github.workspace }}/build/launchpad-cli/arm64/flux
+          FLUXZERO_CLI_AMD64: ${{ github.workspace }}/build/launchpad-cli/amd64/flux
+          REQUIRE_BUNDLED_CLI: '1'
+          CODE_SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}
+        run: |
+          chmod 755 "$FLUXZERO_CLI_ARM64" "$FLUXZERO_CLI_AMD64"
+          native/macos/FluxzeroLaunchpad/package-dmg.sh
+
+      - name: Notarize and staple DMG
+        if: ${{ inputs.notarize }}
+        shell: bash
+        env:
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          native/macos/FluxzeroLaunchpad/notarize-dmg.sh \
+            "native/macos/FluxzeroLaunchpad/build/Fluxzero-Launchpad.dmg"
+
+      - name: Verify signed output
+        shell: bash
+        env:
+          NOTARIZE: ${{ inputs.notarize }}
+        run: |
+          APP_BUNDLE="native/macos/FluxzeroLaunchpad/build/Fluxzero Launchpad.app"
+          DMG_PATH="native/macos/FluxzeroLaunchpad/build/Fluxzero-Launchpad.dmg"
+
+          codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+          if [[ "$NOTARIZE" == "true" ]]; then
+            spctl --assess --type execute --verbose=4 "$APP_BUNDLE"
+            spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+          else
+            echo "::warning::Skipped Gatekeeper notarization assessment because notarization is disabled."
+          fi
+
+      - name: Upload signed DMG
+        uses: actions/upload-artifact@v6
+        with:
+          name: fluxzero-launchpad-macos-dmg
+          path: native/macos/FluxzeroLaunchpad/build/Fluxzero-Launchpad.dmg
+          retention-days: 30
+
+      - name: Remove signing keychain
+        if: always()
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/fluxzero-signing.keychain-db" >/dev/null 2>&1 || true
