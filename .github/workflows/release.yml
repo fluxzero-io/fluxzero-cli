@@ -110,7 +110,7 @@ jobs:
 
   publish-plugins:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build]
+    needs: [version, build-and-test, native-build-macos, native-build-cli]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -132,15 +132,26 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
 
-  native-build:
+  native-build-macos:
     needs: [version, build-and-test]
     uses: ./.github/workflows/native-build.yml
     with:
       version: ${{ needs.version.outputs.version }}
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
+      targets-json: >-
+        {"include":[{"os":"macos-amd64","runner":"macos-14","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"}]}
+
+  native-build-cli:
+    needs: [version, build-and-test]
+    uses: ./.github/workflows/native-build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      jar-name: ${{ needs.build-and-test.outputs.jar-name }}
+      targets-json: >-
+        {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 
   macos-launchpad-build:
-    needs: [version, native-build]
+    needs: [version, native-build-macos]
     uses: ./.github/workflows/macos-launchpad-build.yml
     with:
       version: ${{ needs.version.outputs.version }}
@@ -148,7 +159,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build, macos-launchpad-build]
+    needs: [version, build-and-test, native-build-macos, native-build-cli, macos-launchpad-build]
     permissions:
       contents: write
 
