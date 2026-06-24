@@ -23,18 +23,26 @@ copy_jpackage_background() {
     fi
 
     if [[ -z "$java_home" || ! -f "$java_home/jmods/jdk.jpackage.jmod" ]]; then
-        echo "Missing jpackage resources. Set JAVA_HOME to a JDK with jpackage." >&2
-        exit 1
+        echo "jpackage background resource not found; creating DMG without a Finder background image." >&2
+        return 1
     fi
 
     mkdir -p "$resource_dir"
-    (cd "$resource_dir" && jar xf "$java_home/jmods/jdk.jpackage.jmod" "$resource_path")
+    if ! (cd "$resource_dir" && jar xf "$java_home/jmods/jdk.jpackage.jmod" "$resource_path"); then
+        echo "Could not extract jpackage background resource; creating DMG without a Finder background image." >&2
+        return 1
+    fi
+    if [[ ! -f "$resource_dir/$resource_path" ]]; then
+        echo "jpackage background resource is missing from the JDK; creating DMG without a Finder background image." >&2
+        return 1
+    fi
     cp "$resource_dir/$resource_path" "$output_path"
 }
 
 layout_dmg() {
     local volume_name="$1"
     local mount_dir="$2"
+    local background_path="${3:-}"
 
     osascript <<OSA
 tell application "Finder"
@@ -47,7 +55,9 @@ tell application "Finder"
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to $ICON_SIZE
-        set background picture of viewOptions to POSIX file "$mount_dir/.background/background_dmg.tiff"
+        if "$background_path" is not "" then
+            set background picture of viewOptions to POSIX file "$background_path"
+        end if
         set position of item "$APP_NAME.app" of container window to {120, 130}
         set position of item "Applications" of container window to {390, 130}
         update without registering applications
@@ -122,11 +132,15 @@ fi
 ditto "$APP_BUNDLE" "$MOUNT_DIR/$APP_NAME.app"
 ln -s /Applications "$MOUNT_DIR/Applications"
 mkdir -p "$MOUNT_DIR/.background"
-copy_jpackage_background "$MOUNT_DIR/.background/background_dmg.tiff"
+BACKGROUND_PATH="$MOUNT_DIR/.background/background_dmg.tiff"
+if copy_jpackage_background "$BACKGROUND_PATH"; then
+    layout_dmg "$VOLUME_NAME" "$MOUNT_DIR" "$BACKGROUND_PATH"
+else
+    rmdir "$MOUNT_DIR/.background" 2>/dev/null || true
+    layout_dmg "$VOLUME_NAME" "$MOUNT_DIR"
+fi
 
-layout_dmg "$VOLUME_NAME" "$MOUNT_DIR"
-
-if command -v SetFile >/dev/null 2>&1; then
+if [[ -d "$MOUNT_DIR/.background" ]] && command -v SetFile >/dev/null 2>&1; then
     SetFile -a V "$MOUNT_DIR/.background"
 fi
 
