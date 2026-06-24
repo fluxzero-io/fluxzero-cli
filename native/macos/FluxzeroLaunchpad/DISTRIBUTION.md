@@ -80,12 +80,6 @@ https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/Fluxzero-La
 
 Each GitHub Release is still versioned by tag, and the app bundle receives that release version through `CFBundleShortVersionString`.
 
-### Signed-Only Smoke Test
-
-Before App Store Connect API access is available, run `.github/workflows/macos-launchpad-build.yml` manually with `notarize=false`. That manual path downloads the latest released macOS CLI binaries, builds the universal Launchpad app, signs the bundled CLI binaries and app bundle, signs the DMG, verifies the code signature, and uploads a GitHub Actions artifact.
-
-Do not publish the signed-only artifact on the public website. It is useful for checking the certificate, keychain import, universal build, DMG packaging, and signing flow, but it has not been accepted by Apple's notarization service. Official releases keep `notarize=true` and require notarization credentials.
-
 Configure these GitHub repository secrets:
 
 - `MACOS_DEVELOPER_ID_APPLICATION`: Exact signing identity, for example `Developer ID Application: Fluxzero B.V. (TEAMID)`.
