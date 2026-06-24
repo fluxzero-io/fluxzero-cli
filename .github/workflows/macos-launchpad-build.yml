@@ -34,6 +34,7 @@ jobs:
   macos-launchpad-build:
     name: Build signed macOS Launchpad DMG
     runs-on: macos-14
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
@@ -137,8 +138,10 @@ jobs:
           native/macos/FluxzeroLaunchpad/package-dmg.sh
 
       - name: Notarize and staple DMG
+        timeout-minutes: 50
         shell: bash
         env:
+          NOTARY_WAIT_TIMEOUT: 45m
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}

@@ -8,6 +8,7 @@ NOTARY_KEY_ID="${NOTARY_KEY_ID:-${APPLE_NOTARY_KEY_ID:-}}"
 NOTARY_ISSUER_ID="${NOTARY_ISSUER_ID:-${APPLE_NOTARY_ISSUER_ID:-}}"
 NOTARY_KEY_PATH="${NOTARY_KEY_PATH:-}"
 NOTARY_KEY_BASE64="${NOTARY_KEY_BASE64:-${APPLE_NOTARY_KEY_BASE64:-}}"
+NOTARY_WAIT_TIMEOUT="${NOTARY_WAIT_TIMEOUT:-45m}"
 TMP_DIR=""
 
 if [[ ! -f "$DMG_PATH" ]]; then
@@ -30,7 +31,8 @@ trap cleanup EXIT
 if [[ -n "$NOTARY_KEYCHAIN_PROFILE" ]]; then
     xcrun notarytool submit "$DMG_PATH" \
         --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
-        --wait
+        --wait \
+        --timeout "$NOTARY_WAIT_TIMEOUT"
 elif [[ -n "$NOTARY_KEY_ID" || -n "$NOTARY_ISSUER_ID" || -n "$NOTARY_KEY_PATH" || -n "$NOTARY_KEY_BASE64" ]]; then
     : "${NOTARY_KEY_ID:?Set NOTARY_KEY_ID, APPLE_NOTARY_KEY_ID, or NOTARY_KEYCHAIN_PROFILE.}"
     : "${NOTARY_ISSUER_ID:?Set NOTARY_ISSUER_ID, APPLE_NOTARY_ISSUER_ID, or NOTARY_KEYCHAIN_PROFILE.}"
@@ -45,7 +47,8 @@ elif [[ -n "$NOTARY_KEY_ID" || -n "$NOTARY_ISSUER_ID" || -n "$NOTARY_KEY_PATH" |
         --key "$NOTARY_KEY_PATH" \
         --key-id "$NOTARY_KEY_ID" \
         --issuer "$NOTARY_ISSUER_ID" \
-        --wait
+        --wait \
+        --timeout "$NOTARY_WAIT_TIMEOUT"
 else
     : "${APPLE_ID:?Set APPLE_ID or NOTARY_KEYCHAIN_PROFILE.}"
     : "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID or NOTARY_KEYCHAIN_PROFILE.}"
@@ -54,7 +57,8 @@ else
         --apple-id "$APPLE_ID" \
         --team-id "$APPLE_TEAM_ID" \
         --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-        --wait
+        --wait \
+        --timeout "$NOTARY_WAIT_TIMEOUT"
 fi
 
 xcrun stapler staple "$DMG_PATH"
