@@ -35,7 +35,11 @@ struct FluxzeroLaunchpadApp: App {
 
 @MainActor
 enum FluxzeroAppActions {
-    static func showAboutPanel(model: LaunchpadModel = .shared) {
+    static func showAboutPanel() {
+        showAboutPanel(model: LaunchpadModel.shared)
+    }
+
+    static func showAboutPanel(model: LaunchpadModel) {
         let cliVersion = model.cliStatus?.version ?? "not ready"
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Fluxzero Launchpad",

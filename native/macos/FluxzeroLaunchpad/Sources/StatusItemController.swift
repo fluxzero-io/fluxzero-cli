@@ -9,6 +9,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var cancellables: Set<AnyCancellable> = []
     private var animationTimer: Timer?
     private var settleTimer: Timer?
+    private var settleTarget: CGFloat?
     private var rotation: CGFloat = 0
     private static let animationFramesPerSecond: TimeInterval = 24
     private static let fullRotationDuration: CGFloat = 8
@@ -16,7 +17,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private static let angleTolerance: CGFloat = 0.001
     private static let rotationStep = 360.0 / (fullRotationDuration * CGFloat(animationFramesPerSecond))
 
-    init(model: LaunchpadModel = .shared) {
+    init(model: LaunchpadModel) {
         self.model = model
         statusItem = NSStatusBar.system.statusItem(withLength: 28)
         super.init()
@@ -108,15 +109,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
                 animationTimer?.invalidate()
                 animationTimer = nil
+                settleTarget = nil
                 statusItem.button?.image = FluxzeroMenuBarAssets.templateImage
                 return
             }
             guard animationTimer == nil else { return }
-            animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.animationFramesPerSecond, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.advanceRotation()
-                }
-            }
+            animationTimer = Timer.scheduledTimer(
+                timeInterval: 1.0 / Self.animationFramesPerSecond,
+                target: self,
+                selector: #selector(animationTimerDidFire(_:)),
+                userInfo: nil,
+                repeats: true
+            )
         } else {
             let wasAnimating = animationTimer != nil
             animationTimer?.invalidate()
@@ -132,24 +136,41 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private func settleToNextLogoRestingStep() {
         settleTimer?.invalidate()
+        settleTarget = nil
         let target = previousLogoRestingStep(before: rotation)
         if clockwiseDistance(from: rotation, to: target) <= Self.rotationStep {
             setRotation(target)
             return
         }
 
-        settleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.animationFramesPerSecond, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
+        settleTarget = target
+        settleTimer = Timer.scheduledTimer(
+            timeInterval: 1.0 / Self.animationFramesPerSecond,
+            target: self,
+            selector: #selector(settleTimerDidFire(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+    }
 
-                if self.clockwiseDistance(from: self.rotation, to: target) <= Self.rotationStep {
-                    self.setRotation(target)
-                    self.settleTimer?.invalidate()
-                    self.settleTimer = nil
-                } else {
-                    self.advanceRotation()
-                }
-            }
+    @objc private func animationTimerDidFire(_ timer: Timer) {
+        advanceRotation()
+    }
+
+    @objc private func settleTimerDidFire(_ timer: Timer) {
+        guard let target = settleTarget else {
+            timer.invalidate()
+            settleTimer = nil
+            return
+        }
+
+        if clockwiseDistance(from: rotation, to: target) <= Self.rotationStep {
+            setRotation(target)
+            timer.invalidate()
+            settleTimer = nil
+            settleTarget = nil
+        } else {
+            advanceRotation()
         }
     }
 

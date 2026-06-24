@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task { @MainActor in
-            statusItemController = StatusItemController()
+            statusItemController = StatusItemController(model: LaunchpadModel.shared)
             await LaunchpadModel.shared.prepare()
         }
     }
