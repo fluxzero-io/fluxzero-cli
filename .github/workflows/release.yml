@@ -201,12 +201,6 @@ jobs:
           pattern: flux-*
           path: native-artifacts
 
-      - name: Download macOS Launchpad artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: fluxzero-launchpad-macos-dmg
-          path: launchpad-artifacts
-
       - name: Prepare native executables for release
         run: |
           mkdir -p build/native-releases
@@ -367,6 +361,5 @@ jobs:
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64
             build/native-releases/flux-windows-amd64.exe
-            launchpad-artifacts/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

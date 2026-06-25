@@ -1,0 +1,143 @@
+name: Finish macOS Launchpad Notarization
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Workflow run id that produced the pending DMG artifact'
+        required: true
+        type: string
+      submission_id:
+        description: 'Apple notarization submission id'
+        required: true
+        type: string
+      version:
+        description: 'Optional release tag to update after stapling, for example 1.3.13'
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  finish-notarization:
+    name: Staple accepted macOS Launchpad DMG
+    runs-on: macos-14
+    timeout-minutes: 15
+
+    steps:
+      - name: Download pending DMG artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name fluxzero-launchpad-macos-dmg-pending-notarization \
+            --dir launchpad-artifacts
+
+      - name: Locate DMG
+        id: locate
+        shell: bash
+        run: |
+          DMG_PATH=""
+          while IFS= read -r candidate; do
+            DMG_PATH="$candidate"
+            break
+          done < <(find launchpad-artifacts -type f -name 'Fluxzero-Launchpad.dmg' -print)
+          if [[ -z "$DMG_PATH" ]]; then
+            echo "::error::Could not find Fluxzero-Launchpad.dmg in downloaded artifact"
+            find launchpad-artifacts -type f -print
+            exit 1
+          fi
+          echo "dmg_path=$DMG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Check notarization status
+        id: notary
+        shell: bash
+        env:
+          SUBMISSION_ID: ${{ inputs.submission_id }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+        run: |
+          : "${APPLE_NOTARY_KEY_ID:?Missing APPLE_NOTARY_KEY_ID}"
+          : "${APPLE_NOTARY_ISSUER_ID:?Missing APPLE_NOTARY_ISSUER_ID}"
+          : "${APPLE_NOTARY_KEY_BASE64:?Missing APPLE_NOTARY_KEY_BASE64}"
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          KEY_PATH="$TMP_DIR/AuthKey_$APPLE_NOTARY_KEY_ID.p8"
+          printf '%s' "$APPLE_NOTARY_KEY_BASE64" | base64 -D > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+
+          xcrun notarytool info "$SUBMISSION_ID" \
+            --key "$KEY_PATH" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --output-format json | tee notarization-info.json
+
+          STATUS="$(/usr/bin/plutil -extract status raw -o - notarization-info.json)"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          case "$STATUS" in
+            Accepted)
+              echo "Notarization was accepted."
+              ;;
+            "In Progress")
+              echo "::notice::Notarization is still in progress; rerun this workflow later."
+              ;;
+            Invalid|Rejected)
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --key "$KEY_PATH" \
+                --key-id "$APPLE_NOTARY_KEY_ID" \
+                --issuer "$APPLE_NOTARY_ISSUER_ID" \
+                --output-format json | tee notarization-log.json || true
+              echo "::error::Notarization failed with status $STATUS"
+              exit 1
+              ;;
+            *)
+              echo "::error::Unexpected notarization status: $STATUS"
+              exit 1
+              ;;
+          esac
+
+      - name: Staple and verify DMG
+        if: steps.notary.outputs.status == 'Accepted'
+        shell: bash
+        env:
+          DMG_PATH: ${{ steps.locate.outputs.dmg_path }}
+        run: |
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+
+      - name: Upload notarized DMG artifact
+        if: steps.notary.outputs.status == 'Accepted'
+        uses: actions/upload-artifact@v6
+        with:
+          name: fluxzero-launchpad-macos-dmg
+          path: ${{ steps.locate.outputs.dmg_path }}
+          retention-days: 30
+
+      - name: Attach DMG to GitHub Release
+        if: steps.notary.outputs.status == 'Accepted' && inputs.version != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.version }}
+          files: ${{ steps.locate.outputs.dmg_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload notarization status metadata
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fluxzero-launchpad-notarization-status
+          path: |
+            notarization-info.json
+            notarization-log.json
+          if-no-files-found: warn
+          retention-days: 30
