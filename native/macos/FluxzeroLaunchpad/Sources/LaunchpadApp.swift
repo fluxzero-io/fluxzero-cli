@@ -1,38 +1,6 @@
 import AppKit
 import SwiftUI
 
-@main
-struct FluxzeroLaunchpadApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        Settings {
-            ProjectDefaultsSettingsView()
-                .environmentObject(LaunchpadModel.shared)
-                .frame(width: 560, height: 390)
-        }
-        .commands {
-            CommandGroup(replacing: .appInfo) {
-                Button("About Fluxzero Launchpad") {
-                    FluxzeroAppActions.showAboutPanel()
-                }
-            }
-            CommandGroup(replacing: .appSettings) {
-                Button("Settings...") {
-                    SettingsWindowController.shared.show()
-                }
-                .keyboardShortcut(",", modifiers: [.command])
-            }
-            CommandGroup(after: .newItem) {
-                Button("Check for Updates") {
-                    LaunchpadModel.shared.refresh()
-                }
-                .keyboardShortcut("r", modifiers: [.command])
-            }
-        }
-    }
-}
-
 @MainActor
 enum FluxzeroAppActions {
     static func showAboutPanel() {

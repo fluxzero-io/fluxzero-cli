@@ -12,6 +12,7 @@ enum FluxzeroTerminationPolicy {
     }
 }
 
+@main
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
