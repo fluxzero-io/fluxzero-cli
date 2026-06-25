@@ -29,6 +29,8 @@ on:
         required: false
       APPLE_APP_SPECIFIC_PASSWORD:
         required: false
+      APPLE_NOTARY_WEBHOOK_URL:
+        required: false
 
 jobs:
   macos-launchpad-build:
@@ -171,6 +173,7 @@ jobs:
         env:
           NOTARY_WAIT: '0'
           NOTARY_OUTPUT_PATH: native/macos/FluxzeroLaunchpad/build/notarization-submission.json
+          APPLE_NOTARY_WEBHOOK_URL: ${{ secrets.APPLE_NOTARY_WEBHOOK_URL }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
@@ -178,6 +181,15 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
+          if [[ -n "$APPLE_NOTARY_WEBHOOK_URL" ]]; then
+            separator="?"
+            if [[ "$APPLE_NOTARY_WEBHOOK_URL" == *"?"* ]]; then
+              separator="&"
+            fi
+            export NOTARY_WEBHOOK_URL="${APPLE_NOTARY_WEBHOOK_URL}${separator}source_run_id=${GITHUB_RUN_ID}&version=${{ inputs.version }}&repository=${GITHUB_REPOSITORY}"
+            echo "Notarization webhook is configured."
+          fi
+
           native/macos/FluxzeroLaunchpad/notarize-dmg.sh \
             "native/macos/FluxzeroLaunchpad/build/Fluxzero-Launchpad.dmg"
 

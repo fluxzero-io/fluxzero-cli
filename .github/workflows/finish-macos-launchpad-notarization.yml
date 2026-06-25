@@ -1,6 +1,8 @@
 name: Finish macOS Launchpad Notarization
 
 on:
+  repository_dispatch:
+    types: [macos-launchpad-notarization-complete]
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -8,8 +10,8 @@ on:
         required: true
         type: string
       submission_id:
-        description: 'Apple notarization submission id'
-        required: true
+        description: 'Optional Apple notarization submission id. If omitted, it is read from the source run metadata artifact.'
+        required: false
         type: string
       version:
         description: 'Optional release tag to update after stapling, for example 1.3.13'
@@ -25,18 +27,91 @@ jobs:
     name: Staple accepted macOS Launchpad DMG
     runs-on: macos-14
     timeout-minutes: 15
+    env:
+      SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id || inputs.source_run_id }}
+      INPUT_SUBMISSION_ID: ${{ github.event.client_payload.submission_id || inputs.submission_id }}
+      INPUT_VERSION: ${{ github.event.client_payload.version || inputs.version }}
 
     steps:
+      - name: Validate trigger context
+        shell: bash
+        run: |
+          if [[ -z "$SOURCE_RUN_ID" ]]; then
+            echo "::error::Missing source_run_id"
+            exit 1
+          fi
+
       - name: Download pending DMG artifact
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         run: |
           gh run download "$SOURCE_RUN_ID" \
             --repo "$GITHUB_REPOSITORY" \
             --name fluxzero-launchpad-macos-dmg-pending-notarization \
             --dir launchpad-artifacts
+
+      - name: Download notarization submission metadata
+        id: metadata
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..12}; do
+            if gh run download "$SOURCE_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name fluxzero-launchpad-notarization-submission \
+              --dir notarization-metadata; then
+              exit 0
+            fi
+
+            echo "Notarization metadata is not available yet; retrying in 10 seconds (${attempt}/12)."
+            sleep 10
+          done
+
+          echo "::warning::Could not download notarization metadata artifact"
+          exit 1
+
+      - name: Resolve notarization context
+        id: context
+        shell: bash
+        run: |
+          submission_id="$INPUT_SUBMISSION_ID"
+          version="$INPUT_VERSION"
+
+          context_path=""
+          if [[ -d notarization-metadata ]]; then
+            while IFS= read -r candidate; do
+              context_path="$candidate"
+              break
+            done < <(find notarization-metadata -type f -name 'notarization-context.env' -print)
+          fi
+
+          if [[ -n "$context_path" ]]; then
+            while IFS='=' read -r key value; do
+              case "$key" in
+                submission_id)
+                  if [[ -z "$submission_id" ]]; then
+                    submission_id="$value"
+                  fi
+                  ;;
+                version)
+                  if [[ -z "$version" ]]; then
+                    version="$value"
+                  fi
+                  ;;
+              esac
+            done < "$context_path"
+          fi
+
+          if [[ -z "$submission_id" ]]; then
+            echo "::error::Missing submission_id and no metadata artifact provided one"
+            exit 1
+          fi
+
+          echo "submission_id=$submission_id" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Locate DMG
         id: locate
@@ -58,7 +133,7 @@ jobs:
         id: notary
         shell: bash
         env:
-          SUBMISSION_ID: ${{ inputs.submission_id }}
+          SUBMISSION_ID: ${{ steps.context.outputs.submission_id }}
           APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           APPLE_NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
@@ -123,10 +198,10 @@ jobs:
           retention-days: 30
 
       - name: Attach DMG to GitHub Release
-        if: steps.notary.outputs.status == 'Accepted' && inputs.version != ''
+        if: steps.notary.outputs.status == 'Accepted' && steps.context.outputs.version != ''
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.version }}
+          tag_name: ${{ steps.context.outputs.version }}
           files: ${{ steps.locate.outputs.dmg_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

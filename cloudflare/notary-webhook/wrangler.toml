@@ -1,0 +1,20 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "fluxzero-notary-webhook"
+account_id = "fbb4ae392a349c3a4c7b713ec57dbc29"
+main = "src/index.js"
+compatibility_date = "2026-06-25"
+workers_dev = true
+
+[observability.logs]
+enabled = true
+
+[vars]
+GITHUB_OWNER = "fluxzero-io"
+GITHUB_REPO = "fluxzero-cli"
+GITHUB_EVENT_TYPE = "macos-launchpad-notarization-complete"
+
+# Secrets are configured by .github/workflows/deploy-notary-webhook.yml:
+# - WEBHOOK_TOKEN: random path token embedded in APPLE_NOTARY_WEBHOOK_URL
+# - GITHUB_APP_ID: GitHub App id
+# - GITHUB_APP_INSTALLATION_ID: installation id for fluxzero-io/fluxzero-cli
+# - GITHUB_APP_PRIVATE_KEY_BASE64: base64 encoded GitHub App private key PEM
