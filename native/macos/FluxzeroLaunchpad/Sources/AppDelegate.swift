@@ -13,6 +13,20 @@ enum FluxzeroTerminationPolicy {
 }
 
 @main
+enum FluxzeroLaunchpadMain {
+    private static var appDelegate: AppDelegate?
+
+    @MainActor
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        appDelegate = delegate
+        app.delegate = delegate
+        app.setActivationPolicy(.accessory)
+        app.run()
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
