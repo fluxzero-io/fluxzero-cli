@@ -798,7 +798,7 @@ struct AgentLauncher: Sendable {
         case .claude:
             return try launchClaude(projectPath: projectPath, prompt: prompt)
         case .cursor:
-            return try launchCursor(projectPath: projectPath)
+            return try launchCursor(projectPath: projectPath, prompt: prompt)
         }
     }
 
@@ -816,10 +816,11 @@ struct AgentLauncher: Sendable {
         return AgentLaunchResult(openedClaude: true)
     }
 
-    func launchCursor(projectPath: String) throws -> AgentLaunchResult {
+    func launchCursor(projectPath: String, prompt: String) throws -> AgentLaunchResult {
         if let cursor = findExecutable("cursor") {
             let result = try CommandRunner().run([cursor, projectPath], timeout: 15)
             if result.successful {
+                openCursorPrompt(prompt)
                 return AgentLaunchResult(openedCursor: true)
             }
         }
@@ -828,6 +829,7 @@ struct AgentLauncher: Sendable {
         if let appURL = cursorAppURL() {
             let configuration = NSWorkspace.OpenConfiguration()
             NSWorkspace.shared.open([projectURL], withApplicationAt: appURL, configuration: configuration)
+            openCursorPrompt(prompt)
             return AgentLaunchResult(openedCursor: true)
         }
 
@@ -850,6 +852,17 @@ struct AgentLauncher: Sendable {
 
     func claudeDeepLink(projectPath: String, prompt: String) -> URL {
         URL(string: "claude-cli://open?cwd=\(projectPath.urlEncoded)&q=\(prompt.ifBlank(defaultPrompt).urlEncoded)")!
+    }
+
+    func cursorPromptDeepLink(prompt: String) -> URL {
+        URL(string: "cursor://anysphere.cursor-deeplink/prompt?text=\(prompt.ifBlank(defaultPrompt).urlEncoded)")!
+    }
+
+    private func openCursorPrompt(_ prompt: String) {
+        let url = cursorPromptDeepLink(prompt: prompt)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(750)) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func isCodexInstalled() -> Bool {
@@ -890,7 +903,7 @@ struct AgentLauncher: Sendable {
         URL(string: "https://www.cursor.com/downloads")!
     }
 
-    private let defaultPrompt = "Open START_PROMPT.md and help me continue from there."
+    private let defaultPrompt = "Inspect this Fluxzero project and help me continue from here."
 }
 
 struct AgentLaunchResult: Sendable {
@@ -1087,9 +1100,9 @@ extension URL {
 
     var queryItems: [String: String] {
         URLComponents(url: self, resolvingAgainstBaseURL: false)?
-            .queryItems?
+            .percentEncodedQueryItems?
             .reduce(into: [String: String]()) { result, item in
-                result[item.name] = item.value ?? ""
+                result[item.name.formQueryDecoded] = (item.value ?? "").formQueryDecoded
             } ?? [:]
     }
 
@@ -1105,6 +1118,10 @@ extension URL {
 }
 
 extension String {
+    var formQueryDecoded: String {
+        replacingOccurrences(of: "+", with: "%20").removingPercentEncoding ?? self
+    }
+
     var urlEncoded: String {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")

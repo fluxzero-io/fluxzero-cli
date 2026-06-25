@@ -557,7 +557,7 @@ public sealed class AgentLauncher
                 OpenUri(ClaudeDeepLink(projectPath, prompt));
                 return new AgentLaunchResult { OpenedClaude = true };
             case AgentChoice.Cursor:
-                return LaunchCursor(projectPath);
+                return LaunchCursor(projectPath, prompt);
         }
 
         return new AgentLaunchResult();
@@ -580,7 +580,7 @@ public sealed class AgentLauncher
         return new AgentLaunchResult { OpenedCodex = true };
     }
 
-    private AgentLaunchResult LaunchCursor(string projectPath)
+    private AgentLaunchResult LaunchCursor(string projectPath, string prompt)
     {
         if (FindExecutable("cursor.exe") is { } cursor)
         {
@@ -591,6 +591,7 @@ public sealed class AgentLauncher
             };
             startInfo.ArgumentList.Add(projectPath);
             Process.Start(startInfo);
+            OpenCursorPrompt(prompt);
             return new AgentLaunchResult { OpenedCursor = true };
         }
 
@@ -603,6 +604,7 @@ public sealed class AgentLauncher
             };
             startInfo.ArgumentList.Add(projectPath);
             Process.Start(startInfo);
+            OpenCursorPrompt(prompt);
             return new AgentLaunchResult { OpenedCursor = true };
         }
 
@@ -616,10 +618,22 @@ public sealed class AgentLauncher
     private static Uri ClaudeDeepLink(string projectPath, string prompt) =>
         new($"claude-cli://open?cwd={Uri.EscapeDataString(projectPath)}&q={Uri.EscapeDataString(BlankFallback(prompt))}");
 
+    private static Uri CursorPromptDeepLink(string prompt) =>
+        new($"cursor://anysphere.cursor-deeplink/prompt?text={Uri.EscapeDataString(BlankFallback(prompt))}");
+
+    private static void OpenCursorPrompt(string prompt)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(750));
+            OpenUri(CursorPromptDeepLink(prompt));
+        });
+    }
+
     private static void OpenUri(Uri uri) => Process.Start(new ProcessStartInfo(uri.ToString()) { UseShellExecute = true });
 
     private static string BlankFallback(string prompt) =>
-        string.IsNullOrWhiteSpace(prompt) ? "Open START_PROMPT.md and help me continue from there." : prompt;
+        string.IsNullOrWhiteSpace(prompt) ? "Inspect this Fluxzero project and help me continue from here." : prompt;
 
     private static bool IsCodexInstalled() =>
         FindExecutable("codex.exe") is not null

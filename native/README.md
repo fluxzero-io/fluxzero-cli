@@ -26,7 +26,7 @@ Shared query parameters:
 
 - `name`: Project name for `new` and `create`.
 - `path` or `location`: Existing project path for `open`, output directory for `new` and `create`.
-- `prompt`: First prompt passed to Codex or Claude.
+- `prompt`: First prompt passed to the selected coding agent.
 - `agent`: `codex`, `claude`/`claude-code`, `cursor`, `finder`/`folder`/`explorer`, or `none`/`generate`.
 - `template`: Fluxzero template name.
 - `groupId`, `artifactId`, `packageName`, `description`, `build`, `git`: Advanced project-generation settings.
