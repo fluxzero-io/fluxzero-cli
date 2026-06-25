@@ -16,6 +16,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private static let logoRestingStep: CGFloat = 120
     private static let angleTolerance: CGFloat = 0.001
     private static let rotationStep = 360.0 / (fullRotationDuration * CGFloat(animationFramesPerSecond))
+    private static let recentProjectsLimit = 10
+    private static let missingProjectTooltip = "Project moved or deleted"
 
     init(model: LaunchpadModel) {
         self.model = model
@@ -72,8 +74,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private func rebuildMenu() {
         menu.removeAllItems()
+        model.reloadProjects()
 
         menu.addItem(item("Create Project...", action: #selector(showLaunchpad), enabled: !model.isBusy))
+        menu.addItem(openRecentProjectItem())
 
         menu.addItem(.separator())
         if model.isBusy {
@@ -94,6 +98,42 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         item.target = self
         item.isEnabled = enabled
         return item
+    }
+
+    private func openRecentProjectItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Open Recent Project", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: "Open Recent Project")
+        let recentProjects = Array(model.projects.prefix(Self.recentProjectsLimit))
+
+        if recentProjects.isEmpty {
+            submenu.addItem(statusItem(title: "No Recent Projects"))
+        } else {
+            for project in recentProjects {
+                submenu.addItem(recentProjectItem(project))
+            }
+        }
+
+        item.submenu = submenu
+        return item
+    }
+
+    private func recentProjectItem(_ project: GeneratedProject) -> NSMenuItem {
+        let isAvailable = projectDirectoryExists(at: project.path)
+        let item = NSMenuItem(
+            title: project.name,
+            action: isAvailable ? #selector(openRecentProject(_:)) : nil,
+            keyEquivalent: ""
+        )
+        item.target = self
+        item.representedObject = project
+        item.isEnabled = isAvailable
+        item.toolTip = isAvailable ? project.path : Self.missingProjectTooltip
+        return item
+    }
+
+    private func projectDirectoryExists(at path: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     private func statusItem(title: String) -> NSMenuItem {
@@ -205,6 +245,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func showLaunchpad() {
         LaunchpadWindowController.shared.show()
+    }
+
+    @objc private func openRecentProject(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? GeneratedProject else { return }
+        model.openRecentProject(project)
     }
 
     @objc private func refresh() {

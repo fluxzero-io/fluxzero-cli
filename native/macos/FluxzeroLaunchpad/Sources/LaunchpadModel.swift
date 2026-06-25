@@ -145,8 +145,17 @@ final class LaunchpadModel: ObservableObject {
         }
     }
 
+    func openRecentProject(_ project: GeneratedProject) {
+        let agent = creationDefaults.agentChoice == .none ? AgentChoice.finder : creationDefaults.agentChoice
+        openProject(project, agent: agent)
+    }
+
     func openFolder(_ project: GeneratedProject) {
         agentLauncher.openFolder(project.path)
+    }
+
+    func reloadProjects() {
+        projects = registry.listProjects()
     }
 
     func copyPrompt(_ project: GeneratedProject) {
