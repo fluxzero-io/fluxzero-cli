@@ -18,7 +18,7 @@ on:
         required: false
         type: string
         default: >-
-          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-14","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
+          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
   workflow_dispatch:
     inputs:
       version:
@@ -36,7 +36,7 @@ on:
         required: false
         type: string
         default: >-
-          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-14","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
+          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 
 jobs:
   native-build:
@@ -106,6 +106,24 @@ jobs:
           else
             ./cli/build/native/nativeCompile/flux version
             ./cli/build/native/nativeCompile/flux templates list
+          fi
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            archs="$(lipo -archs ./cli/build/native/nativeCompile/flux)"
+            echo "Native executable architectures: $archs"
+            case "${{ matrix.os }}" in
+              macos-amd64)
+                if [[ "$archs" != "x86_64" ]]; then
+                  echo "ERROR: macos-amd64 artifact must be x86_64, got: $archs"
+                  exit 1
+                fi
+                ;;
+              macos-arm64)
+                if [[ "$archs" != "arm64" ]]; then
+                  echo "ERROR: macos-arm64 artifact must be arm64, got: $archs"
+                  exit 1
+                fi
+                ;;
+            esac
           fi
           echo "Native image verification successful!"
 

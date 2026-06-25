@@ -139,7 +139,7 @@ jobs:
       version: ${{ needs.version.outputs.version }}
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
       targets-json: >-
-        {"include":[{"os":"macos-amd64","runner":"macos-14","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"}]}
+        {"include":[{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"}]}
 
   native-build-cli:
     needs: [version, build-and-test]

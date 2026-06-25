@@ -134,6 +134,18 @@ jobs:
           REQUIRE_BUNDLED_CLI: '1'
           CODE_SIGN_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}
         run: |
+          arm64_archs="$(lipo -archs "$FLUXZERO_CLI_ARM64")"
+          amd64_archs="$(lipo -archs "$FLUXZERO_CLI_AMD64")"
+          echo "Bundled arm64 CLI architectures: $arm64_archs"
+          echo "Bundled amd64 CLI architectures: $amd64_archs"
+          if [[ "$arm64_archs" != "arm64" ]]; then
+            echo "::error::Expected FLUXZERO_CLI_ARM64 to be arm64, got: $arm64_archs"
+            exit 1
+          fi
+          if [[ "$amd64_archs" != "x86_64" ]]; then
+            echo "::error::Expected FLUXZERO_CLI_AMD64 to be x86_64, got: $amd64_archs"
+            exit 1
+          fi
           chmod 755 "$FLUXZERO_CLI_ARM64" "$FLUXZERO_CLI_AMD64"
           native/macos/FluxzeroLaunchpad/package-dmg.sh
 
