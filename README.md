@@ -267,7 +267,9 @@ FluxZero CLI installs to:
 
 ## Templates
 
-Templates are sourced from the external repository [fluxzero-examples](https://github.com/fluxzero-io/fluxzero-examples) at build time. The build downloads the templates ZIP and packages them for use by the CLI. There is no fallback to in-repo templates or git; if downloading fails, the build fails. The downloaded archive is cached under `templates/build/examples-snapshot` and reused on subsequent builds unless you force a refresh.
+Templates are sourced from [fluxzero-examples](https://github.com/fluxzero-io/fluxzero-examples) at build time and packaged for use by the CLI. Local builds automatically use a sibling `../fluxzero-examples` checkout when present, so template changes can be tested without waiting for a published examples release. Override this with `-PexamplesSourceDir=/path/to/fluxzero-examples` or `EXAMPLES_SOURCE_DIR=/path/to/fluxzero-examples`.
+
+When no local source directory is available, the build downloads the `templates.zip` release asset and caches it under `templates/build/examples-snapshot`. Use `REFRESH_EXAMPLES=true` or `-PrefreshExamples=true` to force a fresh download.
 
 **Template features:**
 - Package name replacement

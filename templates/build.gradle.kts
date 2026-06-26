@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.PathSensitivity
+import java.util.zip.ZipFile
+
 plugins {
     kotlin("jvm")
 }
@@ -22,6 +25,12 @@ val examplesReleaseTag: String = (findProperty("examplesReleaseTag") as String?)
     ?: "latest"
 val examplesZipUrl: String? = (findProperty("examplesZipUrl") as String?)
     ?: System.getenv("EXAMPLES_ZIP_URL")
+val configuredExamplesSourceDir: String? = (findProperty("examplesSourceDir") as String?)
+    ?: System.getenv("EXAMPLES_SOURCE_DIR")
+val defaultLocalExamplesDir = rootProject.layout.projectDirectory.dir("../fluxzero-examples").asFile
+val examplesSourceDir = configuredExamplesSourceDir
+    ?.let { file(it) }
+    ?: defaultLocalExamplesDir.takeIf { it.isDirectory && it.resolve("flux-basic-java").isDirectory }
 val githubToken: String? = (findProperty("githubToken") as String?)
     ?: System.getenv("GITHUB_TOKEN")
 val refreshExamples: Boolean = ((findProperty("refreshExamples") as String?)
@@ -51,6 +60,7 @@ val packageTemplates by tasks.registering(Exec::class) {
     environment("EXAMPLES_REPO_URL", examplesRepoUrl)
     environment("EXAMPLES_RELEASE_TAG", examplesReleaseTag)
     if (examplesZipUrl != null) environment("EXAMPLES_ZIP_URL", examplesZipUrl)
+    if (examplesSourceDir != null) environment("EXAMPLES_SOURCE_DIR", examplesSourceDir.absolutePath)
     if (githubToken != null) environment("GITHUB_TOKEN", githubToken)
     if (refreshExamples) environment("REFRESH_EXAMPLES", "true")
     environment("CACHE_DIR", examplesWorkDir.get().asFile.absolutePath)
@@ -66,8 +76,57 @@ val packageTemplates by tasks.registering(Exec::class) {
     inputs.property("examplesRepoUrl", examplesRepoUrl)
     inputs.property("examplesReleaseTag", examplesReleaseTag)
     inputs.property("examplesZipUrl", examplesZipUrl ?: "")
+    inputs.property("examplesSourceDir", examplesSourceDir?.absolutePath ?: "")
+    if (examplesSourceDir != null) {
+        inputs.files(fileTree(examplesSourceDir) {
+            exclude(
+                "**/.git/**",
+                "**/.gradle/**",
+                "**/.idea/**",
+                "**/build/**",
+                "**/target/**",
+                "**/.DS_Store"
+            )
+        })
+            .withPropertyName("examplesSourceFiles")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     inputs.property("refreshExamples", refreshExamples)
     outputs.dir(generatedTemplatesDir)
+}
+
+val verifyPackagedTemplates by tasks.registering {
+    group = "verification"
+    description = "Verify packaged templates include the current local login support."
+
+    dependsOn(packageTemplates)
+
+    val javaTemplateZip = generatedTemplatesDir.map { it.file("flux-basic-java.zip") }
+    inputs.file(javaTemplateZip)
+
+    doLast {
+        val zipFile = javaTemplateZip.get().asFile
+        require(zipFile.isFile) { "Missing packaged template: ${zipFile.absolutePath}" }
+
+        ZipFile(zipFile).use { zip ->
+            val authEndpoint = zip.getEntry("src/main/java/com/example/app/authentication/AppAuthEndpoint.java")
+            require(authEndpoint != null) {
+                "flux-basic-java.zip is missing AppAuthEndpoint.java; generated login cannot work out-of-the-box."
+            }
+
+            val staleEntries = zip.entries().asSequence()
+                .filterNot { it.isDirectory }
+                .filter { it.name.endsWith(".java") || it.name.endsWith(".kt") }
+                .filter { entry ->
+                    zip.getInputStream(entry).bufferedReader().use { it.readText() }.contains("LocalStubIdp")
+                }
+                .map { it.name }
+                .toList()
+            require(staleEntries.isEmpty()) {
+                "flux-basic-java.zip still references the removed LocalStubIdp API: ${staleEntries.joinToString()}"
+            }
+        }
+    }
 }
 
 sourceSets {
@@ -79,7 +138,7 @@ sourceSets {
 }
 
 tasks.named("processResources") {
-    dependsOn(packageTemplates)
+    dependsOn(verifyPackagedTemplates)
 }
 
 tasks.test {

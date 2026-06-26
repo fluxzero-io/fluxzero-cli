@@ -13,6 +13,7 @@ trap 'code=$?; echo "ERROR: Script failed at line $LINENO (cmd: $BASH_COMMAND) w
 
 # Inputs (env vars); Gradle passes these when invoking this script
 EXAMPLES_ZIP_URL=${EXAMPLES_ZIP_URL:-}
+EXAMPLES_SOURCE_DIR=${EXAMPLES_SOURCE_DIR:-}
 EXAMPLES_REPO_URL=${EXAMPLES_REPO_URL:-"https://github.com/fluxzero-io/fluxzero-examples.git"}
 EXAMPLES_RELEASE_TAG=${EXAMPLES_RELEASE_TAG:-"latest"}
 GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -88,8 +89,14 @@ require_cmd unzip
 require_cmd zip
 require_cmd curl
 
+SOURCE_DIR="$CACHE_DIR"
+
+if [[ -n "$EXAMPLES_SOURCE_DIR" ]]; then
+  [[ -d "$EXAMPLES_SOURCE_DIR" ]] || { echo "ERROR: EXAMPLES_SOURCE_DIR is not a directory: $EXAMPLES_SOURCE_DIR" >&2; exit 1; }
+  SOURCE_DIR="$EXAMPLES_SOURCE_DIR"
+  echo "Using local examples source at $SOURCE_DIR"
 # Skip download if cache exists and refresh not requested
-if [[ -d "$CACHE_DIR" && -n "$(ls -A "$CACHE_DIR" 2>/dev/null || true)" && "$REFRESH_EXAMPLES" != "true" ]]; then
+elif [[ -d "$CACHE_DIR" && -n "$(ls -A "$CACHE_DIR" 2>/dev/null || true)" && "$REFRESH_EXAMPLES" != "true" ]]; then
   echo "Using cached examples at $CACHE_DIR (set REFRESH_EXAMPLES=true to refresh)"
 else
   rm -rf "$CACHE_DIR"
@@ -142,13 +149,13 @@ INDEX_FILE="$OUTPUT_DIR/templates.csv"
 # Gather top-level directories and sort (robust with set -e)
 shopt -s nullglob
 names=()
-for d in "$CACHE_DIR"/*/; do
+for d in "$SOURCE_DIR"/*/; do
   [[ -d "$d" ]] || continue
   names+=("$(basename "$d")")
 done
 
 if [[ ${#names[@]} -eq 0 ]]; then
-  echo "ERROR: No templates found in $CACHE_DIR" >&2
+  echo "ERROR: No templates found in $SOURCE_DIR" >&2
   exit 1
 fi
 
@@ -160,7 +167,8 @@ true > "$INDEX_FILE"
 while IFS= read -r name; do
   [[ -z "$name" ]] && continue
   echo "Zipping template: $name"
-  (cd "$CACHE_DIR/$name" && zip -qr "$OUTPUT_DIR/$name.zip" .)
+  (cd "$SOURCE_DIR/$name" && zip -qr "$OUTPUT_DIR/$name.zip" . \
+    -x "build/*" "build/**" "target/*" "target/**" ".gradle/*" ".gradle/**" ".idea/*" ".idea/**" ".DS_Store" "**/.DS_Store")
   echo "$name" >> "$INDEX_FILE"
 done < "$tmpnames"
 rm -f "$tmpnames"
