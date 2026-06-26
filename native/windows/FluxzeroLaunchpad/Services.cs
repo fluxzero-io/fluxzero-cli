@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -580,8 +581,13 @@ public sealed class AgentLauncher
         return new AgentLaunchResult { OpenedCodex = true };
     }
 
-    private AgentLaunchResult LaunchCursor(string projectPath, string prompt)
+    private AgentLaunchResult LaunchCursor(string projectPath, string _)
     {
+        if (TryOpenUri(CursorFileDeepLink(projectPath)))
+        {
+            return new AgentLaunchResult { OpenedCursor = true };
+        }
+
         if (FindExecutable("cursor.exe") is { } cursor)
         {
             var startInfo = new ProcessStartInfo(cursor)
@@ -591,7 +597,6 @@ public sealed class AgentLauncher
             };
             startInfo.ArgumentList.Add(projectPath);
             Process.Start(startInfo);
-            OpenCursorPrompt(prompt);
             return new AgentLaunchResult { OpenedCursor = true };
         }
 
@@ -604,7 +609,6 @@ public sealed class AgentLauncher
             };
             startInfo.ArgumentList.Add(projectPath);
             Process.Start(startInfo);
-            OpenCursorPrompt(prompt);
             return new AgentLaunchResult { OpenedCursor = true };
         }
 
@@ -618,16 +622,34 @@ public sealed class AgentLauncher
     private static Uri ClaudeDeepLink(string projectPath, string prompt) =>
         new($"claude-cli://open?cwd={Uri.EscapeDataString(projectPath)}&q={Uri.EscapeDataString(BlankFallback(prompt))}");
 
-    private static Uri CursorPromptDeepLink(string prompt) =>
-        new($"cursor://anysphere.cursor-deeplink/prompt?text={Uri.EscapeDataString(BlankFallback(prompt))}");
+    private static Uri CursorFileDeepLink(string projectPath) =>
+        new($"cursor://file{CursorFilePath(projectPath)}");
 
-    private static void OpenCursorPrompt(string prompt)
+    private static string CursorFilePath(string projectPath)
     {
-        _ = Task.Run(async () =>
+        var normalizedPath = Path.GetFullPath(projectPath).Replace('\\', '/');
+        if (!normalizedPath.StartsWith("/", StringComparison.Ordinal))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(750));
-            OpenUri(CursorPromptDeepLink(prompt));
-        });
+            normalizedPath = $"/{normalizedPath}";
+        }
+
+        return string.Join("/", normalizedPath.Split('/').Select(CursorPathSegment));
+    }
+
+    private static string CursorPathSegment(string segment) =>
+        Uri.EscapeDataString(segment).Replace("%3A", ":", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryOpenUri(Uri uri)
+    {
+        try
+        {
+            OpenUri(uri);
+            return true;
+        }
+        catch (Exception error) when (error is Win32Exception or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private static void OpenUri(Uri uri) => Process.Start(new ProcessStartInfo(uri.ToString()) { UseShellExecute = true });

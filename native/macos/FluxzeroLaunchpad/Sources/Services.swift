@@ -816,20 +816,22 @@ struct AgentLauncher: Sendable {
         return AgentLaunchResult(openedClaude: true)
     }
 
-    func launchCursor(projectPath: String, prompt: String) throws -> AgentLaunchResult {
+    func launchCursor(projectPath: String, prompt _: String) throws -> AgentLaunchResult {
+        let cursorProjectLink = cursorFileDeepLink(projectPath: projectPath)
+        if NSWorkspace.shared.open(cursorProjectLink) {
+            return AgentLaunchResult(openedCursor: true)
+        }
+
         if let cursor = findExecutable("cursor") {
             let result = try CommandRunner().run([cursor, projectPath], timeout: 15)
             if result.successful {
-                openCursorPrompt(prompt)
                 return AgentLaunchResult(openedCursor: true)
             }
         }
 
-        let projectURL = URL(fileURLWithPath: projectPath)
         if let appURL = cursorAppURL() {
             let configuration = NSWorkspace.OpenConfiguration()
-            NSWorkspace.shared.open([projectURL], withApplicationAt: appURL, configuration: configuration)
-            openCursorPrompt(prompt)
+            NSWorkspace.shared.open([cursorProjectLink], withApplicationAt: appURL, configuration: configuration)
             return AgentLaunchResult(openedCursor: true)
         }
 
@@ -854,15 +856,12 @@ struct AgentLauncher: Sendable {
         URL(string: "claude-cli://open?cwd=\(projectPath.urlEncoded)&q=\(prompt.ifBlank(defaultPrompt).urlEncoded)")!
     }
 
-    func cursorPromptDeepLink(prompt: String) -> URL {
-        URL(string: "cursor://anysphere.cursor-deeplink/prompt?text=\(prompt.ifBlank(defaultPrompt).urlEncoded)")!
-    }
-
-    private func openCursorPrompt(_ prompt: String) {
-        let url = cursorPromptDeepLink(prompt: prompt)
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(750)) {
-            NSWorkspace.shared.open(url)
-        }
+    func cursorFileDeepLink(projectPath: String) -> URL {
+        var components = URLComponents()
+        components.scheme = "cursor"
+        components.host = "file"
+        components.percentEncodedPath = URL(fileURLWithPath: projectPath).standardizedFileURL.path(percentEncoded: true)
+        return components.url!
     }
 
     private func isCodexInstalled() -> Bool {
