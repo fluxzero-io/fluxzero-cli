@@ -55,7 +55,10 @@ class PublishTest {
         val expectedJavaToolOptions = System.getenv("JAVA_TOOL_OPTIONS") ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
         assertEquals(expectedJavaToolOptions, spec.javaToolOptions)
         assertEquals(projectDir.resolve("target/classes"), spec.classesDirectory)
-        assertEquals(listOf(projectDir.resolve("target/fluxzero-dependencies/commons-lang3-3.14.0.jar")), spec.releaseDependencies)
+        assertEquals(
+            listOf(projectDir.resolve("target/fluxzero-dependencies/commons-lang3-3.14.0.jar")),
+            spec.dependencies.map { it.source }
+        )
         assertEquals("com.example", spec.labels["io.fluxzero.maven.group-id"])
         assertEquals("demo-app", spec.labels["io.fluxzero.maven.artifact-id"])
         assertTrue(result.stdout.contains("Published registry.fluxzero.io/demo-app:1.0.0"))
@@ -194,16 +197,18 @@ class PublishTest {
     private class CapturingPublisher : PackagePublisher {
         var spec: JavaPackagePublishSpec? = null
 
-        override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
+        override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
             this.spec = spec
-            return PackagePublishResult(
-                PackageNameSupport.packageReference(
-                    spec.registryHost,
-                    spec.teamId,
-                    spec.packageName,
-                    spec.packageVersion
-                ),
-                "sha256:test"
+            return listOf(
+                PackagePublishResult(
+                    PackageNameSupport.packageReference(
+                        spec.registryHost,
+                        spec.teamId,
+                        spec.packageName,
+                        spec.packageVersion
+                    ),
+                    "sha256:test"
+                )
             )
         }
     }

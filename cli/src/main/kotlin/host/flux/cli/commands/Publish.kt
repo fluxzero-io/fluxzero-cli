@@ -7,9 +7,9 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import host.flux.publishing.BaseImageSource
+import host.flux.publishing.JavaPackageDependency
 import host.flux.publishing.PackageNameSupport
 import host.flux.publishing.PackagePublisher
-import host.flux.publishing.PackagePublishResult
 import host.flux.publishing.JavaPackagePublishSpec
 import host.flux.publishing.JavaPackagePublisher
 import java.nio.file.Files
@@ -151,8 +151,7 @@ class Publish(
             baseImageSource = resolvedBaseImageSource,
             javaToolOptions = resolvedJavaToolOptions,
             classesDirectory = classesDirectory,
-            releaseDependencies = runtimeDependencies(dependenciesDirectory, snapshot = false),
-            snapshotDependencies = runtimeDependencies(dependenciesDirectory, snapshot = true),
+            dependencies = runtimeDependencies(dependenciesDirectory).map { JavaPackageDependency(it) },
             labels = mapOf(
                 "io.fluxzero.maven.group-id" to project.groupId,
                 "io.fluxzero.maven.artifact-id" to project.artifactId,
@@ -169,9 +168,11 @@ class Publish(
             resolvedPackageVersion
         )
         echo("Publishing $packageReference...")
-        val result = publisher.publish(spec)
-        echo("Published ${result.packageReference}")
-        echo("Digest: ${result.digest}")
+        val results = publisher.publish(spec)
+        results.forEach { result ->
+            echo("Published ${result.packageReference}")
+            echo("Digest: ${result.digest}")
+        }
     }
 
     private fun mavenCommand(projectDir: Path): List<String> {
@@ -184,7 +185,7 @@ class Publish(
         }
     }
 
-    private fun runtimeDependencies(directory: Path, snapshot: Boolean): List<Path> {
+    private fun runtimeDependencies(directory: Path): List<Path> {
         if (!Files.isDirectory(directory)) {
             return emptyList()
         }
@@ -192,7 +193,6 @@ class Publish(
             paths.asSequence()
                 .filter { Files.isRegularFile(it) }
                 .filter { it.fileName.toString().endsWith(".jar") }
-                .filter { it.fileName.toString().contains("-SNAPSHOT") == snapshot }
                 .sortedBy { it.fileName.toString() }
                 .toList()
         }
