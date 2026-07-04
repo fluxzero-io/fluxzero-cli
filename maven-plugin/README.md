@@ -59,36 +59,95 @@ mvn fluxzero:sync-project-files
 `publish-package` builds and publishes a Java OCI package from compiled classes and Maven runtime dependency artifacts.
 
 ```bash
-mvn -B package fluxzero:publish-package \
-  -Dfluxzero.package.registryToken="$FLUXZERO_REGISTRY_TOKEN" \
-  -Dfluxzero.package.name="my-service"
+mvn -B package fluxzero:publish-package
 ```
 
-Generated Fluxzero projects put stable package settings in the POM:
+Generated Fluxzero projects put stable package and registry settings in the POM. Use Maven interpolation for values that
+come from CI or the local environment.
 
 ```xml
 <configuration>
   <packageName>my-service</packageName>
   <applicationId>...</applicationId>
+  <images>
+    <image>registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/my-service</image>
+  </images>
+  <tags>
+    <tag>${project.version}</tag>
+    <tag>sha-${env.GITHUB_SHA}</tag>
+  </tags>
+  <credentials>
+    <credential>
+      <registryHost>registry.fluxzero.io</registryHost>
+      <registryUsername>github-ci</registryUsername>
+      <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
+    </credential>
+  </credentials>
 </configuration>
 ```
 
-Keep registry tokens and user credentials out of the POM.
+Keep literal registry tokens and user credentials out of the POM. Refer to environment variables or Maven settings
+instead.
+
+General behavior can still be overridden from the command line or environment:
 
 | Setting | Command-line property | Environment fallback | Default |
 |---------|-----------------------|----------------------|---------|
-| Registry host | `fluxzero.package.registryHost` | `FLUXZERO_REGISTRY_HOST` | `registry.fluxzero.io` |
-| Registry token | `fluxzero.package.registryToken` | `FLUXZERO_REGISTRY_TOKEN` | required |
-| Team id | `fluxzero.team.id` | `FLUXZERO_TEAM_ID` | omitted |
-| Package name | `fluxzero.package.name` | `FLUXZERO_PACKAGE_NAME` | required |
-| Package version | `fluxzero.package.version` | `FLUXZERO_PACKAGE_VERSION` | generated git/time-based tag |
 | Allow dirty worktree | `fluxzero.package.allowDirty` | — | `false` |
-| Application id | `fluxzero.package.applicationId` | `FLUXZERO_PACKAGE_ID` | omitted |
 | Main class | `fluxzero.package.mainClass` | `FLUXZERO_MAIN_CLASS` | `Start-Class` or `Main-Class` from built artifact manifest |
 | Base image | `fluxzero.package.baseImage` | `FLUXZERO_BASE_IMAGE` | Fluxzero Java distroless runtime |
 | Base image source | `fluxzero.package.baseImageSource` | `FLUXZERO_BASE_IMAGE_SOURCE` | `registry` |
 | Skip publish | `fluxzero.package.skip` | — | `false` |
 | Java tool options | `fluxzero.package.javaToolOptions` | `JAVA_TOOL_OPTIONS` | process env var, then Fluxzero JVM defaults |
+
+Package and registry configuration is Maven configuration only:
+
+| Setting | Default |
+|---------|---------|
+| `packageName` | required |
+| `applicationId` | omitted |
+| `registryHost` | `registry.fluxzero.io`, used only when `images` is omitted |
+| `registryUsername` | `fluxzero`, used only when `credentials` is omitted |
+| `registryToken` | required when `credentials` is omitted |
+| `teamId` | omitted, used only when `images` is omitted |
+| `packageVersion` | generated git/time-based tag, used only when `tags` is omitted |
+| `images` | `${registryHost}/${teamId}/${packageName}` or `${registryHost}/${packageName}` |
+| `tags` | `${packageVersion}` or generated git/time-based tag |
+| `credentials` | single credential from `registryHost`, `registryUsername`, and `registryToken` |
+
+To publish the same package to multiple repositories or tags, configure `images`, `tags`, and `credentials`.
+
+```xml
+<configuration>
+  <packageName>my-service</packageName>
+  <images>
+    <image>registry.fluxzero.io/${env.FLUXZERO_ORGANISATION_ID}/my-service</image>
+    <image>ghcr.io/${env.GITHUB_REPOSITORY}-${project.artifactId}</image>
+  </images>
+  <tags>
+    <tag>${project.version}</tag>
+    <tag>sha-${env.GITHUB_SHA}</tag>
+  </tags>
+  <credentials>
+    <credential>
+      <registryHost>registry.fluxzero.io</registryHost>
+      <registryUsername>github-ci</registryUsername>
+      <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
+    </credential>
+    <credential>
+      <registryHost>ghcr.io</registryHost>
+      <registryUsername>${env.GITHUB_ACTOR}</registryUsername>
+      <registryToken>${env.GITHUB_TOKEN}</registryToken>
+    </credential>
+  </credentials>
+</configuration>
+```
+
+| Credential setting | Description |
+|--------------------|-------------|
+| `registryHost` | Registry host for this credential |
+| `registryUsername` | Registry username |
+| `registryToken` | Registry token |
 
 The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.package.allowDirty=true` for local experiments; dirty
 pushes get a `-dirty` tag suffix.
@@ -102,6 +161,8 @@ process `JAVA_TOOL_OPTIONS` value when it exists, otherwise it uses Fluxzero JVM
 
 Generated Maven projects set `project.build.outputTimestamp` to `2000-01-01T00:00:00Z` unless the POM already has a
 value. The package publisher also uses deterministic OCI creation and file modification timestamps for Fluxzero layers.
+Runtime dependencies are written to the container classpath explicitly. Application classes come first, then Maven runtime
+dependencies in Maven's runtime classpath order, comparable to `exec:java`; the dependency layer uses the same order.
 
 The package contains these labels:
 

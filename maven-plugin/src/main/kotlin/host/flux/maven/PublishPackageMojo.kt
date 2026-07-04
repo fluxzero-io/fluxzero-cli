@@ -1,10 +1,11 @@
 package host.flux.maven
 
 import host.flux.publishing.BaseImageSource
+import host.flux.publishing.JavaPackageDependency
+import host.flux.publishing.JavaPackageRegistryCredential
 import host.flux.publishing.PackageNameSupport
 import host.flux.publishing.JavaPackagePublishSpec
 import host.flux.publishing.JavaPackagePublisher
-import org.apache.maven.artifact.Artifact
 import org.apache.maven.execution.MavenSession
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
@@ -15,6 +16,8 @@ import org.apache.maven.plugins.annotations.Parameter
 import org.apache.maven.plugins.annotations.ResolutionScope
 import org.apache.maven.project.MavenProject
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.jar.JarFile
 
 /**
@@ -42,31 +45,52 @@ class PublishPackageMojo : AbstractMojo() {
     @Parameter(defaultValue = "\${session}", readonly = true)
     private var session: MavenSession? = null
 
-    @Parameter(property = "fluxzero.package.registryHost")
+    @Parameter
     private var registryHost: String? = null
+
+    @Parameter
+    private var registryUsername: String? = null
 
     /**
      * Fluxzero registry token. In CI this can be the registry token returned by the Fluxzero GitHub OIDC exchange.
      */
-    @Parameter(property = "fluxzero.package.registryToken")
+    @Parameter
     private var registryToken: String? = null
+
+    /**
+     * Optional image repositories.
+     */
+    @Parameter
+    private var images: List<String> = emptyList()
+
+    /**
+     * Optional tags.
+     */
+    @Parameter
+    private var tags: List<String> = emptyList()
+
+    /**
+     * Optional registry credentials. When omitted, the legacy single-target registry settings are used.
+     */
+    @Parameter
+    private var credentials: List<RegistryCredentialConfiguration> = emptyList()
 
     /**
      * Public package name.
      */
-    @Parameter(property = "fluxzero.package.name")
+    @Parameter
     private var packageName: String? = null
 
     /**
      * Fluxzero team id used as the first registry path segment.
      */
-    @Parameter(property = "fluxzero.team.id")
+    @Parameter
     private var teamId: String? = null
 
     /**
      * Package version to push. When omitted, a git/time-based tag is generated.
      */
-    @Parameter(property = "fluxzero.package.version")
+    @Parameter
     private var packageVersion: String? = null
 
     /**
@@ -78,7 +102,7 @@ class PublishPackageMojo : AbstractMojo() {
     /**
      * Optional Fluxzero application id associated with this package. Stored as package metadata for future deployment flows.
      */
-    @Parameter(property = "fluxzero.package.applicationId")
+    @Parameter
     private var applicationId: String? = null
 
     /**
@@ -121,14 +145,22 @@ class PublishPackageMojo : AbstractMojo() {
             return
         }
 
-        val resolvedRegistryHost = configured("fluxzero.package.registryHost", "FLUXZERO_REGISTRY_HOST", registryHost)
+        val resolvedRegistryHost = registryHost?.takeIf { it.isNotBlank() }
             ?: PackageNameSupport.DEFAULT_REGISTRY_HOST
-        val resolvedToken = configured("fluxzero.package.registryToken", "FLUXZERO_REGISTRY_TOKEN", registryToken)
+        val resolvedRegistryUsername = registryUsername?.takeIf { it.isNotBlank() }
+            ?: JavaPackagePublishSpec.DEFAULT_REGISTRY_USERNAME
+        val resolvedToken = registryToken?.takeIf { it.isNotBlank() }
         if (resolvedRegistryHost.isNullOrBlank()) {
-            throw MojoFailureException("Missing registry host. Set -Dfluxzero.package.registryHost or FLUXZERO_REGISTRY_HOST.")
+            throw MojoFailureException("Missing registry host. Configure <registryHost> in the fluxzero-maven-plugin.")
         }
-        if (resolvedToken.isNullOrBlank()) {
-            throw MojoFailureException("Missing registry token. Set -Dfluxzero.package.registryToken or FLUXZERO_REGISTRY_TOKEN.")
+        if (resolvedRegistryUsername.isBlank()) {
+            throw MojoFailureException("Missing registry username. Configure <registryUsername> in the fluxzero-maven-plugin.")
+        }
+        if (resolvedToken.isNullOrBlank() && credentials.isEmpty()) {
+            throw MojoFailureException(
+                "Missing registry token. Configure <registryToken>, for example with Maven interpolation like " +
+                    "<registryToken>\${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>."
+            )
         }
         if (PackageNameSupport.isPlainHttpRegistryHost(resolvedRegistryHost)) {
             throw MojoFailureException(
@@ -137,18 +169,16 @@ class PublishPackageMojo : AbstractMojo() {
             )
         }
 
-        val resolvedPackageName = configured("fluxzero.package.name", "FLUXZERO_PACKAGE_NAME", packageName)
+        val resolvedPackageName = packageName?.takeIf { it.isNotBlank() }
             ?: throw MojoFailureException(
-                "Missing package name. Configure <packageName> in the fluxzero-maven-plugin, " +
-                    "set -Dfluxzero.package.name, or set FLUXZERO_PACKAGE_NAME."
+                "Missing package name. Configure <packageName> in the fluxzero-maven-plugin."
             )
-        val resolvedTeamId = configured("fluxzero.team.id", "FLUXZERO_TEAM_ID", teamId)
+        val resolvedTeamId = teamId?.takeIf { it.isNotBlank() }
         val gitInfo = PackageNameSupport.gitInfo(project.basedir.toPath())
         ensureCleanGitWorktree(gitInfo)
-        val resolvedVersion = configured("fluxzero.package.version", "FLUXZERO_PACKAGE_VERSION", packageVersion)
-            ?.let { markDirtyPackageVersion(it, gitInfo) }
-            ?: automaticPackageVersion()
-        val resolvedApplicationId = configured("fluxzero.package.applicationId", "FLUXZERO_PACKAGE_ID", applicationId)
+        val resolvedTags = resolveTags(gitInfo)
+        val resolvedVersion = resolvedTags.first()
+        val resolvedApplicationId = applicationId?.takeIf { it.isNotBlank() }
         if (!PackageNameSupport.isValidPackageName(resolvedPackageName)) {
             throw MojoFailureException("Invalid package name '$resolvedPackageName'.")
         }
@@ -180,18 +210,23 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedJavaToolOptions = configuredValue("fluxzero.package.javaToolOptions", "JAVA_TOOL_OPTIONS", javaToolOptions)
             ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
 
-        val packageReference = PackageNameSupport.packageReference(
-            resolvedRegistryHost,
-            resolvedTeamId,
-            resolvedPackageName,
-            resolvedVersion
+        val resolvedImages = resolveImages(
+            defaultRegistryHost = resolvedRegistryHost,
+            defaultPackageName = resolvedPackageName
         )
-        log.info("Building Fluxzero Java package $packageReference")
+        val resolvedCredentials = resolveCredentials(
+            defaultRegistryHost = resolvedRegistryHost,
+            defaultRegistryUsername = resolvedRegistryUsername,
+            defaultRegistryToken = resolvedToken
+        )
+        val packageReferences = resolvedImages.flatMap { image -> resolvedTags.map { tag -> "$image:$tag" } }.joinToString(", ")
+        log.info("Building Fluxzero Java package $packageReferences")
 
         try {
-            val result = JavaPackagePublisher().publish(
+            val results = JavaPackagePublisher().publish(
                 JavaPackagePublishSpec(
                     registryHost = resolvedRegistryHost,
+                    registryUsername = resolvedRegistryUsername,
                     registryToken = resolvedToken,
                     teamId = resolvedTeamId,
                     packageName = resolvedPackageName,
@@ -202,16 +237,20 @@ class PublishPackageMojo : AbstractMojo() {
                     baseImageSource = resolvedBaseImageSource,
                     javaToolOptions = resolvedJavaToolOptions,
                     classesDirectory = outputDirectory.toPath(),
-                    releaseDependencies = runtimeArtifacts(snapshot = false).map { it.file.toPath() },
-                    snapshotDependencies = runtimeArtifacts(snapshot = true).map { it.file.toPath() },
+                    dependencies = runtimeDependencyPaths().map { JavaPackageDependency(it) },
                     labels = mavenLabels(),
+                    images = resolvedImages,
+                    tags = resolvedTags,
+                    credentials = resolvedCredentials,
                     toolName = "fluxzero-maven-plugin"
                 )
             )
 
-            log.info("Published Fluxzero package ${result.packageReference} with digest ${result.digest}")
+            results.forEach { result ->
+                log.info("Published Fluxzero package ${result.packageReference} with digest ${result.digest}")
+            }
         } catch (e: Exception) {
-            throw MojoExecutionException("Failed to publish Fluxzero package $packageReference", e)
+            throw MojoExecutionException("Failed to publish Fluxzero package $packageReferences", e)
         }
     }
 
@@ -250,19 +289,93 @@ class PublishPackageMojo : AbstractMojo() {
         return JarFile(jarFile).use { jar -> PackageNameSupport.mainClassFromManifest(jar.manifest?.mainAttributes) }
     }
 
-    private fun mavenLabels(): Map<String, String> = mapOf(
-        "io.fluxzero.maven.group-id" to project.groupId,
-        "io.fluxzero.maven.artifact-id" to project.artifactId,
-        "io.fluxzero.maven.version" to project.version
-    )
+    private fun mavenLabels(): Map<String, String> = buildMap {
+        put("io.fluxzero.maven.group-id", project.groupId)
+        put("io.fluxzero.maven.artifact-id", project.artifactId)
+        put("io.fluxzero.maven.version", project.version)
+        githubSourceRepository()?.let { put("org.opencontainers.image.source", it) }
+    }
 
-    private fun runtimeArtifacts(snapshot: Boolean): List<Artifact> =
-        project.artifacts
-            .filter { artifact ->
-                artifact.file?.isFile == true &&
-                    artifact.type == "jar" &&
-                    artifact.scope in setOf(Artifact.SCOPE_COMPILE, Artifact.SCOPE_RUNTIME) &&
-                    artifact.isSnapshot == snapshot
+    private fun githubSourceRepository(): String? {
+        val repository = System.getenv("GITHUB_REPOSITORY")?.takeIf { it.isNotBlank() } ?: return null
+        val serverUrl = System.getenv("GITHUB_SERVER_URL")?.takeIf { it.isNotBlank() } ?: "https://github.com"
+        return "${serverUrl.trimEnd('/')}/$repository"
+    }
+
+    private fun resolveTags(gitInfo: PackageNameSupport.GitInfo?): List<String> {
+        val configuredTags = tags.map { it.trim() }.filter { it.isNotBlank() }
+        if (configuredTags.isNotEmpty()) {
+            return configuredTags.map { markDirtyPackageVersion(it, gitInfo) }
+        }
+        return listOf(
+            packageVersion?.takeIf { it.isNotBlank() }
+                ?.let { markDirtyPackageVersion(it, gitInfo) }
+                ?: automaticPackageVersion()
+        )
+    }
+
+    private fun resolveImages(defaultRegistryHost: String, defaultPackageName: String): List<String> {
+        val configuredImages = images.map { it.trim() }.filter { it.isNotBlank() }
+        return configuredImages.ifEmpty {
+            listOf(
+                PackageNameSupport.packageRepository(
+                    defaultRegistryHost,
+                    teamId?.takeIf { it.isNotBlank() },
+                    defaultPackageName
+                )
+            )
+        }
+    }
+
+    private fun resolveCredentials(
+        defaultRegistryHost: String,
+        defaultRegistryUsername: String,
+        defaultRegistryToken: String?
+    ): List<JavaPackageRegistryCredential> {
+        if (credentials.isEmpty()) {
+            return listOf(
+                JavaPackageRegistryCredential(
+                    registryHost = defaultRegistryHost,
+                    registryUsername = defaultRegistryUsername,
+                    registryToken = defaultRegistryToken.orEmpty()
+                )
+            )
+        }
+        return credentials.mapIndexed { index, credential ->
+            val registryHost = credential.registryHost?.takeIf { it.isNotBlank() }
+                ?: defaultRegistryHost
+            val registryUsername = credential.registryUsername?.takeIf { it.isNotBlank() }
+                ?: defaultRegistryUsername
+            val registryToken = credential.registryToken?.takeIf { it.isNotBlank() }
+                ?: defaultRegistryToken
+            if (registryToken.isNullOrBlank()) {
+                throw MojoFailureException(
+                    "Missing registry token for registry credential ${index + 1}. " +
+                        "Configure <registryToken>, for example with Maven interpolation like " +
+                        "<registryToken>\${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>."
+                )
             }
-            .sortedWith(compareBy<Artifact> { it.groupId }.thenBy { it.artifactId }.thenBy { it.version }.thenBy { it.file.name })
+            JavaPackageRegistryCredential(
+                registryHost = registryHost,
+                registryUsername = registryUsername,
+                registryToken = registryToken
+            )
+        }
+    }
+
+    private fun runtimeDependencyPaths(): List<Path> =
+        MavenRuntimeClasspathOrder.runtimeJars(project.runtimeClasspathElements)
+}
+
+class RegistryCredentialConfiguration {
+    var registryHost: String? = null
+    var registryUsername: String? = null
+    var registryToken: String? = null
+}
+
+internal object MavenRuntimeClasspathOrder {
+    fun runtimeJars(classpathElements: Iterable<String>): List<Path> =
+        classpathElements
+            .map(Path::of)
+            .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
 }

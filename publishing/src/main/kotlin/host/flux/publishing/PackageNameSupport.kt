@@ -25,13 +25,13 @@ object PackageNameSupport {
         packageReference(registryHost, null, packageName, version)
 
     fun packageReference(registryHost: String, teamId: String?, packageName: String, version: String): String {
+        return "${packageRepository(registryHost, teamId, packageName)}:$version"
+    }
+
+    fun packageRepository(registryHost: String, teamId: String?, packageName: String): String {
         val registry = registryAuthority(registryHost)
         val teamPath = teamId?.trim('/')?.takeIf { it.isNotBlank() }
-        return if (teamPath == null) {
-            "$registry/$packageName:$version"
-        } else {
-            "$registry/$teamPath/$packageName:$version"
-        }
+        return if (teamPath == null) "$registry/$packageName" else "$registry/$teamPath/$packageName"
     }
 
     fun registryAuthority(registryHost: String): String {
@@ -123,6 +123,25 @@ object PackageNameSupport {
 
     fun isValidTeamId(teamId: String): Boolean =
         isValidPackageName(teamId)
+
+    fun isValidNamespace(namespace: String): Boolean =
+        namespace.trim('/').split('/').all { isValidPackageName(it) }
+
+    fun isValidImageRepository(image: String): Boolean {
+        val normalized = image.trim()
+        if (normalized.isBlank() || normalized != normalized.lowercase(Locale.ROOT) || normalized.contains(Regex("\\s"))) {
+            return false
+        }
+        if (!normalized.contains("/") || normalized.contains("@")) {
+            return false
+        }
+        if (normalized.substringAfterLast("/").contains(":")) {
+            return false
+        }
+        val registryHost = registryAuthority(normalized)
+        val path = normalized.substringAfter("/")
+        return registryHost.isNotBlank() && path.split("/").all { isValidPackageName(it) }
+    }
 
     fun isValidTag(version: String): Boolean = tagPattern.matches(version)
 

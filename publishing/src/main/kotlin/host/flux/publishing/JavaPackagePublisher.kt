@@ -14,28 +14,24 @@ import java.time.Instant
 import kotlin.streams.asSequence
 
 fun interface PackagePublisher {
-    fun publish(spec: JavaPackagePublishSpec): PackagePublishResult
+    fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult>
 }
 
 class JavaPackagePublisher : PackagePublisher {
-    override fun publish(spec: JavaPackagePublishSpec): PackagePublishResult {
+    override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
         spec.validate()
 
-        val packageReference = PackageNameSupport.packageReference(
-            spec.registryHost,
-            spec.teamId,
-            spec.packageName,
-            spec.packageVersion
-        )
-        val builder = createContainerBuilder(spec)
+        return spec.packageReferences().map { packageReference ->
+            val credential = spec.credentialFor(packageReference.image)
+            val builder = createContainerBuilder(spec)
+            val targetImage = RegistryImage.named(packageReference.reference)
+                .addCredential(credential.registryUsername, credential.registryToken)
+            val containerizer = Containerizer.to(targetImage)
+                .setToolName(spec.toolName)
 
-        val targetImage = RegistryImage.named(packageReference)
-            .addCredential("fluxzero", spec.registryToken)
-        val containerizer = Containerizer.to(targetImage)
-            .setToolName(spec.toolName)
-
-        val container = builder.containerize(containerizer)
-        return PackagePublishResult(packageReference, container.digest.toString())
+            val container = builder.containerize(containerizer)
+            PackagePublishResult(packageReference.reference, container.digest.toString())
+        }
     }
 
     internal fun buildPlan(spec: JavaPackagePublishSpec): ContainerBuildPlan {
@@ -44,13 +40,14 @@ class JavaPackagePublisher : PackagePublisher {
     }
 
     private fun createContainerBuilder(spec: JavaPackagePublishSpec): JibContainerBuilder {
+        val dependencies = spec.orderedDependencies()
         val builder = when (spec.baseImageSource) {
             BaseImageSource.REGISTRY -> Jib.from(spec.baseImage)
             BaseImageSource.DOCKER_DAEMON -> Jib.from(DockerDaemonImage.named(spec.baseImage))
         }
             .setCreationTime(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP)
             .setWorkingDirectory(AbsoluteUnixPath.get("/app"))
-            .setEntrypoint("java", "-cp", "/app/classes:/app/libs/*", spec.mainClass)
+            .setEntrypoint("java", "-cp", classpath(dependencies), spec.mainClass)
             .addLabel("org.opencontainers.image.title", spec.packageName)
             .addLabel("org.opencontainers.image.version", spec.packageVersion)
             .addLabel("io.fluxzero.package.metadata-version", "1")
@@ -66,16 +63,15 @@ class JavaPackagePublisher : PackagePublisher {
             }
         }
 
-        addDependencyLayer(builder, "dependencies", spec.releaseDependencies)
-        addDependencyLayer(builder, "snapshot-dependencies", spec.snapshotDependencies)
         addApplicationLayer(builder, spec.classesDirectory)
+        addDependencyLayer(builder, "dependencies", dependencies)
         return builder
     }
 
     private fun addDependencyLayer(
         builder: JibContainerBuilder,
         name: String,
-        dependencies: List<Path>
+        dependencies: List<JavaPackageDependency>
     ) {
         if (dependencies.isEmpty()) {
             return
@@ -83,8 +79,8 @@ class JavaPackagePublisher : PackagePublisher {
         val layerBuilder = FileEntriesLayer.builder().setName(name)
         dependencies.forEach { dependency ->
             layerBuilder.addEntry(
-                dependency,
-                AbsoluteUnixPath.get("/app/libs/${dependency.fileName}"),
+                dependency.source,
+                AbsoluteUnixPath.get(dependency.containerPath),
                 JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP
             )
         }
@@ -114,6 +110,9 @@ class JavaPackagePublisher : PackagePublisher {
 
     private fun normalizedRelativePath(root: Path, file: Path): String =
         root.relativize(file).joinToString("/")
+
+    private fun classpath(dependencies: List<JavaPackageDependency>): String =
+        (listOf("/app/classes") + dependencies.map { it.containerPath }).joinToString(":")
 }
 
 enum class BaseImageSource {
@@ -134,7 +133,8 @@ enum class BaseImageSource {
 
 data class JavaPackagePublishSpec(
     val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
-    val registryToken: String,
+    val registryUsername: String = DEFAULT_REGISTRY_USERNAME,
+    val registryToken: String? = null,
     val teamId: String? = null,
     val packageName: String,
     val packageVersion: String,
@@ -144,14 +144,18 @@ data class JavaPackagePublishSpec(
     val baseImageSource: BaseImageSource = BaseImageSource.REGISTRY,
     val javaToolOptions: String = DEFAULT_JAVA_TOOL_OPTIONS,
     val classesDirectory: Path,
-    val releaseDependencies: List<Path> = emptyList(),
-    val snapshotDependencies: List<Path> = emptyList(),
+    val dependencies: List<JavaPackageDependency> = emptyList(),
     val labels: Map<String, String> = emptyMap(),
+    val images: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val credentials: List<JavaPackageRegistryCredential> = emptyList(),
     val toolName: String = "fluxzero-publishing"
 ) {
     companion object {
         val REPRODUCIBLE_CONTAINER_TIMESTAMP: Instant = Instant.EPOCH
         val REPRODUCIBLE_FILE_TIMESTAMP: Instant = Instant.EPOCH
+
+        const val DEFAULT_REGISTRY_USERNAME = "fluxzero"
 
         const val DEFAULT_BASE_IMAGE =
             "gcr.io/distroless/java25-debian13:nonroot@sha256:f25ab728deeafec63d7176a473536f4f4347d42db7e24b3bb0fb7b05ff84d248"
@@ -161,22 +165,92 @@ data class JavaPackagePublishSpec(
     }
 
     fun validate() {
-        require(registryHost.isNotBlank()) { "Missing registry host." }
-        require(registryToken.isNotBlank()) { "Missing registry token." }
-        require(!PackageNameSupport.isPlainHttpRegistryHost(registryHost)) {
-            "Fluxzero registry host must use HTTPS when a registry token is sent. " +
-                "Use an https:// registry host or the local TLS proxy for end-to-end tests."
-        }
+        require(PackageNameSupport.isValidPackageName(packageName)) { "Invalid package name '$packageName'." }
+        require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }
         teamId?.takeIf { it.isNotBlank() }?.let {
             require(PackageNameSupport.isValidTeamId(it)) { "Invalid team id '$it'." }
         }
-        require(PackageNameSupport.isValidPackageName(packageName)) { "Invalid package name '$packageName'." }
-        require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }
         require(mainClass.isNotBlank()) { "Missing application main class." }
         require(baseImage.isNotBlank()) { "Missing Java runtime base image." }
         require(classesDirectory.toFile().isDirectory) {
             "Project output directory does not exist: ${classesDirectory.toAbsolutePath()}."
         }
+        orderedDependencies().forEach { dependency ->
+            require(Files.isRegularFile(dependency.source)) {
+                "Dependency JAR does not exist: ${dependency.source.toAbsolutePath()}."
+            }
+        }
+        packageReferences().forEach { credentialFor(it.image) }
+        resolvedCredentials().forEach { it.validate() }
+    }
+
+    fun packageReferences(): List<JavaPackageReference> =
+        resolvedImages().flatMap { image ->
+            resolvedTags().map { tag ->
+                require(PackageNameSupport.isValidTag(tag)) { "Invalid package tag '$tag'." }
+                JavaPackageReference(image, "$image:$tag")
+            }
+        }
+
+    fun credentialFor(image: String): JavaPackageRegistryCredential {
+        val registryHost = PackageNameSupport.registryAuthority(image)
+        return resolvedCredentials().firstOrNull { credential ->
+            PackageNameSupport.registryAuthority(credential.registryHost) == registryHost
+        } ?: throw IllegalArgumentException("Missing registry credential for '$registryHost'.")
+    }
+
+    private fun resolvedImages(): List<String> =
+        images.takeIf { it.isNotEmpty() }
+            ?: listOf(PackageNameSupport.packageRepository(registryHost, teamId, packageName))
+
+    private fun resolvedTags(): List<String> =
+        tags.takeIf { it.isNotEmpty() } ?: listOf(packageVersion)
+
+    private fun resolvedCredentials(): List<JavaPackageRegistryCredential> =
+        credentials.takeIf { it.isNotEmpty() }
+            ?: listOf(
+                JavaPackageRegistryCredential(
+                    registryHost = registryHost,
+                    registryUsername = registryUsername,
+                    registryToken = registryToken.orEmpty()
+                )
+            )
+
+    internal fun orderedDependencies(): List<JavaPackageDependency> = dependencies
+}
+
+data class JavaPackageReference(
+    val image: String,
+    val reference: String
+) {
+    init {
+        require(PackageNameSupport.isValidImageRepository(image)) { "Invalid package image '$image'." }
+    }
+}
+
+data class JavaPackageRegistryCredential(
+    val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
+    val registryUsername: String = JavaPackagePublishSpec.DEFAULT_REGISTRY_USERNAME,
+    val registryToken: String
+) {
+    fun validate() {
+        require(registryHost.isNotBlank()) { "Missing registry host." }
+        require(registryUsername.isNotBlank()) { "Missing registry username." }
+        require(registryToken.isNotBlank()) { "Missing registry token." }
+        require(!PackageNameSupport.isPlainHttpRegistryHost(registryHost)) {
+            "Fluxzero registry host must use HTTPS when a registry token is sent. " +
+                "Use an https:// registry host or the local TLS proxy for end-to-end tests."
+        }
+    }
+}
+
+data class JavaPackageDependency(
+    val source: Path,
+    val containerPath: String = "/app/libs/${source.fileName}"
+) {
+    init {
+        require(containerPath.startsWith("/")) { "Dependency container path must be absolute: $containerPath." }
+        require(containerPath.endsWith(".jar")) { "Dependency container path must point at a JAR: $containerPath." }
     }
 }
 

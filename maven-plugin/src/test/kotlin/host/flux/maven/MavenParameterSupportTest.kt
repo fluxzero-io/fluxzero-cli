@@ -8,16 +8,16 @@ class MavenParameterSupportTest {
     @Test
     fun `Maven user property overrides configured plugin value`() {
         val userProperties = Properties().apply {
-            setProperty("fluxzero.package.name", "cli-image")
+            setProperty("fluxzero.package.mainClass", "com.example.CliMain")
         }
 
         assertEquals(
-            "cli-image",
+            "com.example.CliMain",
             MavenParameterSupport.firstConfigured(
                 userProperties,
-                "fluxzero.package.name",
+                "fluxzero.package.mainClass",
                 "FLUXZERO_TEST_ENV_DOES_NOT_EXIST",
-                "pom-image"
+                "com.example.PomMain"
             )
         )
     }
@@ -25,35 +25,35 @@ class MavenParameterSupportTest {
     @Test
     fun `blank Maven user property falls back to configured plugin value`() {
         val userProperties = Properties().apply {
-            setProperty("fluxzero.package.name", " ")
+            setProperty("fluxzero.package.mainClass", " ")
         }
 
         assertEquals(
-            "pom-image",
+            "com.example.PomMain",
             MavenParameterSupport.firstConfigured(
                 userProperties,
-                "fluxzero.package.name",
+                "fluxzero.package.mainClass",
                 "FLUXZERO_TEST_ENV_DOES_NOT_EXIST",
-                "pom-image"
+                "com.example.PomMain"
             )
         )
     }
 
     @Test
     fun `system property is used when Maven session is unavailable`() {
-        System.setProperty("fluxzero.package.name", "system-image")
+        System.setProperty("fluxzero.package.mainClass", "com.example.SystemMain")
         try {
             assertEquals(
-                "system-image",
+                "com.example.SystemMain",
                 MavenParameterSupport.firstConfigured(
                     null,
-                    "fluxzero.package.name",
+                    "fluxzero.package.mainClass",
                     "FLUXZERO_TEST_ENV_DOES_NOT_EXIST",
-                    "pom-image"
+                    "com.example.PomMain"
                 )
             )
         } finally {
-            System.clearProperty("fluxzero.package.name")
+            System.clearProperty("fluxzero.package.mainClass")
         }
     }
 

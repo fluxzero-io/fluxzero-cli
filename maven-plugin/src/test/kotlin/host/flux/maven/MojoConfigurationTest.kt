@@ -33,6 +33,35 @@ class MojoConfigurationTest {
     }
 
     @Test
+    fun testPublishPackageRegistryUsernameParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val registryUsernameField = fields.find { it.name == "registryUsername" }
+        assertNotNull("registryUsername parameter should exist for non-Fluxzero registries", registryUsernameField)
+    }
+
+    @Test
+    fun testPublishPackageImagesTagsAndCredentialsParametersExist() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        assertNotNull("images parameter should exist for multi-registry publishing", fields.find { it.name == "images" })
+        assertNotNull("tags parameter should exist for multi-tag publishing", fields.find { it.name == "tags" })
+        assertNotNull("credentials parameter should exist for registry credentials", fields.find { it.name == "credentials" })
+    }
+
+    @Test
+    fun testRegistryCredentialConfigurationFieldsExist() {
+        val fields = RegistryCredentialConfiguration::class.java.declaredFields
+
+        assertNotNull(fields.find { it.name == "registryHost" })
+        assertNotNull(fields.find { it.name == "registryUsername" })
+        assertNotNull(fields.find { it.name == "registryToken" })
+        assertFalse(fields.any { it.name.endsWith("EnvironmentVariable") })
+    }
+
+    @Test
     fun testPublishPackageTeamIdParameterExists() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields

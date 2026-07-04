@@ -42,7 +42,11 @@
         <artifactId>fluxzero-maven-plugin</artifactId>
         <version>${fluxzero.maven.plugin.version}</version>
         <configuration>
+          <registryHost>${env.FLUXZERO_REGISTRY_HOST}</registryHost>
+          <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
+          <teamId>team-a</teamId>
           <packageName>spring-boot-app</packageName>
+          <packageVersion>${env.FLUXZERO_PACKAGE_VERSION}</packageVersion>
           <applicationId>local-spring-boot-app</applicationId>
         </configuration>
       </plugin>
