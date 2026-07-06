@@ -21,16 +21,21 @@ class JavaPackagePublisher : PackagePublisher {
     override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
         spec.validate()
 
-        return spec.packageReferences().map { packageReference ->
-            val credential = spec.credentialFor(packageReference.image)
+        return spec.publishTargets().flatMap { publishTarget ->
+            val credential = spec.credentialFor(publishTarget.image)
             val builder = createContainerBuilder(spec)
-            val targetImage = RegistryImage.named(packageReference.reference)
+            val targetImage = RegistryImage.named(publishTarget.primaryReference.reference)
                 .addCredential(credential.registryUsername, credential.registryToken)
             val containerizer = Containerizer.to(targetImage)
                 .setToolName(spec.toolName)
+            publishTarget.additionalTags.forEach { tag ->
+                containerizer.withAdditionalTag(tag)
+            }
 
             val container = builder.containerize(containerizer)
-            PackagePublishResult(packageReference.reference, container.digest.toString())
+            publishTarget.references.map { packageReference ->
+                PackagePublishResult(packageReference.reference, container.digest.toString())
+            }
         }
     }
 
@@ -185,12 +190,22 @@ data class JavaPackagePublishSpec(
     }
 
     fun packageReferences(): List<JavaPackageReference> =
-        resolvedImages().flatMap { image ->
-            resolvedTags().map { tag ->
-                require(PackageNameSupport.isValidTag(tag)) { "Invalid package tag '$tag'." }
+        publishTargets().flatMap { it.references }
+
+    internal fun publishTargets(): List<JavaPackagePublishTarget> {
+        val tags = resolvedTags()
+        return resolvedImages().map { image ->
+            val references = tags.map { tag ->
                 JavaPackageReference(image, "$image:$tag")
             }
+            JavaPackagePublishTarget(
+                image = image,
+                primaryReference = references.first(),
+                additionalTags = references.drop(1).map { it.tag },
+                references = references
+            )
         }
+    }
 
     fun credentialFor(image: String): JavaPackageRegistryCredential {
         val registryHost = PackageNameSupport.registryAuthority(image)
@@ -219,12 +234,23 @@ data class JavaPackagePublishSpec(
     internal fun orderedDependencies(): List<JavaPackageDependency> = dependencies
 }
 
+internal data class JavaPackagePublishTarget(
+    val image: String,
+    val primaryReference: JavaPackageReference,
+    val additionalTags: List<String>,
+    val references: List<JavaPackageReference>
+)
+
 data class JavaPackageReference(
     val image: String,
     val reference: String
 ) {
+    val tag: String = reference.removePrefix("$image:")
+
     init {
         require(PackageNameSupport.isValidImageRepository(image)) { "Invalid package image '$image'." }
+        require(tag != reference) { "Invalid package reference '$reference' for image '$image'." }
+        require(PackageNameSupport.isValidTag(tag)) { "Invalid package tag '$tag'." }
     }
 }
 

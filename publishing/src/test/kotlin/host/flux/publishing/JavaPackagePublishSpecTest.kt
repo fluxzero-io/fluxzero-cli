@@ -91,6 +91,49 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun resolvesOnePublishTargetPerImageWithAdditionalTags() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        val spec = JavaPackagePublishSpec(
+            packageName = "service",
+            packageVersion = "1.0.0",
+            mainClass = "com.example.Application",
+            classesDirectory = classesDirectory,
+            images = listOf(
+                "registry.fluxzero.io/org-a/service",
+                "ghcr.io/fluxzero-io/dashboard-fluxzero-io-service"
+            ),
+            tags = listOf("1.0.0", "sha-1234567"),
+            credentials = listOf(
+                JavaPackageRegistryCredential("registry.fluxzero.io", "github-ci", "fluxzero-token"),
+                JavaPackageRegistryCredential("ghcr.io", "github-actor", "github-token")
+            )
+        )
+
+        val targets = spec.publishTargets()
+
+        assertEquals(2, targets.size)
+        assertEquals("registry.fluxzero.io/org-a/service:1.0.0", targets[0].primaryReference.reference)
+        assertEquals(listOf("sha-1234567"), targets[0].additionalTags)
+        assertEquals(
+            listOf(
+                "registry.fluxzero.io/org-a/service:1.0.0",
+                "registry.fluxzero.io/org-a/service:sha-1234567"
+            ),
+            targets[0].references.map { it.reference }
+        )
+        assertEquals("ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:1.0.0", targets[1].primaryReference.reference)
+        assertEquals(listOf("sha-1234567"), targets[1].additionalTags)
+        assertEquals(
+            listOf(
+                "ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:1.0.0",
+                "ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:sha-1234567"
+            ),
+            targets[1].references.map { it.reference }
+        )
+    }
+
+    @Test
     fun resolvesLegacySingleTargetReferenceAndCredential() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
 
