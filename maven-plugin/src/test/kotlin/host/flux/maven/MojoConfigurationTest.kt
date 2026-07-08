@@ -98,6 +98,26 @@ class MojoConfigurationTest {
     }
 
     @Test
+    fun testPublishPackageDebugParameterExists() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val debugPackagePublishField = fields.find { it.name == "debugPackagePublish" }
+        assertNotNull("debugPackagePublish parameter should exist for registry diagnostics", debugPackagePublishField)
+    }
+
+    @Test
+    fun testPublishPackageRetryParametersExist() {
+        val mojoClass = PublishPackageMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        val publishAttemptsField = fields.find { it.name == "publishAttempts" }
+        val publishRetryDelayMillisField = fields.find { it.name == "publishRetryDelayMillis" }
+        assertNotNull("publishAttempts parameter should exist for registry blob-upload retries", publishAttemptsField)
+        assertNotNull("publishRetryDelayMillis parameter should exist for registry blob-upload retries", publishRetryDelayMillisField)
+    }
+
+    @Test
     fun testEnabledParameterExists() {
         val mojoClass = SyncProjectFilesMojo::class.java
         val fields = mojoClass.declaredFields

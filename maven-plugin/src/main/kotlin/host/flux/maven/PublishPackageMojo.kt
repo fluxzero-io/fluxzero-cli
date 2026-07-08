@@ -3,9 +3,10 @@ package host.flux.maven
 import host.flux.publishing.BaseImageSource
 import host.flux.publishing.JavaPackageDependency
 import host.flux.publishing.JavaPackageRegistryCredential
-import host.flux.publishing.PackageNameSupport
+import host.flux.publishing.JavaPackagePublishDiagnostics
 import host.flux.publishing.JavaPackagePublishSpec
 import host.flux.publishing.JavaPackagePublisher
+import host.flux.publishing.PackageNameSupport
 import org.apache.maven.execution.MavenSession
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
@@ -135,6 +136,24 @@ class PublishPackageMojo : AbstractMojo() {
     @Parameter(property = "fluxzero.package.skip", defaultValue = "false")
     private var skipPackagePublish: Boolean = false
 
+    /**
+     * Log detailed Jib registry publish diagnostics.
+     */
+    @Parameter(property = "fluxzero.package.debug", defaultValue = "false")
+    private var debugPackagePublish: Boolean = false
+
+    /**
+     * Maximum publish attempts per image for transient registry blob-upload failures.
+     */
+    @Parameter(property = "fluxzero.package.publishAttempts", defaultValue = "3")
+    private var publishAttempts: Int = JavaPackagePublishSpec.DEFAULT_PUBLISH_ATTEMPTS
+
+    /**
+     * Base delay between publish attempts in milliseconds.
+     */
+    @Parameter(property = "fluxzero.package.publishRetryDelayMillis", defaultValue = "2000")
+    private var publishRetryDelayMillis: Long = JavaPackagePublishSpec.DEFAULT_PUBLISH_RETRY_DELAY_MILLIS
+
     override fun execute() {
         if (skipPackagePublish) {
             log.info("Skipping Fluxzero package publish")
@@ -223,7 +242,7 @@ class PublishPackageMojo : AbstractMojo() {
         log.info("Building Fluxzero Java package $packageReferences")
 
         try {
-            val results = JavaPackagePublisher().publish(
+            val results = JavaPackagePublisher(publishingDiagnostics()).publish(
                 JavaPackagePublishSpec(
                     registryHost = resolvedRegistryHost,
                     registryUsername = resolvedRegistryUsername,
@@ -242,7 +261,9 @@ class PublishPackageMojo : AbstractMojo() {
                     images = resolvedImages,
                     tags = resolvedTags,
                     credentials = resolvedCredentials,
-                    toolName = "fluxzero-maven-plugin"
+                    toolName = "fluxzero-maven-plugin",
+                    publishAttempts = publishAttempts,
+                    publishRetryDelayMillis = publishRetryDelayMillis
                 )
             )
 
@@ -253,6 +274,11 @@ class PublishPackageMojo : AbstractMojo() {
             throw MojoExecutionException("Failed to publish Fluxzero package $packageReferences", e)
         }
     }
+
+    private fun publishingDiagnostics(): JavaPackagePublishDiagnostics =
+        if (!debugPackagePublish) JavaPackagePublishDiagnostics.NONE else JavaPackagePublishDiagnostics { event ->
+            log.info("[publish-debug] ${event.toLogLine()}")
+        }
 
     private fun ensureCleanGitWorktree(gitInfo: PackageNameSupport.GitInfo?) {
         try {

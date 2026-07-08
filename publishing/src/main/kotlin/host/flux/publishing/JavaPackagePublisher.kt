@@ -3,25 +3,39 @@ package host.flux.publishing
 import com.google.cloud.tools.jib.api.Containerizer
 import com.google.cloud.tools.jib.api.DockerDaemonImage
 import com.google.cloud.tools.jib.api.Jib
+import com.google.cloud.tools.jib.api.LogEvent
 import com.google.cloud.tools.jib.api.JibContainerBuilder
 import com.google.cloud.tools.jib.api.RegistryImage
 import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
 import com.google.cloud.tools.jib.api.buildplan.ContainerBuildPlan
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
+import com.google.cloud.tools.jib.event.events.TimerEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.streams.asSequence
 
 fun interface PackagePublisher {
     fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult>
 }
 
-class JavaPackagePublisher : PackagePublisher {
+class JavaPackagePublisher(private val diagnostics: JavaPackagePublishDiagnostics = JavaPackagePublishDiagnostics.NONE) : PackagePublisher {
     override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
         spec.validate()
 
         return spec.publishTargets().flatMap { publishTarget ->
+            publishWithRetries(spec, publishTarget)
+        }
+    }
+
+    private fun publishWithRetries(
+        spec: JavaPackagePublishSpec,
+        publishTarget: JavaPackagePublishTarget
+    ): List<PackagePublishResult> {
+        var attempt = 1
+        while (true) {
             val credential = spec.credentialFor(publishTarget.image)
             val builder = createContainerBuilder(spec)
             val targetImage = RegistryImage.named(publishTarget.primaryReference.reference)
@@ -31,10 +45,58 @@ class JavaPackagePublisher : PackagePublisher {
             publishTarget.additionalTags.forEach { tag ->
                 containerizer.withAdditionalTag(tag)
             }
+            addDiagnostics(containerizer, publishTarget, attempt)
 
-            val container = builder.containerize(containerizer)
-            publishTarget.references.map { packageReference ->
-                PackagePublishResult(packageReference.reference, container.digest.toString())
+            diagnostics.record(
+                JavaPackagePublishDiagnosticEvent(
+                    category = "target-start",
+                    targetImage = publishTarget.image,
+                    targetReference = publishTarget.primaryReference.reference,
+                    attempt = attempt,
+                    message = "Publishing ${publishTarget.references.joinToString { it.reference }}"
+                )
+            )
+            try {
+                val container = builder.containerize(containerizer)
+                diagnostics.record(
+                    JavaPackagePublishDiagnosticEvent(
+                        category = "target-finish",
+                        targetImage = publishTarget.image,
+                        targetReference = publishTarget.primaryReference.reference,
+                        attempt = attempt,
+                        message = "Published digest ${container.digest}"
+                    )
+                )
+                return publishTarget.references.map { packageReference ->
+                    PackagePublishResult(packageReference.reference, container.digest.toString())
+                }
+            } catch (exception: Exception) {
+                val willRetry = attempt < spec.publishAttempts && exception.isRetriableRegistryBlobUploadFailure()
+                diagnostics.record(
+                    JavaPackagePublishDiagnosticEvent(
+                        category = if (willRetry) "target-attempt-failure" else "target-failure",
+                        targetImage = publishTarget.image,
+                        targetReference = publishTarget.primaryReference.reference,
+                        level = "ERROR",
+                        attempt = attempt,
+                        message = "${exception::class.qualifiedName}: ${exception.message}"
+                    )
+                )
+                if (!willRetry) {
+                    throw exception
+                }
+                val delayMillis = retryDelayMillis(spec, attempt)
+                diagnostics.record(
+                    JavaPackagePublishDiagnosticEvent(
+                        category = "target-retry",
+                        targetImage = publishTarget.image,
+                        targetReference = publishTarget.primaryReference.reference,
+                        attempt = attempt,
+                        message = "Retrying publish after ${delayMillis}ms because the registry returned a transient blob upload-session error"
+                    )
+                )
+                sleepBeforeRetry(delayMillis, exception)
+                attempt++
             }
         }
     }
@@ -42,6 +104,53 @@ class JavaPackagePublisher : PackagePublisher {
     internal fun buildPlan(spec: JavaPackagePublishSpec): ContainerBuildPlan {
         spec.validate()
         return createContainerBuilder(spec).toContainerBuildPlan()
+    }
+
+    private fun addDiagnostics(containerizer: Containerizer, publishTarget: JavaPackagePublishTarget, attempt: Int) {
+        containerizer.addEventHandler(LogEvent::class.java) { event ->
+            diagnostics.record(
+                JavaPackagePublishDiagnosticEvent(
+                    category = "jib-log",
+                    targetImage = publishTarget.image,
+                    targetReference = publishTarget.primaryReference.reference,
+                    level = event.level.name,
+                    attempt = attempt,
+                    message = event.message
+                )
+            )
+        }
+        containerizer.addEventHandler(TimerEvent::class.java) { event ->
+            diagnostics.record(
+                JavaPackagePublishDiagnosticEvent(
+                    category = "jib-timer",
+                    targetImage = publishTarget.image,
+                    targetReference = publishTarget.primaryReference.reference,
+                    level = event.state.name,
+                    attempt = attempt,
+                    message = buildString {
+                        append(event.description)
+                        append(" durationMs=").append(event.duration.toMillis())
+                        append(" elapsedMs=").append(event.elapsed.toMillis())
+                    }
+                )
+            )
+        }
+    }
+
+    private fun retryDelayMillis(spec: JavaPackagePublishSpec, failedAttempt: Int): Long =
+        spec.publishRetryDelayMillis * failedAttempt.toLong()
+
+    private fun sleepBeforeRetry(delayMillis: Long, originalFailure: Exception) {
+        if (delayMillis <= 0) {
+            return
+        }
+        try {
+            TimeUnit.MILLISECONDS.sleep(delayMillis)
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            originalFailure.addSuppressed(interrupted)
+            throw originalFailure
+        }
     }
 
     private fun createContainerBuilder(spec: JavaPackagePublishSpec): JibContainerBuilder {
@@ -120,6 +229,21 @@ class JavaPackagePublisher : PackagePublisher {
         (listOf("/app/classes") + dependencies.map { it.containerPath }).joinToString(":")
 }
 
+internal fun Throwable.isRetriableRegistryBlobUploadFailure(): Boolean =
+    generateSequence(this) { it.cause }.any { throwable ->
+        throwable.message.isRetriableRegistryBlobUploadMessage()
+    }
+
+private fun String?.isRetriableRegistryBlobUploadMessage(): Boolean {
+    val message = this?.lowercase(Locale.ROOT) ?: return false
+    val isBlobUploadSessionError = message.contains("blob_upload_unknown") ||
+        message.contains("blob upload unknown") ||
+        message.contains("blob_unknown") ||
+        message.contains("blob unknown to registry")
+    val isBlobUploadOperation = message.contains("push blob") || message.contains("/blobs/upload/")
+    return isBlobUploadSessionError && isBlobUploadOperation
+}
+
 enum class BaseImageSource {
     REGISTRY,
     DOCKER_DAEMON;
@@ -154,13 +278,18 @@ data class JavaPackagePublishSpec(
     val images: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val credentials: List<JavaPackageRegistryCredential> = emptyList(),
-    val toolName: String = "fluxzero-publishing"
+    val toolName: String = "fluxzero-publishing",
+    val publishAttempts: Int = DEFAULT_PUBLISH_ATTEMPTS,
+    val publishRetryDelayMillis: Long = DEFAULT_PUBLISH_RETRY_DELAY_MILLIS
 ) {
     companion object {
         val REPRODUCIBLE_CONTAINER_TIMESTAMP: Instant = Instant.EPOCH
         val REPRODUCIBLE_FILE_TIMESTAMP: Instant = Instant.EPOCH
 
         const val DEFAULT_REGISTRY_USERNAME = "fluxzero"
+
+        const val DEFAULT_PUBLISH_ATTEMPTS = 3
+        const val DEFAULT_PUBLISH_RETRY_DELAY_MILLIS = 2000L
 
         const val DEFAULT_BASE_IMAGE =
             "gcr.io/distroless/java25-debian13:nonroot@sha256:f25ab728deeafec63d7176a473536f4f4347d42db7e24b3bb0fb7b05ff84d248"
@@ -177,6 +306,8 @@ data class JavaPackagePublishSpec(
         }
         require(mainClass.isNotBlank()) { "Missing application main class." }
         require(baseImage.isNotBlank()) { "Missing Java runtime base image." }
+        require(publishAttempts >= 1) { "Publish attempts must be at least 1." }
+        require(publishRetryDelayMillis >= 0) { "Publish retry delay must be at least 0." }
         require(classesDirectory.toFile().isDirectory) {
             "Project output directory does not exist: ${classesDirectory.toAbsolutePath()}."
         }

@@ -3,6 +3,7 @@ package host.flux.publishing
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
 import java.nio.file.Files
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -180,6 +181,30 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun rejectsInvalidPublishRetrySettings() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            JavaPackagePublishSpec(
+                packageName = "service",
+                packageVersion = "1.0.0",
+                mainClass = "com.example.Application",
+                classesDirectory = classesDirectory,
+                publishAttempts = 0
+            ).validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            JavaPackagePublishSpec(
+                packageName = "service",
+                packageVersion = "1.0.0",
+                mainClass = "com.example.Application",
+                classesDirectory = classesDirectory,
+                publishRetryDelayMillis = -1
+            ).validate()
+        }
+    }
+
+    @Test
     fun rejectsInvalidImageRepositories() {
         listOf(
             "registry.fluxzero.io/Upper/service",
@@ -205,6 +230,29 @@ class JavaPackagePublishSpecTest {
     @Test
     fun hasDefaultJavaToolOptions() {
         assertEquals("-XX:MaxRAMPercentage=75.0", JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS.substringBefore(" "))
+    }
+
+    @Test
+    fun detectsRetriableRegistryBlobUploadFailures() {
+        val exception = RuntimeException(
+            "Tried to push BLOB for ghcr.io/org/repo with digest sha256:abc but failed because: blob unknown to registry",
+            RuntimeException(
+                """
+                404 Not Found
+                PUT https://ghcr.io/v2/org/repo/blobs/upload/1.uuid?digest=sha256:abc
+                {"errors":[{"code":"BLOB_UPLOAD_UNKNOWN","message":"blob upload unknown to registry"}]}
+                """.trimIndent()
+            )
+        )
+
+        assertTrue(exception.isRetriableRegistryBlobUploadFailure())
+    }
+
+    @Test
+    fun doesNotRetryUnrelatedRegistryFailures() {
+        val exception = RuntimeException("authentication failed for ghcr.io/org/repo")
+
+        assertFalse(exception.isRetriableRegistryBlobUploadFailure())
     }
 
     @Test
