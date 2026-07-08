@@ -3,7 +3,6 @@ package host.flux.maven
 import host.flux.publishing.BaseImageSource
 import host.flux.publishing.JavaPackageDependency
 import host.flux.publishing.JavaPackageRegistryCredential
-import host.flux.publishing.JavaPackagePublishDiagnostics
 import host.flux.publishing.JavaPackagePublishSpec
 import host.flux.publishing.JavaPackagePublisher
 import host.flux.publishing.PackageNameSupport
@@ -137,12 +136,6 @@ class PublishPackageMojo : AbstractMojo() {
     private var skipPackagePublish: Boolean = false
 
     /**
-     * Log detailed Jib registry publish diagnostics.
-     */
-    @Parameter(property = "fluxzero.package.debug", defaultValue = "false")
-    private var debugPackagePublish: Boolean = false
-
-    /**
      * Maximum publish attempts per image for transient registry blob-upload failures.
      */
     @Parameter(property = "fluxzero.package.publishAttempts", defaultValue = "3")
@@ -242,7 +235,7 @@ class PublishPackageMojo : AbstractMojo() {
         log.info("Building Fluxzero Java package $packageReferences")
 
         try {
-            val results = JavaPackagePublisher(publishingDiagnostics()).publish(
+            val results = JavaPackagePublisher().publish(
                 JavaPackagePublishSpec(
                     registryHost = resolvedRegistryHost,
                     registryUsername = resolvedRegistryUsername,
@@ -274,11 +267,6 @@ class PublishPackageMojo : AbstractMojo() {
             throw MojoExecutionException("Failed to publish Fluxzero package $packageReferences", e)
         }
     }
-
-    private fun publishingDiagnostics(): JavaPackagePublishDiagnostics =
-        if (!debugPackagePublish) JavaPackagePublishDiagnostics.NONE else JavaPackagePublishDiagnostics { event ->
-            log.info("[publish-debug] ${event.toLogLine()}")
-        }
 
     private fun ensureCleanGitWorktree(gitInfo: PackageNameSupport.GitInfo?) {
         try {

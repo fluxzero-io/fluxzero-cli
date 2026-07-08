@@ -13,9 +13,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    systemProperties(
-        System.getProperties().stringPropertyNames()
-            .filter { it.startsWith("fluxzero.ghcrStress") }
-            .associateWith { System.getProperty(it) }
-    )
 }

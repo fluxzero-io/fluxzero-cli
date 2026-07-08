@@ -3,13 +3,11 @@ package host.flux.publishing
 import com.google.cloud.tools.jib.api.Containerizer
 import com.google.cloud.tools.jib.api.DockerDaemonImage
 import com.google.cloud.tools.jib.api.Jib
-import com.google.cloud.tools.jib.api.LogEvent
 import com.google.cloud.tools.jib.api.JibContainerBuilder
 import com.google.cloud.tools.jib.api.RegistryImage
 import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
 import com.google.cloud.tools.jib.api.buildplan.ContainerBuildPlan
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
-import com.google.cloud.tools.jib.event.events.TimerEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -21,7 +19,7 @@ fun interface PackagePublisher {
     fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult>
 }
 
-class JavaPackagePublisher(private val diagnostics: JavaPackagePublishDiagnostics = JavaPackagePublishDiagnostics.NONE) : PackagePublisher {
+class JavaPackagePublisher : PackagePublisher {
     override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
         spec.validate()
 
@@ -45,57 +43,18 @@ class JavaPackagePublisher(private val diagnostics: JavaPackagePublishDiagnostic
             publishTarget.additionalTags.forEach { tag ->
                 containerizer.withAdditionalTag(tag)
             }
-            addDiagnostics(containerizer, publishTarget, attempt)
 
-            diagnostics.record(
-                JavaPackagePublishDiagnosticEvent(
-                    category = "target-start",
-                    targetImage = publishTarget.image,
-                    targetReference = publishTarget.primaryReference.reference,
-                    attempt = attempt,
-                    message = "Publishing ${publishTarget.references.joinToString { it.reference }}"
-                )
-            )
             try {
                 val container = builder.containerize(containerizer)
-                diagnostics.record(
-                    JavaPackagePublishDiagnosticEvent(
-                        category = "target-finish",
-                        targetImage = publishTarget.image,
-                        targetReference = publishTarget.primaryReference.reference,
-                        attempt = attempt,
-                        message = "Published digest ${container.digest}"
-                    )
-                )
                 return publishTarget.references.map { packageReference ->
                     PackagePublishResult(packageReference.reference, container.digest.toString())
                 }
             } catch (exception: Exception) {
                 val willRetry = attempt < spec.publishAttempts && exception.isRetriableRegistryBlobUploadFailure()
-                diagnostics.record(
-                    JavaPackagePublishDiagnosticEvent(
-                        category = if (willRetry) "target-attempt-failure" else "target-failure",
-                        targetImage = publishTarget.image,
-                        targetReference = publishTarget.primaryReference.reference,
-                        level = "ERROR",
-                        attempt = attempt,
-                        message = "${exception::class.qualifiedName}: ${exception.message}"
-                    )
-                )
                 if (!willRetry) {
                     throw exception
                 }
-                val delayMillis = retryDelayMillis(spec, attempt)
-                diagnostics.record(
-                    JavaPackagePublishDiagnosticEvent(
-                        category = "target-retry",
-                        targetImage = publishTarget.image,
-                        targetReference = publishTarget.primaryReference.reference,
-                        attempt = attempt,
-                        message = "Retrying publish after ${delayMillis}ms because the registry returned a transient blob upload-session error"
-                    )
-                )
-                sleepBeforeRetry(delayMillis, exception)
+                sleepBeforeRetry(retryDelayMillis(spec, attempt), exception)
                 attempt++
             }
         }
@@ -104,37 +63,6 @@ class JavaPackagePublisher(private val diagnostics: JavaPackagePublishDiagnostic
     internal fun buildPlan(spec: JavaPackagePublishSpec): ContainerBuildPlan {
         spec.validate()
         return createContainerBuilder(spec).toContainerBuildPlan()
-    }
-
-    private fun addDiagnostics(containerizer: Containerizer, publishTarget: JavaPackagePublishTarget, attempt: Int) {
-        containerizer.addEventHandler(LogEvent::class.java) { event ->
-            diagnostics.record(
-                JavaPackagePublishDiagnosticEvent(
-                    category = "jib-log",
-                    targetImage = publishTarget.image,
-                    targetReference = publishTarget.primaryReference.reference,
-                    level = event.level.name,
-                    attempt = attempt,
-                    message = event.message
-                )
-            )
-        }
-        containerizer.addEventHandler(TimerEvent::class.java) { event ->
-            diagnostics.record(
-                JavaPackagePublishDiagnosticEvent(
-                    category = "jib-timer",
-                    targetImage = publishTarget.image,
-                    targetReference = publishTarget.primaryReference.reference,
-                    level = event.state.name,
-                    attempt = attempt,
-                    message = buildString {
-                        append(event.description)
-                        append(" durationMs=").append(event.duration.toMillis())
-                        append(" elapsedMs=").append(event.elapsed.toMillis())
-                    }
-                )
-            )
-        }
     }
 
     private fun retryDelayMillis(spec: JavaPackagePublishSpec, failedAttempt: Int): Long =

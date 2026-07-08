@@ -35,7 +35,6 @@ val mavenPluginParameterDescriptions = mapOf(
     "packageName" to "Required public package name for publish-package.",
     "packageVersion" to "Package version for publish-package. Defaults to a generated git/time-based tag.",
     "tags" to "Tags for publish-package.",
-    "debugPackagePublish" to "Log detailed Jib publish diagnostics. Property: fluxzero.package.debug.",
     "publishAttempts" to "Maximum publish attempts per image for transient registry blob-upload failures. Property: fluxzero.package.publishAttempts.",
     "publishRetryDelayMillis" to "Base delay between publish attempts in milliseconds. Property: fluxzero.package.publishRetryDelayMillis.",
     "teamId" to "Fluxzero team id for publish-package.",

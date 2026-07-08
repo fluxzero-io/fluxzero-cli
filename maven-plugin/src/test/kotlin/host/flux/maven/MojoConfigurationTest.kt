@@ -98,15 +98,6 @@ class MojoConfigurationTest {
     }
 
     @Test
-    fun testPublishPackageDebugParameterExists() {
-        val mojoClass = PublishPackageMojo::class.java
-        val fields = mojoClass.declaredFields
-
-        val debugPackagePublishField = fields.find { it.name == "debugPackagePublish" }
-        assertNotNull("debugPackagePublish parameter should exist for registry diagnostics", debugPackagePublishField)
-    }
-
-    @Test
     fun testPublishPackageRetryParametersExist() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
