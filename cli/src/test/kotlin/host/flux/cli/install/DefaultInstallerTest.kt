@@ -60,6 +60,8 @@ class DefaultInstallerTest {
         assertEquals("v2.0.0", (result as InstallResult.FreshInstall).version)
         assertTrue(Files.exists(tempHome.resolve(".fluxzero/bin/fz")))
         assertTrue(Files.isExecutable(tempHome.resolve(".fluxzero/bin/fz")))
+        assertTrue(Files.exists(tempHome.resolve(".fluxzero/bin/fluxzero")))
+        assertTrue(Files.isExecutable(tempHome.resolve(".fluxzero/bin/fluxzero")))
     }
 
     @Test
@@ -98,6 +100,8 @@ class DefaultInstallerTest {
         // Verify new installation
         assertTrue(Files.exists(tempHome.resolve(".fluxzero/bin/fz")))
         assertTrue(Files.isExecutable(tempHome.resolve(".fluxzero/bin/fz")))
+        assertTrue(Files.exists(tempHome.resolve(".fluxzero/bin/fluxzero")))
+        assertTrue(Files.isExecutable(tempHome.resolve(".fluxzero/bin/fluxzero")))
         
         // Verify legacy cleanup
         assertTrue(!Files.exists(legacyDir.resolve("fluxzero-cli.jar")))

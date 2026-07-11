@@ -96,7 +96,7 @@ The fluxzero-cli uses per-project versioning rather than global installation. Ea
 
 ## Usage
 
-Once installed, you can use the CLI with the `fz` command:
+Once installed, you can use the CLI with either the short `fz` command or the equivalent `fluxzero` command:
 
 ```bash
 # Initialize a new project (interactive template selection)
@@ -108,12 +108,74 @@ fz templates list
 # Build and publish the current Maven project as a Fluxzero package
 FLUXZERO_REGISTRY_TOKEN=... fz publish
 
+# Start the local Fluxzero development environment
+fz dev
+
+# Expose the active environment to an MCP client over stdio
+fz mcp
+
 # Show version
 fz version
 
 # Upgrade CLI to latest version
 fz upgrade
 ```
+
+### Local development
+
+`fz dev` (or `fluxzero dev`) starts the Fluxzero dev server version that matches the SDK version in the Maven project. It supervises the
+local runtime, proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP
+endpoint. Ports and credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
+
+The application main class is detected from compiled Java or Kotlin classes. Use `--main-class` only when a project
+contains multiple executable entrypoints and the intended one is ambiguous.
+
+```bash
+fz dev
+```
+
+Use `Ctrl-C` to stop the environment and its managed processes gracefully. Common overrides include:
+
+```bash
+fz dev --fast-compiler
+fz dev --app app
+fz dev --app app --app audittrail
+fz dev --environment dev
+fz dev --port 4200
+fz dev --idp external
+fz dev --frontend-command "npm run dev"
+fz dev --frontend-url http://localhost:5173
+fz dev --no-tests
+```
+
+Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
+remain ignored under `.fluxzero/dev/`:
+
+```yaml
+version: 1
+environment: local
+apps:
+  - app
+port: 4200
+idp: external
+frontend:
+  command: "cd frontend && npm start -- --host 127.0.0.1 --port {port}"
+  backendPaths:
+    - /api
+```
+
+Command-line options override environment variables, which override `dev.yaml`; built-in defaults apply last.
+Unknown keys and unsupported config versions fail startup instead of being silently ignored.
+
+`fz mcp` or `fluxzero mcp` is intended as the stdio command in an agent's MCP configuration. It discovers the active environment from
+the project directory and reads the dynamic endpoint and token without exposing either in agent configuration:
+
+```bash
+fz mcp --project-dir /path/to/project
+```
+
+Set `FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a dev-server version that differs
+from the project's Fluxzero SDK version.
 
 ### CLI Commands & Parameters
 

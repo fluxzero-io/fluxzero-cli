@@ -1,5 +1,7 @@
 import org.apache.tools.ant.filters.ReplaceTokens
 import org.gradle.jvm.tasks.Jar
+import java.util.jar.Attributes
+import java.util.jar.JarFile
 
 plugins {
     kotlin("jvm")
@@ -11,6 +13,7 @@ plugins {
 dependencies {
     implementation(project(":templates"))
     implementation(project(":publishing"))
+    implementation(project(":dev-launcher"))
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
     implementation("org.jline:jline:3.30.4")
 }
@@ -46,6 +49,13 @@ tasks.shadowJar {
     mergeServiceFiles()
     archiveClassifier.set("")
     archiveBaseName.set("fluxzero-cli")
+    manifest {
+        attributes("Main-Class" to application.mainClass.get())
+    }
+}
+
+tasks.jar {
+    archiveClassifier.set("plain")
 }
 
 tasks.withType<Jar>().configureEach {
@@ -72,6 +82,26 @@ tasks.named("startScripts") {
 
 tasks.named("startShadowScripts") {
     dependsOn("jar")
+}
+
+val verifyRunnableJar by tasks.registering {
+    dependsOn(tasks.shadowJar)
+    val runnableJar = tasks.shadowJar.flatMap { it.archiveFile }
+    inputs.file(runnableJar)
+    doLast {
+        JarFile(runnableJar.get().asFile).use { jar ->
+            check(jar.manifest.mainAttributes.getValue(Attributes.Name.MAIN_CLASS) == application.mainClass.get()) {
+                "Runnable CLI jar is missing Main-Class ${application.mainClass.get()}"
+            }
+        }
+        check(runnableJar.get().asFile != tasks.jar.get().archiveFile.get().asFile) {
+            "Plain and runnable CLI jars must not use the same output path"
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(verifyRunnableJar)
 }
 
 tasks.register<Copy>("generateScripts") {

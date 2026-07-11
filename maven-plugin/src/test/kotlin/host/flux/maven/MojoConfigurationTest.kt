@@ -15,6 +15,24 @@ class MojoConfigurationTest {
     }
 
     @Test
+    fun testDevMojoAndControlParametersExist() {
+        val mojoClass = DevMojo::class.java
+        val fields = mojoClass.declaredFields
+
+        assertNotNull(fields.find { it.name == "devServerVersion" })
+        assertNotNull(fields.find { it.name == "devMainClass" })
+        assertNotNull(fields.find { it.name == "applications" })
+        assertNotNull(fields.find { it.name == "environment" })
+        assertNotNull(fields.find { it.name == "port" })
+        assertNotNull(fields.find { it.name == "idp" })
+        assertNotNull(fields.find { it.name == "frontendCommand" })
+        assertNotNull(fields.find { it.name == "frontendEnabled" })
+        assertNotNull(fields.find { it.name == "backendPaths" })
+        assertNotNull(fields.find { it.name == "fastCompiler" })
+        assertNotNull(fields.find { it.name == "skipDev" })
+    }
+
+    @Test
     fun testPublishPackageMetadataParameterExists() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields

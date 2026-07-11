@@ -228,6 +228,10 @@ jobs:
             echo "Install script failed to install native binary!"
             exit 1
           fi
+          if [ ! -x "$TEST_HOME/.fluxzero/bin/fluxzero" ]; then
+            echo "Install script failed to install fluxzero alias!"
+            exit 1
+          fi
           
           # Test the installed CLI
           $TEST_HOME/.fluxzero/bin/fz version
@@ -235,10 +239,15 @@ jobs:
             echo "Installed native binary verification failed!"
             exit 1
           fi
+          $TEST_HOME/.fluxzero/bin/fluxzero version
           
           # Check if fz was created in /usr/local/bin
           if [ ! -x "/usr/local/bin/fz" ]; then
             echo "Install script failed to create /usr/local/bin/fz!"
+            exit 1
+          fi
+          if [ ! -x "/usr/local/bin/fluxzero" ]; then
+            echo "Install script failed to create /usr/local/bin/fluxzero!"
             exit 1
           fi
           
@@ -255,6 +264,7 @@ jobs:
             echo "fz templates list command failed!"
             exit 1
           fi
+          fluxzero version
           
           echo "Bash install script verification successful!"
           
@@ -271,7 +281,7 @@ jobs:
           echo "Install scripts verification successful!"
           
           # Cleanup
-          sudo rm -f /usr/local/bin/fz
+          sudo rm -f /usr/local/bin/fz /usr/local/bin/fluxzero
           rm -rf $TEST_HOME
 
       - name: Test uninstall scripts
@@ -305,6 +315,10 @@ jobs:
           # Verify system link was removed
           if [ -f "/usr/local/bin/fz" ]; then
             echo "ERROR: Uninstall script failed to remove /usr/local/bin/fz!"
+            exit 1
+          fi
+          if [ -f "/usr/local/bin/fluxzero" ]; then
+            echo "ERROR: Uninstall script failed to remove /usr/local/bin/fluxzero!"
             exit 1
           fi
           

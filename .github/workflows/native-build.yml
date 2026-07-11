@@ -215,6 +215,10 @@ jobs:
               echo "ERROR: fz.exe was not installed correctly!"
               exit 1
             fi
+            if [ ! -f "$TEST_HOME/.fluxzero/bin/fluxzero.exe" ]; then
+              echo "ERROR: fluxzero.exe alias was not installed correctly!"
+              exit 1
+            fi
             
             # Test the installed binary
             "$TEST_HOME/.fluxzero/bin/fz.exe" version
@@ -222,6 +226,7 @@ jobs:
               echo "ERROR: Installed flux.exe failed to run!"
               exit 1
             fi
+            "$TEST_HOME/.fluxzero/bin/fluxzero.exe" version
             
           else
             # Test bash script
@@ -236,6 +241,10 @@ jobs:
               echo "ERROR: fz was not installed correctly!"
               exit 1
             fi
+            if [ ! -x "$TEST_HOME/.fluxzero/bin/fluxzero" ]; then
+              echo "ERROR: fluxzero alias was not installed correctly!"
+              exit 1
+            fi
             
             # Test the installed binary
             "$TEST_HOME/.fluxzero/bin/fz" version
@@ -243,6 +252,7 @@ jobs:
               echo "ERROR: Installed flux failed to run!"
               exit 1
             fi
+            "$TEST_HOME/.fluxzero/bin/fluxzero" version
             
             # Test the PATH installation (fz command)
             if [[ "$RUNNER_OS" == "Linux" ]]; then
@@ -255,6 +265,11 @@ jobs:
                 fi
               else
                 echo "WARNING: /usr/local/bin/fz was not created (permissions issue expected in CI)"
+              fi
+              if [ -x "/usr/local/bin/fluxzero" ]; then
+                /usr/local/bin/fluxzero version
+              else
+                echo "WARNING: /usr/local/bin/fluxzero was not created (permissions issue expected in CI)"
               fi
             fi
           fi
@@ -326,6 +341,10 @@ jobs:
               echo "ERROR: Uninstall script failed to remove /usr/local/bin/fz!"
               exit 1
             fi
+            if [[ "$RUNNER_OS" == "Linux" ]] && [ -f "/usr/local/bin/fluxzero" ]; then
+              echo "ERROR: Uninstall script failed to remove /usr/local/bin/fluxzero!"
+              exit 1
+            fi
           fi
           
           echo "Uninstall script test successful!"
@@ -334,6 +353,9 @@ jobs:
           rm -rf "$TEST_HOME"
           if [[ "$RUNNER_OS" == "Linux" ]] && [ -f "/usr/local/bin/fz" ]; then
             sudo rm -f /usr/local/bin/fz || true
+          fi
+          if [[ "$RUNNER_OS" == "Linux" ]] && [ -f "/usr/local/bin/fluxzero" ]; then
+            sudo rm -f /usr/local/bin/fluxzero || true
           fi
 
       - name: Upload native executable

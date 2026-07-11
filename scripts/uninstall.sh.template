@@ -154,18 +154,24 @@ fi
 
 # Check for system-wide installation
 SYSTEM_LINK="/usr/local/bin/fz"
+SYSTEM_ALIAS="/usr/local/bin/fluxzero"
 FOUND_SYSTEM=0
 if [ -f "$SYSTEM_LINK" ] || [ -L "$SYSTEM_LINK" ]; then
     FOUND_SYSTEM=1
 fi
+FOUND_SYSTEM_ALIAS=0
+if [ -f "$SYSTEM_ALIAS" ] || [ -L "$SYSTEM_ALIAS" ]; then
+    FOUND_SYSTEM_ALIAS=1
+fi
 
 # Check if anything was found
-if [ $FOUND_CURRENT -eq 0 ] && [ $FOUND_LEGACY -eq 0 ] && [ $FOUND_SYSTEM -eq 0 ]; then
+if [ $FOUND_CURRENT -eq 0 ] && [ $FOUND_LEGACY -eq 0 ] && [ $FOUND_SYSTEM -eq 0 ] && [ $FOUND_SYSTEM_ALIAS -eq 0 ]; then
     echo "${GREEN}No FluxZero CLI installation found.${NC}"
     echo "Locations checked:"
     echo "  - $CURRENT_DIR"
     echo "  - $LEGACY_DIR"
     echo "  - $SYSTEM_LINK"
+    echo "  - $SYSTEM_ALIAS"
     exit 0
 fi
 
@@ -173,6 +179,7 @@ echo "${YELLOW}Found FluxZero CLI installations:${NC}"
 [ $FOUND_CURRENT -eq 1 ] && echo "  ✓ Current installation: $CURRENT_DIR"
 [ $FOUND_LEGACY -eq 1 ] && echo "  ✓ Legacy installation: $LEGACY_DIR"
 [ $FOUND_SYSTEM -eq 1 ] && echo "  ✓ System command: $SYSTEM_LINK"
+[ $FOUND_SYSTEM_ALIAS -eq 1 ] && echo "  ✓ System command: $SYSTEM_ALIAS"
 echo
 
 if [ -z "$FORCE_UNINSTALL" ] && [ -z "$QUIET" ]; then
@@ -209,6 +216,11 @@ if [ $FOUND_SYSTEM -eq 1 ]; then
         REMOVED_COUNT=$((REMOVED_COUNT + 1))
     fi
 fi
+if [ $FOUND_SYSTEM_ALIAS -eq 1 ]; then
+    if remove_file "$SYSTEM_ALIAS" "system command (fluxzero)"; then
+        REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+fi
 
 echo
 echo "Uninstallation Summary:"
@@ -224,7 +236,7 @@ elif [ $REMOVED_COUNT -gt 1 ]; then
 fi
 
 # Final verification
-if [ ! -d "$CURRENT_DIR" ] && [ ! -d "$LEGACY_DIR" ] && [ ! -f "$SYSTEM_LINK" ]; then
+if [ ! -d "$CURRENT_DIR" ] && [ ! -d "$LEGACY_DIR" ] && [ ! -f "$SYSTEM_LINK" ] && [ ! -f "$SYSTEM_ALIAS" ]; then
     echo "${GREEN}✓ FluxZero CLI has been completely removed from your system.${NC}"
 else
     echo "${YELLOW}Some FluxZero CLI components may still remain on your system.${NC}"

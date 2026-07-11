@@ -6,6 +6,7 @@ Maven plugin for Fluxzero project setup and Java package publishing.
 
 - `sync-project-files`: updates `.fluxzero/agents/` for the project's Fluxzero SDK version.
 - `publish-package`: builds and publishes a Java OCI package from Maven output.
+- `dev`: starts the local Fluxzero development environment and keeps it running until interrupted.
 
 ## Quick Start
 
@@ -35,6 +36,35 @@ Add the plugin to your `pom.xml`:
 This configuration runs `sync-project-files` during the Maven `initialize` phase.
 
 ## Configuration
+
+### `dev`
+
+`dev` is the project-local fallback for starting the same environment as `fz dev`, without requiring a globally
+installed CLI. The goal resolves the `io.fluxzero:dev-server` artifact matching the project's Fluxzero SDK version,
+then runs it in the foreground:
+
+```bash
+./mvnw fluxzero:dev
+```
+
+Use `Ctrl-C` to stop the application, frontend, IDP, proxy, runtime, and MCP endpoint gracefully.
+
+| Setting | Command-line property | Default |
+|---------|-----------------------|---------|
+| Dev-server version | `fluxzero.dev.serverVersion` | project Fluxzero SDK version |
+| Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
+| Application name | `fluxzero.dev.applicationName` | Maven artifact id |
+| Namespace | `fluxzero.dev.namespace` | project default |
+| Watch sources | `fluxzero.dev.watch` | `true` |
+| Compile on start | `fluxzero.dev.compileOnStart` | `true` |
+| Background tests | `fluxzero.dev.testsEnabled` | `true` |
+| Fast compiler | `fluxzero.dev.fastCompiler` | `false` |
+| Frontend command | `fluxzero.dev.frontendCommand` | none |
+| External frontend URL | `fluxzero.dev.frontendUrl` | none |
+| Skip dev environment | `fluxzero.dev.skip` | `false` |
+
+Agent integrations should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
+own stdout would corrupt the MCP protocol stream.
 
 ### `sync-project-files`
 

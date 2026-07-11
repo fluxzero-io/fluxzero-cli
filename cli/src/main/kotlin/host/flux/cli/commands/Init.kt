@@ -18,9 +18,10 @@ import host.flux.templates.models.BuildSystem
 import java.nio.file.Paths
 
 class Init(
-    private val prompt: Prompt = JLinePrompt(),
+    private val prompt: Prompt? = null,
     private val scaffoldService: ScaffoldService? = null
 ) : CliktCommand() {
+    private val actualPrompt: Prompt by lazy { prompt ?: JLinePrompt() }
 
     override fun help(context: Context): String = "Initialize a new Flux application"
 
@@ -106,7 +107,7 @@ class Init(
     }
 
     private fun promptForName(): String {
-        val input = prompt.readLine("Enter project name (will be normalized): ")?.trim()
+        val input = actualPrompt.readLine("Enter project name (will be normalized): ")?.trim()
         if (input.isNullOrBlank()) {
             throw RuntimeException("Cannot read input in non-interactive mode. Please specify --name parameter.")
         }
@@ -115,7 +116,7 @@ class Init(
 
     private fun promptForPackage(): String {
         while (true) {
-            val input = prompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ")
+            val input = actualPrompt.readLine("Enter package name (e.g., com.example.myapp) [com.example.app]: ")
             if (input == null) {
                 throw RuntimeException("Cannot read input in non-interactive mode. Please specify --package parameter.")
             }
@@ -132,7 +133,7 @@ class Init(
             echo("Please select a build system:")
             echo("1) Maven")
             echo("2) Gradle")
-            val input = prompt.readLine("Enter choice [1-2]: ")?.trim()
+            val input = actualPrompt.readLine("Enter choice [1-2]: ")?.trim()
             when (input) {
                 "1" -> return BuildSystem.MAVEN
                 "2" -> return BuildSystem.GRADLE
@@ -149,7 +150,7 @@ class Init(
             while (true) {
                 echo("Please select a template:")
                 templates.forEachIndexed { i, t -> echo("${i + 1}) ${t.name}") }
-                val input = prompt.readLine("Enter choice [1-${templates.size}]: ")?.trim()
+                val input = actualPrompt.readLine("Enter choice [1-${templates.size}]: ")?.trim()
                 if (input == null) {
                     throw RuntimeException("Cannot read input in non-interactive mode. Please specify --template parameter.")
                 }
