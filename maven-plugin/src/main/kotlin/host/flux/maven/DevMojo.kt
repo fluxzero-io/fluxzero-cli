@@ -83,6 +83,9 @@ class DevMojo : AbstractMojo() {
     @Parameter(property = "fluxzero.dev.skip", defaultValue = "false")
     private var skipDev: Boolean = false
 
+    @Parameter(property = "fluxzero.dev.background", defaultValue = "false")
+    private var background: Boolean = false
+
     override fun execute() {
         if (skipDev) {
             log.info("Skipping Fluxzero dev environment")
@@ -116,7 +119,7 @@ class DevMojo : AbstractMojo() {
         }
         try {
             val exitCode = DevServerLauncher(messageSink = { log.info(it) }).launch(
-                DevLaunchRequest(root, version, DevLaunchTarget.SERVER, arguments)
+                DevLaunchRequest(root, version, DevLaunchTarget.SERVER, arguments, detached = background)
             )
             if (exitCode != 0 && exitCode != 130 && exitCode != 143) {
                 throw MojoFailureException("Fluxzero dev server exited with code $exitCode.")

@@ -75,4 +75,32 @@ class DevTest {
         assertEquals(0, result.statusCode)
         assertTrue(request!!.arguments.contains("--no-frontend"))
     }
+
+    @Test
+    fun `starts dev server detached when background is requested`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("--project-dir", projectDirectory.toString(), "--background")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.SERVER, request?.target)
+        assertTrue(request?.detached == true)
+    }
+
+    @Test
+    fun `forwards lifecycle actions to control target`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("logs", "--project-dir", projectDirectory.toString(), "--follow", "--errors", "--app", "orders")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.CONTROL, request?.target)
+        assertTrue(request!!.arguments.containsAll(listOf("logs", "--follow", "--errors", "--app", "orders")))
+    }
 }

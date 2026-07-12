@@ -16,7 +16,9 @@ val shade by configurations.creating {
 
 dependencies {
     shade(project(":project-files"))
+    shade(project(":dev-launcher"))
     compileOnly(project(":project-files"))
+    implementation(project(":dev-launcher"))
 
     implementation(gradleApi())
     implementation(gradleKotlinDsl())

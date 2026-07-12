@@ -56,6 +56,71 @@ class FluxzeroPluginFunctionalTest {
             .build()
 
         assertTrue(result.output.contains("syncProjectFiles"))
+        assertTrue(result.output.contains("fluxzeroDev"))
+        assertTrue(result.output.contains("fluxzeroDevMetadata"))
+        assertTrue(result.output.contains("fluxzeroDevTest"))
+    }
+
+    @Test
+    fun `dev task help documents lifecycle and launch options`() {
+        buildFile.writeText("""
+            plugins {
+                java
+                id("io.fluxzero.tools.gradle.plugin")
+            }
+
+            fluxzero {
+                projectFiles {
+                    enabled.set(false)
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("help", "--task", "fluxzeroDev")
+            .withPluginClasspath()
+            .build()
+
+        assertTrue(result.output.contains("--background"), result.output)
+        assertTrue(result.output.contains("--applications"), result.output)
+        assertTrue(result.output.contains("--environment"), result.output)
+        assertTrue(result.output.contains("--frontend-command"), result.output)
+        assertTrue(result.output.contains("--no-tests"), result.output)
+        assertTrue(result.output.contains("--port"), result.output)
+    }
+
+    @Test
+    fun `dev metadata task compiles application and writes classpath contract`() {
+        buildFile.writeText("""
+            plugins {
+                java
+                id("io.fluxzero.tools.gradle.plugin")
+            }
+
+            fluxzero {
+                projectFiles {
+                    enabled.set(false)
+                }
+            }
+        """.trimIndent())
+        val source = File(testProjectDir, "src/main/java/com/example/App.java")
+        source.parentFile.mkdirs()
+        source.writeText("""
+            package com.example;
+            public class App { public static void main(String[] args) { } }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("fluxzeroDevMetadata")
+            .withPluginClasspath()
+            .build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":fluxzeroDevMetadata")?.outcome)
+        val metadata = File(testProjectDir, ".fluxzero/dev/gradle-metadata.json").readText()
+        assertTrue(metadata.contains("build/classes/java/main"), metadata)
+        assertTrue(metadata.contains("\"name\": \"test-project\""), metadata)
     }
 
     @Test

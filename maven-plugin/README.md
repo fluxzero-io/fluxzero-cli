@@ -48,12 +48,18 @@ then runs it in the foreground:
 ```
 
 Use `Ctrl-C` to stop the application, frontend, IDP, proxy, runtime, and MCP endpoint gracefully.
+Set `-Dfluxzero.dev.background=true` to detach. A detached environment is controlled with `fz dev status`,
+`fz dev logs --follow`, and `fz dev stop`; only one session can run per project.
 
 | Setting | Command-line property | Default |
 |---------|-----------------------|---------|
 | Dev-server version | `fluxzero.dev.serverVersion` | project Fluxzero SDK version |
 | Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
 | Application name | `fluxzero.dev.applicationName` | Maven artifact id |
+| Applications/configurations | `fluxzero.dev.applications` | all discovered applications |
+| Environment | `fluxzero.dev.environment` | `local` |
+| Public gateway port | `fluxzero.dev.port` | dynamic |
+| IDP mode | `fluxzero.dev.idp` | `managed` |
 | Namespace | `fluxzero.dev.namespace` | project default |
 | Watch sources | `fluxzero.dev.watch` | `true` |
 | Compile on start | `fluxzero.dev.compileOnStart` | `true` |
@@ -61,7 +67,16 @@ Use `Ctrl-C` to stop the application, frontend, IDP, proxy, runtime, and MCP end
 | Fast compiler | `fluxzero.dev.fastCompiler` | `false` |
 | Frontend command | `fluxzero.dev.frontendCommand` | none |
 | External frontend URL | `fluxzero.dev.frontendUrl` | none |
+| Frontend enabled | `fluxzero.dev.frontendEnabled` | `true` |
+| Startup timeout | `fluxzero.dev.startupTimeoutMillis` | `20000` |
+| Graceful app shutdown timeout | `fluxzero.dev.gracefulShutdownTimeoutMillis` | `5000` |
+| Source debounce | `fluxzero.dev.debounceMillis` | `300` |
+| Background/detached | `fluxzero.dev.background` | `false` |
 | Skip dev environment | `fluxzero.dev.skip` | `false` |
+
+`backendPaths` and `appArgs` are repeatable Maven configuration elements. Stable shared environment, frontend,
+application flavor, 1Password-reference, and startup-command configuration belongs in tracked `.fluxzero/dev.yaml`;
+the Maven properties above are local or invocation-specific overrides.
 
 Agent integrations should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
 own stdout would corrupt the MCP protocol stream.

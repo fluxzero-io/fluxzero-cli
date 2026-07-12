@@ -1,6 +1,7 @@
 # Fluxzero Gradle Plugin
 
-Gradle plugin for Fluxzero projects that automatically synchronizes AI agent instruction files from GitHub releases.
+Gradle plugin for Fluxzero projects. It provides the project-local dev environment and synchronizes AI agent
+instruction files from GitHub releases.
 
 ## Features
 
@@ -9,6 +10,8 @@ Gradle plugin for Fluxzero projects that automatically synchronizes AI agent ins
 - **Lifecycle Integration**: Runs automatically before compilation
 - **Multi-Module Support**: Configurable to run only on root project or all modules
 - **Smart Caching**: Only downloads when version changes
+- **Local Dev Environment**: Starts the same runtime, proxy, IDP, reload, test, frontend, diagnostics, and MCP stack as `fz dev`
+- **Gradle-Correct Builds**: Gradle owns compilation, annotation processors, resources, and runtime/test classpaths
 
 ## Quick Start
 
@@ -23,6 +26,79 @@ plugins {
 ```
 
 That's it! The plugin will automatically detect your SDK version and language, then sync agent files before compilation.
+
+## Local Development
+
+Apply the plugin to the root project and run:
+
+```bash
+./gradlew fluxzeroDev
+```
+
+The task runs in the foreground by default. Use `Ctrl-C` for controlled cleanup, or explicitly detach it:
+
+```bash
+./gradlew fluxzeroDev -Pfluxzero.dev.background=true
+fz dev status
+fz dev logs --follow
+fz dev stop
+```
+
+The same launch settings are available as native task options, for example
+`./gradlew fluxzeroDev --background --applications=api,worker --no-tests`. Run
+`./gradlew help --task fluxzeroDev` for the complete, locally installed option reference.
+
+Only one dev session can run per project. The test runtime is currently in-memory, so a stopped or unexpectedly killed
+session loses its data and replays startup commands on the next launch. Background mode is useful for agent-launched
+work, but intentionally remains opt-in because it keeps the environment's processes and memory alive.
+
+Shared defaults normally belong in `.fluxzero/dev.yaml`. Gradle DSL overrides are available when build-owned
+configuration is preferable:
+
+```kotlin
+fluxzero {
+    dev {
+        applications.set(listOf("app", "audittrail"))
+        environment.set("local")
+        port.set(4200)
+        idp.set("external")
+        frontendCommand.set("cd frontend && npm run dev -- --port {port}")
+        backendPaths.set(listOf("/api", "/webhooks"))
+        testsEnabled.set(true)
+        background.set(false)
+    }
+}
+```
+
+| Setting | Gradle property | Default |
+|---------|-----------------|---------|
+| `serverVersion` | explicit DSL or `FLUXZERO_DEV_SERVER_VERSION` | detected SDK version |
+| `mainClass` | `fluxzero.dev.mainClass` | auto-detected |
+| `applicationName` | `fluxzero.dev.applicationName` | project name |
+| `applications` | `fluxzero.dev.applications` (comma-separated) | all discovered apps |
+| `environment` | `fluxzero.dev.environment` | `local` |
+| `port` | `fluxzero.dev.port` | dynamic |
+| `idp` | `fluxzero.dev.idp` | `managed` |
+| `namespace` | `fluxzero.dev.namespace` | project default |
+| `watch` | `fluxzero.dev.watch` | `true` |
+| `compileOnStart` | `fluxzero.dev.compileOnStart` | `true` |
+| `testsEnabled` | `fluxzero.dev.testsEnabled` | `true` |
+| `fastCompiler` | `fluxzero.dev.fastCompiler` | `false`; Maven-only optimization |
+| `frontendCommand` / `frontendUrl` | `fluxzero.dev.frontendCommand` / `fluxzero.dev.frontendUrl` | none |
+| `frontendEnabled` | `fluxzero.dev.frontendEnabled` | `true` |
+| `backendPaths` / `appArgs` | comma-separated properties with the same names | empty |
+| `startupTimeoutMillis` | `fluxzero.dev.startupTimeoutMillis` | `20000` |
+| `gracefulShutdownTimeoutMillis` | `fluxzero.dev.gracefulShutdownTimeoutMillis` | `5000` |
+| `debounceMillis` | `fluxzero.dev.debounceMillis` | `300` |
+| `background` | `fluxzero.dev.background` | `false` |
+
+`fluxzeroDevMetadata` is the build contract used internally by the dev server. It compiles main and test source sets,
+then writes application outputs and classpaths to ignored `.fluxzero/dev/gradle-metadata.json`. It can also be run
+directly when troubleshooting Gradle discovery:
+
+```bash
+./gradlew fluxzeroDevMetadata
+```
 
 ## Configuration
 

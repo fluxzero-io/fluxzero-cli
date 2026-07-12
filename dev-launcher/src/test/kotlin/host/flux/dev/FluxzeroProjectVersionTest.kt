@@ -41,4 +41,24 @@ class FluxzeroProjectVersionTest {
 
         assertEquals("2.0.1", FluxzeroProjectVersion.detect(projectDirectory))
     }
+
+    @Test
+    fun `detects Gradle SDK version from property reference`() {
+        Files.writeString(projectDirectory.resolve("gradle.properties"), "fluxzeroVersion=1.230.0\n")
+        Files.writeString(
+            projectDirectory.resolve("build.gradle.kts"),
+            "dependencies { implementation(platform(\"io.fluxzero:fluxzero-bom:\$fluxzeroVersion\")) }"
+        )
+
+        assertEquals("1.230.0", FluxzeroProjectVersion.detect(projectDirectory))
+    }
+
+    @Test
+    fun `detects Gradle SDK version from version catalog`() {
+        Files.createDirectories(projectDirectory.resolve("gradle"))
+        Files.writeString(projectDirectory.resolve("build.gradle.kts"), "plugins { java }")
+        Files.writeString(projectDirectory.resolve("gradle/libs.versions.toml"), "fluxzero = \"1.231.0\"\n")
+
+        assertEquals("1.231.0", FluxzeroProjectVersion.detect(projectDirectory))
+    }
 }

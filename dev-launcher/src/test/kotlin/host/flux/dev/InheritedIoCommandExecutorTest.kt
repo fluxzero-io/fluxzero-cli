@@ -6,6 +6,7 @@ import org.junit.jupiter.api.condition.OS
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Path
+import java.nio.file.Files
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -15,6 +16,54 @@ import kotlin.test.assertTrue
 
 @EnabledOnOs(OS.LINUX, OS.MAC)
 class InheritedIoCommandExecutorTest {
+    @Test
+    fun `detached child survives launcher scope and writes bootstrap log`() {
+        val directory = Files.createTempDirectory("fluxzero-detached-executor")
+        val log = directory.resolve("bootstrap.log")
+        val executor = InheritedIoCommandExecutor()
+
+        val pid = withShellDetach {
+            executor.supervise(onShutdown = { }) {
+                executor.startDetached(
+                    listOf(javaExecutable(), "-cp", fixtureClasspath(), ExecutorChildFixture::class.java.name),
+                    directory,
+                    log
+                )
+            }
+        }
+
+        val process = ProcessHandle.of(pid).orElseThrow()
+        try {
+            assertTrue(awaitFileOutput(log, "child ready"), Files.readString(log))
+            assertTrue(process.isAlive)
+        } finally {
+            process.descendants().toList().asReversed().forEach(ProcessHandle::destroyForcibly)
+            process.destroyForcibly()
+        }
+    }
+
+    @Test
+    fun `detached child survives launcher process exit`() {
+        val directory = Files.createTempDirectory("fluxzero-detached-parent")
+        val log = directory.resolve("bootstrap.log")
+        val parent = ProcessBuilder(
+            javaExecutable(), "-Dfluxzero.dev.detach.shell=true", "-cp", fixtureClasspath(),
+            DetachedExecutorParentFixture::class.java.name,
+            directory.toString(), log.toString()
+        ).redirectErrorStream(true).start()
+        val pid = parent.inputStream.bufferedReader().readLine().trim().toLong()
+        assertTrue(parent.waitFor(3, TimeUnit.SECONDS), "detached launcher parent did not exit")
+
+        val process = ProcessHandle.of(pid).orElseThrow()
+        try {
+            assertTrue(awaitFileOutput(log, "child ready"), Files.readString(log))
+            assertTrue(process.isAlive)
+        } finally {
+            process.descendants().toList().asReversed().forEach(ProcessHandle::destroyForcibly)
+            process.destroyForcibly()
+        }
+    }
+
     @Test
     fun `launcher reports shutdown only after its child has stopped`() {
         val output = ByteArrayOutputStream()
@@ -78,6 +127,26 @@ class InheritedIoCommandExecutorTest {
         return false
     }
 
+    private fun awaitFileOutput(file: Path, expected: String): Boolean {
+        val deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
+        while (System.nanoTime() < deadline) {
+            if (Files.isRegularFile(file) && Files.readString(file).contains(expected)) return true
+            Thread.sleep(25)
+        }
+        return false
+    }
+
+    private fun <T> withShellDetach(block: () -> T): T {
+        val key = "fluxzero.dev.detach.shell"
+        val previous = System.getProperty(key)
+        System.setProperty(key, "true")
+        return try {
+            block()
+        } finally {
+            if (previous == null) System.clearProperty(key) else System.setProperty(key, previous)
+        }
+    }
+
     private fun fixtureClasspath(): String = listOf(
         InheritedIoCommandExecutor::class.java,
         InheritedIoCommandExecutorTest::class.java,
@@ -115,6 +184,19 @@ object ExecutorTransitionFixture {
             System.out.flush()
             CountDownLatch(1).await()
         }
+    }
+}
+
+object DetachedExecutorParentFixture {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val java = Path.of(System.getProperty("java.home"), "bin", "java").toString()
+        val pid = InheritedIoCommandExecutor().startDetached(
+            listOf(java, "-cp", System.getProperty("java.class.path"), ExecutorChildFixture::class.java.name),
+            Path.of(args[0]),
+            Path.of(args[1])
+        )
+        println(pid)
     }
 }
 

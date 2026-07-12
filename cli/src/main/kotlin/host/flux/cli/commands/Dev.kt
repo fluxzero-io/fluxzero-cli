@@ -3,10 +3,13 @@ package host.flux.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.path
 import host.flux.dev.DevLaunchRequest
@@ -20,7 +23,11 @@ class Dev(
 ) : CliktCommand() {
     override fun help(context: Context): String = "Start the local Fluxzero development environment"
 
-    private val projectDirectory by option("--project-dir", "--dir", help = "Maven project directory.")
+    private val action by argument(
+        help = "Action: start (default), status, logs, or stop."
+    ).optional()
+
+    private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)
         .default(Path.of(""))
     private val devServerVersion by option(
@@ -75,9 +82,37 @@ class Dev(
         help = "Additional frontend path routed unchanged to Fluxzero; repeatable."
     ).multiple()
     private val appArgs by option("--app-arg", help = "Application argument; repeatable.").multiple()
+    private val background by option(
+        "-d", "--background", "--detach",
+        help = "Start in the background. Foreground remains the default."
+    ).flag(default = false)
+    private val follow by option("-f", "--follow", help = "Follow output for the logs action.").flag(default = false)
+    private val errors by option("--errors", help = "Show only warning and error log lines.").flag(default = false)
+    private val json by option("--json", help = "Print machine-readable status JSON.").flag(default = false)
+    private val force by option("--force", help = "Force termination for the stop action.").flag(default = false)
 
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
+        val selectedAction = action ?: "start"
+        if (selectedAction !in setOf("start", "status", "logs", "stop")) {
+            throw UsageError("Unknown dev action '$selectedAction'. Expected start, status, logs, or stop.")
+        }
+        if (selectedAction != "start") {
+            val controlArguments = buildList {
+                add(selectedAction)
+                addOption("--project-dir", root.toString())
+                addFlag("--json", json)
+                addFlag("--follow", follow)
+                addFlag("--errors", errors)
+                addFlag("--force", force)
+                applications.singleOrNull()?.let { addOption("--app", it) }
+            }
+            val exitCode = launcher.launch(
+                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.CONTROL, controlArguments)
+            )
+            if (exitCode != 0) throw ProgramResult(exitCode)
+            return
+        }
         val arguments = buildList {
             addOption("--project-dir", root.toString())
             addOption("--main-class", mainClass)
@@ -101,7 +136,7 @@ class Dev(
             appArgs.forEach { addOption("--app-arg", it) }
         }
         val exitCode = launcher.launch(
-            DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, arguments)
+            DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, arguments, background)
         )
         if (exitCode != 0 && exitCode != 130 && exitCode != 143) {
             throw ProgramResult(exitCode)

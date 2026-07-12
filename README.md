@@ -123,7 +123,7 @@ fz upgrade
 
 ### Local development
 
-`fz dev` (or `fluxzero dev`) starts the Fluxzero dev server version that matches the SDK version in the Maven project. It supervises the
+`fz dev` (or `fluxzero dev`) starts the Fluxzero dev server version that matches the SDK version in a Maven or Gradle project. It supervises the
 local runtime, proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP
 endpoint. Ports and credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
 
@@ -148,6 +148,52 @@ fz dev --frontend-url http://localhost:5173
 fz dev --no-tests
 ```
 
+Foreground is the default because the test runtime currently keeps its data in memory. Background mode is explicit:
+
+```bash
+fz dev --background
+fz dev status
+fz dev status --json
+fz dev logs --follow
+fz dev logs --follow --errors
+fz dev logs --follow --app orders
+fz dev stop
+fz dev stop --force
+```
+
+`logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
+
+Only one dev session may be active per project. `status`, `logs`, `stop`, MCP discovery, and the next `dev` launch
+reconcile stale session state when the supervisor was killed unexpectedly. Because that also means the embedded test
+runtime lost its in-memory data, startup commands run again in the next session. Background mode keeps that state alive
+when a terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop`.
+
+Start options:
+
+| Option | Meaning |
+|--------|---------|
+| `--app <selector>` | Start one module, main class, test app, or named app configuration; repeatable. |
+| `--main-class <class>` | Override main-class detection. |
+| `--application-name <name>` | Override the Fluxzero runtime application name. |
+| `--environment <name>` | Set `ENVIRONMENT`; defaults to `local`. |
+| `--namespace <name>` | Set the Fluxzero namespace. |
+| `--port <port>` | Prefer a public browser/gateway port; dynamic by default. |
+| `--idp managed|external` | Start the local IDP or use application-owned IDP configuration. |
+| `--no-idp` | Alias for `--idp external`. |
+| `--frontend-command <command>` | Start a managed frontend; use `{port}` for its private upstream port. |
+| `--frontend-url <url>` | Proxy an externally managed frontend. |
+| `--no-frontend` | Run a backend-only environment. |
+| `--backend-path <path>` | Route an extra public path directly to Fluxzero; repeatable. |
+| `--fast-compiler` | Enable the Maven-correct fast Java path; Maven remains the fallback. |
+| `--no-tests` | Disable background test selection and execution. |
+| `--no-watch` | Disable source watching. |
+| `--no-compile-on-start` | Start infrastructure without compiling applications. |
+| `--app-arg <argument>` | Pass an application argument; repeatable. |
+| `--startup-timeout-ms <ms>` | Override application/frontend readiness timeout. |
+| `--graceful-shutdown-timeout-ms <ms>` | Override rolling app shutdown timeout. |
+| `--debounce-ms <ms>` | Override source-change debounce. |
+| `--background`, `--detach`, `-d` | Start detached and return after startup reaches success or a concrete failure. |
+
 Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
 remain ignored under `.fluxzero/dev/`:
 
@@ -162,7 +208,25 @@ frontend:
   command: "cd frontend && npm start -- --host 127.0.0.1 --port {port}"
   backendPaths:
     - /api
+applicationConfig:
+  rebound-encrypted:
+    application: rebound
+    applicationName: rebound
+    env:
+      FEATURE_MODE: local
+    secrets:
+      ENCRYPTION_KEY: "op://Fluxzero Cloud/flux_cloud_flux-encryption-key/local encryption-key"
+commands:
+  create-admin:
+    type: com.example.CreateUser
+    payload:
+      name: Local Admin
 ```
+
+`apps` may contain direct selectors or keys from `applicationConfig`. Secret values never belong in this file: only
+tracked `op://` references are allowed, and `op run` injects their values directly into the selected child process.
+YAML commands execute in declaration order, followed by JSON commands under
+`src/test/resources/fluxzero/dev/commands` in filename order.
 
 Command-line options override environment variables, which override `dev.yaml`; built-in defaults apply last.
 Unknown keys and unsupported config versions fail startup instead of being silently ignored.
@@ -176,6 +240,19 @@ fz mcp --project-dir /path/to/project
 
 Set `FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a dev-server version that differs
 from the project's Fluxzero SDK version.
+
+Project-local launchers provide the same environment without a globally installed CLI:
+
+```bash
+./mvnw fluxzero:dev
+./mvnw fluxzero:dev -Dfluxzero.dev.background=true
+
+./gradlew fluxzeroDev
+./gradlew fluxzeroDev -Pfluxzero.dev.background=true
+```
+
+The Gradle plugin also owns `fluxzeroDevMetadata`, the compile/classpath contract consumed by the dev server. Apply the
+plugin to the root project so multi-project applications are discovered together.
 
 ### CLI Commands & Parameters
 

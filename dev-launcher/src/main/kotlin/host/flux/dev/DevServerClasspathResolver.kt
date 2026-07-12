@@ -8,34 +8,52 @@ class DevServerClasspathResolver(
     private val executor: CommandExecutor,
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) {
-    fun resolve(projectDirectory: Path, version: String): String {
-        require(Files.isRegularFile(projectDirectory.resolve("pom.xml"))) {
-            "No pom.xml found in $projectDirectory. Fluxzero dev currently supports Maven projects."
-        }
+    fun resolve(projectDirectory: Path, version: String, reuseSnapshotCache: Boolean = false): String {
+        val maven = Files.isRegularFile(projectDirectory.resolve("pom.xml"))
+        val gradle = Files.isRegularFile(projectDirectory.resolve("build.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("build.gradle.kts")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle.kts"))
+        require(maven || gradle) { "No Maven or Gradle build found in $projectDirectory." }
         val launcherDirectory = projectDirectory.resolve(".fluxzero/dev/launcher")
         val classpathFile = launcherDirectory.resolve("classpath.txt")
         val versionFile = launcherDirectory.resolve("version")
-        if (!version.endsWith("SNAPSHOT") && isValidCache(classpathFile, versionFile, version)) {
+        if ((!version.endsWith("SNAPSHOT") || reuseSnapshotCache)
+            && isValidCache(classpathFile, versionFile, version)) {
             return Files.readString(classpathFile).trim()
         }
 
         Files.createDirectories(launcherDirectory)
-        val launcherPom = launcherDirectory.resolve("pom.xml")
-        writeAtomically(launcherPom, launcherPom(version))
         Files.deleteIfExists(classpathFile)
         messageSink("Resolving Fluxzero dev server $version...")
-        val command = mavenCommand(projectDirectory) + listOf(
-            "-q",
-            "-f", launcherPom.toString(),
-            "org.apache.maven.plugins:maven-dependency-plugin:3.11.0:build-classpath",
-            "-Dmdep.includeScope=runtime",
-            "-Dmdep.outputFile=${classpathFile.toAbsolutePath()}"
-        )
+        val command = if (maven) {
+            val launcherPom = launcherDirectory.resolve("pom.xml")
+            writeAtomically(launcherPom, launcherPom(version))
+            mavenCommand(projectDirectory) + listOf(
+                "-q",
+                "-f", launcherPom.toString(),
+                "org.apache.maven.plugins:maven-dependency-plugin:3.11.0:build-classpath",
+                "-Dmdep.includeScope=runtime",
+                "-Dmdep.outputFile=${classpathFile.toAbsolutePath()}"
+            )
+        } else {
+            writeAtomically(launcherDirectory.resolve("settings.gradle"),
+                            "rootProject.name = 'fluxzero-dev-launcher'\n")
+            writeAtomically(launcherDirectory.resolve("build.gradle"), launcherGradle(version))
+            gradleCommand(projectDirectory) + listOf(
+                "-q", "-p", launcherDirectory.toString(), "resolveFluxzeroDevServer",
+                "-PfluxzeroDevClasspath=${classpathFile.toAbsolutePath()}",
+                "--no-daemon",
+                "--no-configuration-cache"
+            )
+        }
         val exitCode = executor.execute(command, projectDirectory, OutputMode.STDOUT_TO_STDERR)
         if (exitCode == 130 || exitCode == 143) {
             throw DevLaunchInterruptedException(exitCode)
         }
-        check(exitCode == 0) { "Could not resolve Fluxzero dev server $version (Maven exit code $exitCode)." }
+        check(exitCode == 0) {
+            "Could not resolve Fluxzero dev server $version (${if (maven) "Maven" else "Gradle"} exit code $exitCode)."
+        }
         check(Files.isRegularFile(classpathFile) && Files.readString(classpathFile).isNotBlank()) {
             "Maven did not produce a runtime classpath for Fluxzero dev server $version."
         }
@@ -47,6 +65,12 @@ class DevServerClasspathResolver(
         val windows = System.getProperty("os.name").lowercase().contains("win")
         val wrapper = projectDirectory.resolve(if (windows) "mvnw.cmd" else "mvnw")
         return if (Files.isRegularFile(wrapper)) listOf(wrapper.toAbsolutePath().toString()) else listOf("mvn")
+    }
+
+    internal fun gradleCommand(projectDirectory: Path): List<String> {
+        val windows = System.getProperty("os.name").lowercase().contains("win")
+        val wrapper = projectDirectory.resolve(if (windows) "gradlew.bat" else "gradlew")
+        return if (Files.isRegularFile(wrapper)) listOf(wrapper.toAbsolutePath().toString()) else listOf("gradle")
     }
 
     private fun isValidCache(classpathFile: Path, versionFile: Path, version: String): Boolean {
@@ -92,12 +116,39 @@ class DevServerClasspathResolver(
         </project>
         """.trimIndent()
 
+    private fun launcherGradle(version: String): String =
+        """
+        repositories {
+            mavenLocal()
+            mavenCentral()
+        }
+
+        configurations {
+            devServer
+        }
+
+        dependencies {
+            devServer('io.fluxzero:dev-server:${groovy(version)}:standalone') {
+                transitive = false
+            }
+        }
+
+        tasks.register('resolveFluxzeroDevServer') {
+            doLast {
+                file(providers.gradleProperty('fluxzeroDevClasspath').get()).text =
+                    configurations.devServer.asPath
+            }
+        }
+        """.trimIndent()
+
     private fun xml(value: String): String = value
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&apos;")
+
+    private fun groovy(value: String): String = value.replace("\\", "\\\\").replace("'", "\\'")
 }
 
 internal class DevLaunchInterruptedException(val exitCode: Int) : RuntimeException(null, null, false, false)

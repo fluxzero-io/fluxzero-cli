@@ -93,6 +93,24 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `control action reuses active snapshot classpath`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "0-SNAPSHOT")
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
+
+        DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL, listOf("status"))
+        )
+
+        assertEquals(1, commands.size)
+        assertTrue(commands.single().contains(DevLaunchTarget.CONTROL.mainClass))
+    }
+
+    @Test
     fun `reports one clean stop when snapshot resolution is interrupted`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val messages = mutableListOf<String>()
@@ -174,6 +192,130 @@ class DevServerLauncherTest {
         )
 
         assertEquals(listOf("supervise-start", "resolve", "server", "supervise-end"), events)
+    }
+
+    @Test
+    fun `detached launch starts server without terminal ownership and waits for readiness`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val commands = mutableListOf<Invocation>()
+        var detachedCommand: List<String>? = null
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                detachedCommand = command
+                assertEquals(projectDirectory.resolve(".fluxzero/dev/bootstrap.log"), outputFile)
+                return 4242
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
+                listOf("--project-dir", projectDirectory.toString()), detached = true
+            )
+        )
+
+        assertEquals(0, exitCode)
+        assertTrue(detachedCommand!!.contains(DevLaunchTarget.SERVER.mainClass))
+        assertTrue(!detachedCommand!!.contains("-Dfluxzero.dev.launcherOwnsShutdown=true"))
+        val wait = commands.last().command
+        assertTrue(wait.contains(DevLaunchTarget.CONTROL.mainClass))
+        assertTrue(wait.containsAll(listOf("wait", "--pid", "4242")))
+    }
+
+    @Test
+    fun `detached launch materializes safe Fluxzero environment options without forwarding secrets`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        var detachedCommand = emptyList<String>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                detachedCommand = command
+                return 4242
+            }
+        }
+        val environment = mapOf(
+            "FLUXZERO_MAIN_CLASS" to "example.Main",
+            "FLUXZERO_APPLICATION_NAME" to "Example",
+            "FLUXZERO_NAMESPACE" to "local",
+            "FLUXZERO_DEV_PORT" to "4200",
+            "FLUXZERO_DEV_APPS" to "api, worker",
+            "OP_SERVICE_ACCOUNT_TOKEN" to "never-forward-this"
+        )
+
+        DevServerLauncher(executor, environment) { }.launch(
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", detached = true)
+        )
+
+        assertTrue(detachedCommand.containsAll(listOf(
+            "--main-class", "example.Main", "--application-name", "Example",
+            "--namespace", "local", "--port", "4200", "--app", "api", "--app", "worker"
+        )))
+        assertTrue(detachedCommand.none { it.contains("never-forward-this") })
+    }
+
+    @Test
+    fun `control target invokes lifecycle main`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ ->
+            commands += command
+            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+            }
+            0
+        }
+
+        DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
+                listOf("status", "--project-dir", projectDirectory.toString())
+            )
+        )
+
+        assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
+        assertTrue(commands.last().contains("status"))
+    }
+
+    @Test
+    fun `resolves standalone artifact with project Gradle wrapper`() {
+        Files.writeString(projectDirectory.resolve("build.gradle.kts"), "plugins { java }")
+        Files.writeString(projectDirectory.resolve("gradlew"), "wrapper")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ ->
+            commands += command
+            command.firstOrNull { it.startsWith("-PfluxzeroDevClasspath=") }?.let {
+                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+            }
+            0
+        }
+
+        DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL, listOf("status"))
+        )
+
+        assertEquals(projectDirectory.resolve("gradlew").toAbsolutePath().toString(), commands.first().first())
+        assertTrue(commands.first().contains("resolveFluxzeroDevServer"))
+        assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
+        val launcherBuild = Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/build.gradle"))
+        assertTrue(launcherBuild.contains("io.fluxzero:dev-server:0-SNAPSHOT:standalone"))
     }
 
     private data class Invocation(

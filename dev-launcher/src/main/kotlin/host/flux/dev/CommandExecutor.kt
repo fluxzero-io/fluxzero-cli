@@ -1,6 +1,8 @@
 package host.flux.dev
 
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -14,6 +16,12 @@ enum class OutputMode {
 
 fun interface CommandExecutor {
     fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int
+
+    fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long =
+        error("Detached processes are not supported by this command executor")
+
+    fun releaseDetached(workingDirectory: Path) {
+    }
 
     fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T = action()
 }
@@ -29,6 +37,124 @@ class InheritedIoCommandExecutor : CommandExecutor {
             executeInScope(command, workingDirectory, outputMode, scope)
         }
     }
+
+    override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+        java.nio.file.Files.createDirectories(outputFile.parent)
+        java.nio.file.Files.writeString(
+            outputFile,
+            "",
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING
+        )
+        if (isWindows()) {
+            return ProcessBuilder(command)
+                .directory(workingDirectory.toFile())
+                .redirectInput(ProcessBuilder.Redirect.from(java.io.File("NUL")))
+                .redirectOutput(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
+                .redirectError(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
+                .start().pid()
+        }
+        if (isMac() && !java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) {
+            return startWithLaunchd(command, workingDirectory, outputFile)
+        }
+        val bootstrap = ProcessBuilder(
+            listOf(
+                "/bin/sh", "-c",
+                "nohup \"\$@\" </dev/null >>\"\$0\" 2>&1 & echo \$!",
+                outputFile.toString()
+            ) + command
+        )
+            .directory(workingDirectory.toFile())
+            .redirectError(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
+            .start()
+        val pid = bootstrap.inputStream.bufferedReader().readLine()?.trim()?.toLongOrNull()
+            ?: error("Detached process bootstrap did not report a PID. See $outputFile")
+        check(bootstrap.waitFor(2, TimeUnit.SECONDS) && bootstrap.exitValue() == 0) {
+            "Detached process bootstrap failed. See $outputFile"
+        }
+        return pid
+    }
+
+    override fun releaseDetached(workingDirectory: Path) {
+        if (!isMac() || java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) return
+        val domain = "gui/${userId()}"
+        ProcessBuilder("/bin/launchctl", "bootout", "$domain/${launchdLabel(workingDirectory)}")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD).start().run {
+                if (!waitFor(1, TimeUnit.SECONDS)) destroyForcibly()
+            }
+    }
+
+    private fun startWithLaunchd(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+        val uid = userId()
+        val domain = "gui/$uid"
+        val label = launchdLabel(workingDirectory)
+        releaseDetached(workingDirectory)
+        val plist = workingDirectory.resolve(".fluxzero/dev/launchd.plist")
+        val arguments = listOf("/bin/zsh", "-lc", "exec \"\$@\"", "fluxzero-dev") + command
+        val argumentXml = arguments.joinToString("\n") { "      <string>${xml(it)}</string>" }
+        java.nio.file.Files.writeString(
+            plist,
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+              <key>Label</key><string>$label</string>
+              <key>ProgramArguments</key>
+              <array>
+            $argumentXml
+              </array>
+              <key>WorkingDirectory</key><string>${xml(workingDirectory.toString())}</string>
+              <key>StandardOutPath</key><string>${xml(outputFile.toString())}</string>
+              <key>StandardErrorPath</key><string>${xml(outputFile.toString())}</string>
+              <key>RunAtLoad</key><true/>
+              <key>KeepAlive</key><false/>
+              <key>ProcessType</key><string>Interactive</string>
+              <key>ExitTimeOut</key><integer>1</integer>
+            </dict>
+            </plist>
+            """.trimIndent()
+        )
+        val bootstrap = ProcessBuilder("/bin/launchctl", "bootstrap", domain, plist.toString())
+            .redirectErrorStream(true).start()
+        val detail = bootstrap.inputStream.bufferedReader().readText()
+        check(bootstrap.waitFor(5, TimeUnit.SECONDS) && bootstrap.exitValue() == 0) {
+            "Could not register detached Fluxzero dev process: ${detail.trim()}"
+        }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            val state = ProcessBuilder("/bin/launchctl", "print", "$domain/$label")
+                .redirectErrorStream(true).start()
+            val output = state.inputStream.bufferedReader().readText()
+            state.waitFor(2, TimeUnit.SECONDS)
+            Regex("(?m)^\\s*pid = (\\d+)\\s*$").find(output)?.groupValues?.get(1)?.toLongOrNull()?.let {
+                return it
+            }
+            Thread.sleep(50)
+        }
+        error("Detached Fluxzero dev process did not report a PID. See $outputFile")
+    }
+
+    private fun userId(): String {
+        val process = ProcessBuilder("/usr/bin/id", "-u").redirectErrorStream(true).start()
+        val value = process.inputStream.bufferedReader().readText().trim()
+        check(process.waitFor(2, TimeUnit.SECONDS) && process.exitValue() == 0 && value.isNotBlank()) {
+            "Could not determine the current macOS user id"
+        }
+        return value
+    }
+
+    private fun launchdLabel(workingDirectory: Path): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(workingDirectory.toAbsolutePath().normalize().toString().toByteArray())
+            .take(10).joinToString("") { "%02x".format(it) }
+        return "io.fluxzero.dev.$digest"
+    }
+
+    private fun xml(value: String): String = value
+        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\"", "&quot;").replace("'", "&apos;")
 
     override fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T {
         val scope = ExecutionScope(onShutdown)
@@ -123,4 +249,8 @@ class InheritedIoCommandExecutor : CommandExecutor {
             process.destroyForcibly()
         }
     }
+
+    private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
+
+    private fun isMac() = System.getProperty("os.name").lowercase().contains("mac")
 }

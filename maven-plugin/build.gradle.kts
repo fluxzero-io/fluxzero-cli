@@ -55,6 +55,10 @@ val mavenPluginParameterDescriptions = mapOf(
     "devServerVersion" to "Fluxzero dev-server artifact version. Property: fluxzero.dev.serverVersion.",
     "devMainClass" to "Optional application main class override for the dev environment. Property: fluxzero.dev.mainClass.",
     "devApplicationName" to "Fluxzero application name for the dev environment. Property: fluxzero.dev.applicationName.",
+    "applications" to "Applications, modules, or named project configurations to start.",
+    "environment" to "Application environment/profile. Property: fluxzero.dev.environment. Default: local.",
+    "port" to "Preferred public gateway port. Property: fluxzero.dev.port.",
+    "idp" to "IDP mode: managed or external. Property: fluxzero.dev.idp.",
     "devNamespace" to "Fluxzero namespace for the dev environment. Property: fluxzero.dev.namespace.",
     "watch" to "Enable source watching in the dev environment. Property: fluxzero.dev.watch.",
     "compileOnStart" to "Compile and launch the application when dev starts. Property: fluxzero.dev.compileOnStart.",
@@ -68,7 +72,8 @@ val mavenPluginParameterDescriptions = mapOf(
     "startupTimeoutMillis" to "Application readiness timeout in milliseconds. Property: fluxzero.dev.startupTimeoutMillis.",
     "gracefulShutdownTimeoutMillis" to "Graceful app shutdown timeout in milliseconds. Property: fluxzero.dev.gracefulShutdownTimeoutMillis.",
     "debounceMillis" to "Source watcher debounce in milliseconds. Property: fluxzero.dev.debounceMillis.",
-    "skipDev" to "Skip starting the dev environment. Property: fluxzero.dev.skip."
+    "skipDev" to "Skip starting the dev environment. Property: fluxzero.dev.skip.",
+    "background" to "Start the dev environment in the background. Property: fluxzero.dev.background."
 )
 
 fun Element.firstDirectChild(tagName: String): Element? =
