@@ -2,7 +2,15 @@ package host.flux.dev
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+
+private const val PREFLIGHT_MAIN_CLASS = "io.fluxzero.devserver.DevServerPreflightMain"
+private const val USE_DYNAMIC_PORT_EXIT_CODE = 75
+private const val CANCEL_STARTUP_EXIT_CODE = 76
 
 fun interface DevLauncher {
     fun launch(request: DevLaunchRequest): Int
@@ -27,32 +35,42 @@ class DevServerLauncher(
         require(!request.detached || request.target == DevLaunchTarget.SERVER) {
             "Only the Fluxzero dev server can be started in the background"
         }
-        val shutdown = ShutdownOutcome(request.target == DevLaunchTarget.SERVER && !request.detached, messageSink)
-        return executor.supervise(shutdown::report) {
+        val shutdown = ShutdownOutcome(messageSink).also {
+            if (request.target == DevLaunchTarget.SERVER) it.expectStopped()
+        }
+        return executor.supervise(shutdown::begin, shutdown::complete) {
             try {
-                val classpath = DevServerClasspathResolver(executor, messageSink)
-                    .resolve(projectDirectory, version, reuseSnapshotCache = request.target != DevLaunchTarget.SERVER)
-                val launcherProperty = if (request.target == DevLaunchTarget.SERVER && !request.detached) {
-                    listOf("-Dfluxzero.dev.launcherOwnsShutdown=true")
-                } else {
-                    emptyList()
-                }
-                val command = listOf(
-                    javaExecutable(),
-                    "--enable-native-access=ALL-UNNAMED"
-                ) + launcherProperty + request.jvmOptions + listOf(
-                    "-cp",
-                    classpath,
-                    request.target.mainClass
-                ) + if (request.detached) detachedArguments(request.arguments) else request.arguments
-                if (request.detached) {
-                    launchDetached(command, projectDirectory)
-                } else executor.execute(command, projectDirectory, OutputMode.INHERIT).also { exitCode ->
-                    if (request.target == DevLaunchTarget.SERVER && (exitCode == 0 || exitCode == 130 || exitCode == 143)) {
-                        shutdown.report()
+                val resolver = DevServerClasspathResolver(executor, messageSink)
+                val likelyActive = request.target == DevLaunchTarget.SERVER && likelyActive(projectDirectory)
+                var classpath = resolver.resolve(
+                    projectDirectory, version,
+                    reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive
+                )
+                var command = command(classpath, request)
+                if (request.target == DevLaunchTarget.SERVER) {
+                    var active = likelyActive && probe(command, projectDirectory)
+                    if (likelyActive && !active) {
+                        classpath = resolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
+                        command = command(classpath, request)
+                        active = false
                     }
+                    launchServer(command, projectDirectory, request.detached, shutdown, active)
+                } else {
+                    if (request.arguments.firstOrNull() == "attach") {
+                        shutdown.expectStopped {
+                            stopDetached(projectDirectory, command, OutputMode.DISCARD, cleanup = true, force = false)
+                        }
+                    }
+                    val exitCode = executor.execute(command, projectDirectory, OutputMode.INHERIT)
                     if (request.target == DevLaunchTarget.CONTROL && request.arguments.firstOrNull() == "stop") {
                         executor.releaseDetached(projectDirectory)
+                    }
+                    if (request.target == DevLaunchTarget.CONTROL && request.arguments.firstOrNull() == "attach"
+                        && exitCode in setOf(130, 143)) {
+                        shutdown.report()
+                        0
+                    } else {
+                        exitCode
                     }
                 }
             } catch (e: DevLaunchInterruptedException) {
@@ -62,9 +80,110 @@ class DevServerLauncher(
         }
     }
 
-    private fun launchDetached(command: List<String>, projectDirectory: Path): Int {
+    private fun command(classpath: String, request: DevLaunchRequest): List<String> = listOf(
+        javaExecutable(),
+        "--enable-native-access=ALL-UNNAMED"
+    ) + unsafeMemoryOption() + request.jvmOptions + listOf(
+        "-cp",
+        classpath,
+        request.target.mainClass
+    ) + request.arguments
+
+    private fun launchServer(
+        command: List<String>, projectDirectory: Path, detached: Boolean, shutdown: ShutdownOutcome, active: Boolean
+    ): Int {
+        if (active) {
+            if (detached) {
+                messageSink("Fluxzero dev is already running in the background.")
+                return 0
+            }
+            shutdown.expectStopped {
+                stopDetached(projectDirectory, command, OutputMode.DISCARD, cleanup = true, force = false)
+            }
+            return attach(command, projectDirectory, -1, shutdown)
+        }
+        val detachedCommand = command.takeWhile { it != DevLaunchTarget.SERVER.mainClass } +
+            DevLaunchTarget.SERVER.mainClass + detachedArguments(command.dropWhile {
+                it != DevLaunchTarget.SERVER.mainClass
+            }.drop(1))
+        val preflightExitCode = executor.execute(
+            preflightCommand(detachedCommand), projectDirectory, OutputMode.INHERIT
+        )
+        val launchCommand = when (preflightExitCode) {
+            0 -> detachedCommand
+            USE_DYNAMIC_PORT_EXIT_CODE -> detachedCommand + listOf("--port", "0")
+            CANCEL_STARTUP_EXIT_CODE -> return 0
+            else -> return preflightExitCode
+        }
+        return if (detached) launchDetached(launchCommand, projectDirectory, shutdown)
+        else launchAttached(launchCommand, projectDirectory, shutdown)
+    }
+
+    private fun probe(command: List<String>, projectDirectory: Path): Boolean = executor.execute(
+        controlCommand(command, "probe", "--project-dir", projectDirectory.toString()),
+        projectDirectory,
+        OutputMode.DISCARD
+    ) == 0
+
+    private fun likelyActive(projectDirectory: Path): Boolean {
+        val sessionFile = projectDirectory.resolve(".fluxzero/dev/session.json")
+        if (!Files.isRegularFile(sessionFile)) return false
+        return runCatching {
+            val content = Files.readString(sessionFile)
+            val status = Regex("\"status\"\\s*:\\s*\"([^\"]+)\"").find(content)?.groupValues?.get(1)
+            val pid = Regex("\"pid\"\\s*:\\s*(\\d+)").find(content)?.groupValues?.get(1)?.toLongOrNull()
+            status !in setOf(null, "stopped", "stopped-unexpectedly") && pid != null &&
+                ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
+        }.getOrDefault(false)
+    }
+
+    private fun launchAttached(command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome): Int {
+        val bootstrapLog = projectDirectory.resolve(".fluxzero/dev/bootstrap.log")
+        val startedPid = CompletableFuture<Long>()
+        shutdown.expectStopped {
+            val pid = runCatching { startedPid.get(5, TimeUnit.SECONDS) }.getOrNull()
+            stopDetached(projectDirectory, command, OutputMode.DISCARD, cleanup = true, force = false)
+            if (pid != null && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)) {
+                stopDetachedProcess(projectDirectory, pid)
+            }
+        }
+        val pid = try {
+            executor.startDetached(command, projectDirectory, bootstrapLog).also(startedPid::complete)
+        } catch (e: Exception) {
+            startedPid.completeExceptionally(e)
+            throw e
+        }
+        return attach(command, projectDirectory, pid, shutdown)
+    }
+
+    private fun attach(command: List<String>, projectDirectory: Path, pid: Long, shutdown: ShutdownOutcome): Int {
+        val arguments = buildList {
+            add("attach")
+            addAll(listOf("--project-dir", projectDirectory.toString()))
+            if (pid > 0) addAll(listOf("--pid", pid.toString()))
+        }
+        val exitCode = executor.execute(controlCommand(command, *arguments.toTypedArray()), projectDirectory,
+                                        OutputMode.INHERIT)
+        if (exitCode in setOf(130, 143)) {
+            shutdown.report()
+            return 0
+        }
+        val sessionFile = projectDirectory.resolve(".fluxzero/dev/session.json")
+        val stillRunning = Files.isRegularFile(sessionFile) && executor.execute(
+                controlCommand(command, "probe", "--project-dir", projectDirectory.toString()),
+                projectDirectory,
+                OutputMode.DISCARD
+            ) == 0
+        if (!stillRunning) {
+            executor.releaseDetached(projectDirectory)
+        }
+        return exitCode
+    }
+
+    private fun launchDetached(command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome): Int {
         val bootstrapLog = projectDirectory.resolve(".fluxzero/dev/bootstrap.log")
         val pid = executor.startDetached(command, projectDirectory, bootstrapLog)
+        shutdown.expectStopped { stopDetachedProcess(projectDirectory, pid) }
         val waitCommand = command.takeWhile { it != "-cp" } + listOf(
             "-cp",
             command[command.indexOf("-cp") + 1],
@@ -87,6 +206,30 @@ class DevServerLauncher(
         }
     }
 
+    private fun controlCommand(serverCommand: List<String>, vararg arguments: String): List<String> {
+        val mainIndex = serverCommand.indexOf(DevLaunchTarget.SERVER.mainClass)
+        require(mainIndex >= 0) { "Fluxzero dev server main class is missing from launch command" }
+        return serverCommand.take(mainIndex) + DevLaunchTarget.CONTROL.mainClass + arguments
+    }
+
+    private fun preflightCommand(serverCommand: List<String>): List<String> {
+        val mainIndex = serverCommand.indexOf(DevLaunchTarget.SERVER.mainClass)
+        require(mainIndex >= 0) { "Fluxzero dev server main class is missing from launch command" }
+        return serverCommand.take(mainIndex) + PREFLIGHT_MAIN_CLASS + serverCommand.drop(mainIndex + 1)
+    }
+
+    private fun stopDetachedProcess(projectDirectory: Path, pid: Long) {
+        ProcessHandle.of(pid).ifPresent { process ->
+            process.destroy()
+            val deadline = System.nanoTime() + Duration.ofSeconds(2).toNanos()
+            while (process.isAlive && System.nanoTime() < deadline) {
+                TimeUnit.MILLISECONDS.sleep(25)
+            }
+            if (process.isAlive) process.destroyForcibly()
+        }
+        executor.releaseDetached(projectDirectory)
+    }
+
     private fun detachedArguments(arguments: List<String>): List<String> = buildList {
         addAll(arguments)
         addEnvironmentOption(arguments, "--main-class", "FLUXZERO_MAIN_CLASS")
@@ -107,15 +250,24 @@ class DevServerLauncher(
         }
     }
 
-    private fun stopDetached(projectDirectory: Path, serverCommand: List<String>) {
+    private fun stopDetached(
+        projectDirectory: Path,
+        serverCommand: List<String>,
+        outputMode: OutputMode = OutputMode.INHERIT,
+        cleanup: Boolean = false,
+        force: Boolean = true
+    ) {
         val classpathIndex = serverCommand.indexOf("-cp")
         if (classpathIndex < 0) return
         val stopCommand = serverCommand.take(classpathIndex) + listOf(
             "-cp", serverCommand[classpathIndex + 1],
             DevLaunchTarget.CONTROL.mainClass,
-            "stop", "--project-dir", projectDirectory.toString(), "--force"
-        )
-        runCatching { executor.execute(stopCommand, projectDirectory, OutputMode.INHERIT) }
+            "stop", "--project-dir", projectDirectory.toString()
+        ) + if (force) listOf("--force") else emptyList()
+        runCatching {
+            if (cleanup) executor.executeCleanup(stopCommand, projectDirectory, outputMode)
+            else executor.execute(stopCommand, projectDirectory, outputMode)
+        }
         executor.releaseDetached(projectDirectory)
     }
 
@@ -130,17 +282,40 @@ class DevServerLauncher(
         else if (isWindows()) "java.exe" else "java"
     }
 
+    private fun unsafeMemoryOption(): List<String> =
+        if (Runtime.version().feature() >= 24) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
+
     private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
 
-    private class ShutdownOutcome(
-        private val enabled: Boolean,
-        private val messageSink: (String) -> Unit
-    ) {
-        private val reported = AtomicBoolean()
+    private inner class ShutdownOutcome(private val messageSink: (String) -> Unit) {
+        private val expected = AtomicBoolean()
+        private val stoppingReported = AtomicBoolean()
+        private val stoppedReported = AtomicBoolean()
+        private val action = AtomicReference<() -> Unit>({})
+
+        fun expectStopped(beforeReport: () -> Unit = {}) {
+            action.set(beforeReport)
+            expected.set(true)
+        }
+
+        fun begin() {
+            if (expected.get() && stoppingReported.compareAndSet(false, true)) {
+                messageSink("\nStopping Fluxzero dev server and all started applications...")
+                action.get().invoke()
+            }
+        }
+
+        fun complete() {
+            if (stoppingReported.get() && stoppedReported.compareAndSet(false, true)) {
+                messageSink("Fluxzero dev server stopped.")
+            }
+        }
 
         fun report() {
-            if (enabled && reported.compareAndSet(false, true)) {
-                messageSink("\nFluxzero dev stopped.")
+            try {
+                begin()
+            } finally {
+                complete()
             }
         }
     }

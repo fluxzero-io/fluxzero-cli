@@ -17,6 +17,45 @@ import kotlin.test.assertTrue
 @EnabledOnOs(OS.LINUX, OS.MAC)
 class InheritedIoCommandExecutorTest {
     @Test
+    fun `cleanup command can run after supervised shutdown was requested`() {
+        val directory = Files.createTempDirectory("fluxzero-cleanup-command")
+        val marker = directory.resolve("cleanup-ran")
+        val process = ProcessBuilder(
+            javaExecutable(), "-cp", fixtureClasspath(), CleanupExecutorFixture::class.java.name,
+            directory.toString(), marker.toString()
+        ).redirectErrorStream(true).start()
+        assertEquals("ready", process.inputStream.bufferedReader().readLine())
+        val signal = ProcessBuilder("kill", "-TERM", process.pid().toString()).start()
+        assertTrue(signal.waitFor(2, TimeUnit.SECONDS) && signal.exitValue() == 0)
+        assertTrue(process.waitFor(4, TimeUnit.SECONDS), "cleanup fixture did not stop")
+        assertEquals("done", Files.readString(marker))
+    }
+
+    @Test
+    fun `enables native access for build wrapper processes`() {
+        val directory = Files.createTempDirectory("fluxzero-maven-options")
+        val mavenWrapper = directory.resolve("mvnw")
+        Files.writeString(mavenWrapper, "#!/bin/sh\nprintf '%s' \"\$MAVEN_OPTS\" > maven-opts.txt\n")
+        mavenWrapper.toFile().setExecutable(true)
+        val gradleWrapper = directory.resolve("gradlew")
+        Files.writeString(gradleWrapper, "#!/bin/sh\nprintf '%s' \"\$GRADLE_OPTS\" > gradle-opts.txt\n")
+        gradleWrapper.toFile().setExecutable(true)
+
+        val executor = InheritedIoCommandExecutor()
+        assertEquals(0, executor.execute(listOf(mavenWrapper.toString()), directory, OutputMode.INHERIT))
+        assertEquals(0, executor.execute(listOf(gradleWrapper.toString()), directory, OutputMode.INHERIT))
+
+        val mavenOptions = Files.readString(directory.resolve("maven-opts.txt"))
+        val gradleOptions = Files.readString(directory.resolve("gradle-opts.txt"))
+        assertTrue(mavenOptions.contains("--enable-native-access=ALL-UNNAMED"))
+        assertTrue(gradleOptions.contains("--enable-native-access=ALL-UNNAMED"))
+        if (Runtime.version().feature() >= 24) {
+            assertTrue(mavenOptions.contains("--sun-misc-unsafe-memory-access=allow"))
+            assertTrue(gradleOptions.contains("--sun-misc-unsafe-memory-access=allow"))
+        }
+    }
+
+    @Test
     fun `detached child survives launcher scope and writes bootstrap log`() {
         val directory = Files.createTempDirectory("fluxzero-detached-executor")
         val log = directory.resolve("bootstrap.log")
@@ -65,7 +104,7 @@ class InheritedIoCommandExecutorTest {
     }
 
     @Test
-    fun `launcher reports shutdown only after its child has stopped`() {
+    fun `sigint reports stopping before its child and stopped afterwards`() {
         val output = ByteArrayOutputStream()
         val process = ProcessBuilder(
             javaExecutable(), "-cp", fixtureClasspath(), ExecutorParentFixture::class.java.name
@@ -76,17 +115,19 @@ class InheritedIoCommandExecutorTest {
         try {
             assertTrue(awaitOutput(output, "child ready"), output.toString(Charsets.UTF_8))
 
-            val signal = ProcessBuilder("kill", "-TERM", process.pid().toString()).start()
+            val signal = ProcessBuilder("kill", "-INT", process.pid().toString()).start()
             assertTrue(signal.waitFor(2, TimeUnit.SECONDS) && signal.exitValue() == 0)
             assertTrue(process.waitFor(4, TimeUnit.SECONDS), "launcher did not stop after one signal")
             reader.join(1_000)
 
             val text = output.toString(Charsets.UTF_8)
+            val launcherStopping = text.indexOf("Stopping Fluxzero dev server")
             val childStopped = text.indexOf("child stopped")
-            val launcherStopped = text.indexOf("Fluxzero dev stopped.")
-            assertTrue(childStopped >= 0 && launcherStopped > childStopped, text)
-            assertTrue(text.trimEnd().endsWith("Fluxzero dev stopped."), text)
-            assertEquals(143, process.exitValue())
+            val launcherStopped = text.indexOf("Fluxzero dev server stopped.")
+            assertTrue(launcherStopping >= 0 && childStopped > launcherStopping, text)
+            assertTrue(launcherStopped > childStopped, text)
+            assertTrue(text.trimEnd().endsWith("Fluxzero dev server stopped."), text)
+            assertEquals(130, process.exitValue())
         } finally {
             if (process.isAlive) process.destroyForcibly()
         }
@@ -110,8 +151,11 @@ class InheritedIoCommandExecutorTest {
             reader.join(1_000)
 
             val text = output.toString(Charsets.UTF_8)
-            assertEquals(1, Regex("Fluxzero dev stopped\\.").findAll(text).count(), text)
-            assertTrue(text.trimEnd().endsWith("Fluxzero dev stopped."), text)
+            val stopping = text.indexOf("Stopping Fluxzero dev server")
+            val stopped = text.indexOf("Fluxzero dev server stopped.")
+            assertTrue(stopping >= 0 && stopped > stopping, text)
+            assertEquals(1, Regex("Fluxzero dev server stopped\\.").findAll(text).count(), text)
+            assertTrue(text.trimEnd().endsWith("Fluxzero dev server stopped."), text)
             assertEquals(143, process.exitValue())
         } finally {
             if (process.isAlive) process.destroyForcibly()
@@ -166,7 +210,10 @@ object ExecutorParentFixture {
     fun main(args: Array<String>) {
         val java = Path.of(System.getProperty("java.home"), "bin", "java").toString()
         val executor = InheritedIoCommandExecutor()
-        executor.supervise(onShutdown = { println("Fluxzero dev stopped.") }) {
+        executor.supervise(
+            onShutdownStarted = { println("Stopping Fluxzero dev server and all started applications...") },
+            onShutdownComplete = { println("Fluxzero dev server stopped.") }
+        ) {
             executor.execute(
                 listOf(java, "-cp", System.getProperty("java.class.path"), ExecutorChildFixture::class.java.name),
                 Path.of("").toAbsolutePath(),
@@ -179,8 +226,33 @@ object ExecutorParentFixture {
 object ExecutorTransitionFixture {
     @JvmStatic
     fun main(args: Array<String>) {
-        InheritedIoCommandExecutor().supervise(onShutdown = { println("Fluxzero dev stopped.") }) {
+        InheritedIoCommandExecutor().supervise(
+            onShutdownStarted = { println("Stopping Fluxzero dev server and all started applications...") },
+            onShutdownComplete = { println("Fluxzero dev server stopped.") }
+        ) {
             println("between children")
+            System.out.flush()
+            CountDownLatch(1).await()
+        }
+    }
+}
+
+object CleanupExecutorFixture {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val directory = Path.of(args[0])
+        val marker = Path.of(args[1])
+        val executor = InheritedIoCommandExecutor()
+        executor.supervise(
+            onShutdown = {
+                executor.executeCleanup(
+                    listOf("/bin/sh", "-c", "printf done > '${marker}'"),
+                    directory,
+                    OutputMode.DISCARD
+                )
+            }
+        ) {
+            println("ready")
             System.out.flush()
             CountDownLatch(1).await()
         }

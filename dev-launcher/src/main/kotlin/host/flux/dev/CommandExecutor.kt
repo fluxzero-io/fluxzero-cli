@@ -11,11 +11,15 @@ import java.util.concurrent.atomic.AtomicReference
 
 enum class OutputMode {
     INHERIT,
-    STDOUT_TO_STDERR
+    STDOUT_TO_STDERR,
+    DISCARD
 }
 
 fun interface CommandExecutor {
     fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int
+
+    fun executeCleanup(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int =
+        execute(command, workingDirectory, outputMode)
 
     fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long =
         error("Detached processes are not supported by this command executor")
@@ -24,6 +28,15 @@ fun interface CommandExecutor {
     }
 
     fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T = action()
+
+    fun <T> supervise(onShutdownStarted: () -> Unit, onShutdownComplete: () -> Unit, action: () -> T): T =
+        supervise(
+            onShutdown = {
+                onShutdownStarted()
+                onShutdownComplete()
+            },
+            action = action
+        )
 }
 
 class InheritedIoCommandExecutor : CommandExecutor {
@@ -36,6 +49,22 @@ class InheritedIoCommandExecutor : CommandExecutor {
         } else {
             executeInScope(command, workingDirectory, outputMode, scope)
         }
+    }
+
+    override fun executeCleanup(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+        val nullInput = if (isWindows()) "NUL" else "/dev/null"
+        val builder = ProcessBuilder(command)
+            .directory(workingDirectory.toFile())
+            .redirectInput(ProcessBuilder.Redirect.from(java.io.File(nullInput)))
+            .redirectError(if (outputMode == OutputMode.DISCARD) ProcessBuilder.Redirect.DISCARD
+                           else ProcessBuilder.Redirect.INHERIT)
+        builder.redirectOutput(if (outputMode == OutputMode.INHERIT) ProcessBuilder.Redirect.INHERIT
+                               else ProcessBuilder.Redirect.DISCARD)
+        val process = builder.start()
+        if (process.waitFor(5, TimeUnit.SECONDS)) return process.exitValue()
+        process.destroyForcibly()
+        process.waitFor(500, TimeUnit.MILLISECONDS)
+        return 130
     }
 
     override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
@@ -157,7 +186,15 @@ class InheritedIoCommandExecutor : CommandExecutor {
         .replace("\"", "&quot;").replace("'", "&apos;")
 
     override fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T {
-        val scope = ExecutionScope(onShutdown)
+        return supervise({}, onShutdown, action)
+    }
+
+    override fun <T> supervise(
+        onShutdownStarted: () -> Unit,
+        onShutdownComplete: () -> Unit,
+        action: () -> T
+    ): T {
+        val scope = ExecutionScope(onShutdownStarted, onShutdownComplete)
         check(activeScope.compareAndSet(null, scope)) { "Command executor is already supervising a launch" }
         val shutdownHook = Thread({ scope.shutdown() }, "fluxzero-dev-launcher-shutdown")
         Runtime.getRuntime().addShutdownHook(shutdownHook)
@@ -184,8 +221,11 @@ class InheritedIoCommandExecutor : CommandExecutor {
             .directory(workingDirectory.toFile())
             .redirectInput(ProcessBuilder.Redirect.INHERIT)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
+        configureBuildJvm(builder, command)
         if (outputMode == OutputMode.INHERIT) {
             builder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
+        } else if (outputMode == OutputMode.DISCARD) {
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD)
         }
         val attempt = ProcessAttempt()
         check(scope.activeAttempt.compareAndSet(null, attempt)) { "Command executor already has an active child" }
@@ -211,19 +251,45 @@ class InheritedIoCommandExecutor : CommandExecutor {
         }
     }
 
-    private inner class ExecutionScope(private val onShutdown: () -> Unit) {
+    private fun configureBuildJvm(builder: ProcessBuilder, command: List<String>) {
+        val executable = command.firstOrNull()?.let { Path.of(it).fileName.toString().lowercase() } ?: return
+        val variable = when (executable) {
+            "mvn", "mvnw", "mvn.cmd", "mvnw.cmd" -> "MAVEN_OPTS"
+            "gradle", "gradlew", "gradle.bat", "gradlew.bat" -> "GRADLE_OPTS"
+            else -> return
+        }
+        val existing = builder.environment()[variable].orEmpty()
+        val required = buildList {
+            add("--enable-native-access=ALL-UNNAMED")
+            if (Runtime.version().feature() >= 24) add("--sun-misc-unsafe-memory-access=allow")
+        }
+        val missing = required.filterNot(existing::contains)
+        if (missing.isNotEmpty()) {
+            builder.environment()[variable] = (listOf(existing) + missing)
+                .filter(String::isNotBlank).joinToString(" ")
+        }
+    }
+
+    private inner class ExecutionScope(
+        private val onShutdownStarted: () -> Unit,
+        private val onShutdownComplete: () -> Unit
+    ) {
         val shutdownRequested = AtomicBoolean()
         val activeAttempt = AtomicReference<ProcessAttempt>()
 
         fun shutdown() {
             if (!shutdownRequested.compareAndSet(false, true)) return
             try {
-                activeAttempt.get()?.let { attempt ->
-                    attempt.startFinished.await(1, TimeUnit.SECONDS)
-                    attempt.process.get()?.let(::stop)
-                }
+                onShutdownStarted()
             } finally {
-                onShutdown()
+                try {
+                    activeAttempt.get()?.let { attempt ->
+                        attempt.startFinished.await(1, TimeUnit.SECONDS)
+                        attempt.process.get()?.let(::stop)
+                    }
+                } finally {
+                    onShutdownComplete()
+                }
             }
         }
     }

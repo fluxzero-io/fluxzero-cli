@@ -32,6 +32,8 @@ class DevTest {
                 "--fast-compiler",
                 "--no-tests",
                 "--frontend-command", "npm run dev",
+                "--frontend-directory", "frontend",
+                "--frontend-setup-command", "npm install --prefer-offline --no-audit --no-fund",
                 "--backend-path", "/graphql",
                 "--app-arg", "--seed"
             )
@@ -46,6 +48,10 @@ class DevTest {
         assertTrue(request!!.arguments.containsAll(listOf("--port", "4200")))
         assertTrue(request!!.arguments.containsAll(listOf("--idp", "external")))
         assertTrue(request!!.arguments.containsAll(listOf("--frontend-command", "npm run dev", "--backend-path", "/graphql")))
+        assertTrue(request!!.arguments.containsAll(listOf("--frontend-directory", "frontend")))
+        assertTrue(request!!.arguments.containsAll(listOf(
+            "--frontend-setup-command", "npm install --prefer-offline --no-audit --no-fund"
+        )))
         assertTrue(request!!.arguments.containsAll(listOf("--no-tests", "--app-arg", "--seed")))
     }
 
@@ -102,5 +108,19 @@ class DevTest {
         assertEquals(0, result.statusCode)
         assertEquals(DevLaunchTarget.CONTROL, request?.target)
         assertTrue(request!!.arguments.containsAll(listOf("logs", "--follow", "--errors", "--app", "orders")))
+    }
+
+    @Test
+    fun `forwards attach action to control target`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("attach", "--project-dir", projectDirectory.toString())
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.CONTROL, request?.target)
+        assertTrue(request!!.arguments.contains("attach"))
     }
 }

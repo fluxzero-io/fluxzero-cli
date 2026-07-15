@@ -17,12 +17,20 @@ class DevServerLauncherTest {
         Files.writeString(projectDirectory.resolve("mvnw"), "wrapper")
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         val commands = mutableListOf<Invocation>()
-        val executor = CommandExecutor { command, workingDirectory, outputMode ->
-            commands += Invocation(command, workingDirectory, outputMode)
-            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
-                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+        var serverCommand = emptyList<String>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
             }
-            0
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                serverCommand = command
+                return 4242
+            }
         }
         val launcher = DevServerLauncher(executor, mapOf("JAVA_HOME" to projectDirectory.toString())) { }
 
@@ -36,17 +44,22 @@ class DevServerLauncherTest {
         )
 
         assertEquals(0, exitCode)
-        assertEquals(2, commands.size)
+        assertEquals(3, commands.size)
         assertEquals(OutputMode.STDOUT_TO_STDERR, commands[0].outputMode)
         assertEquals(projectDirectory.resolve("mvnw").toAbsolutePath().toString(), commands[0].command.first())
         val launcherPom = Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/pom.xml"))
         assertTrue(launcherPom.contains("<classifier>standalone</classifier>"))
         assertTrue(launcherPom.contains("<groupId>*</groupId>"))
-        assertEquals(OutputMode.INHERIT, commands[1].outputMode)
-        assertTrue(commands[1].command.contains("--enable-native-access=ALL-UNNAMED"))
-        assertTrue(commands[1].command.contains("-Dfluxzero.dev.launcherOwnsShutdown=true"))
-        assertTrue(commands[1].command.contains(DevLaunchTarget.SERVER.mainClass))
-        assertTrue(commands[1].command.contains("--fast-compiler"))
+        assertTrue(commands[1].command.contains("io.fluxzero.devserver.DevServerPreflightMain"))
+        assertEquals(OutputMode.INHERIT, commands[2].outputMode)
+        assertTrue(serverCommand.contains("--enable-native-access=ALL-UNNAMED"))
+        if (Runtime.version().feature() >= 24) {
+            assertTrue(serverCommand.contains("--sun-misc-unsafe-memory-access=allow"))
+        }
+        assertTrue(!serverCommand.contains("-Dfluxzero.dev.launcherOwnsShutdown=true"))
+        assertTrue(serverCommand.contains(DevLaunchTarget.SERVER.mainClass))
+        assertTrue(serverCommand.contains("--fast-compiler"))
+        assertTrue(commands[2].command.containsAll(listOf(DevLaunchTarget.CONTROL.mainClass, "attach", "--pid", "4242")))
     }
 
     @Test
@@ -75,21 +88,25 @@ class DevServerLauncherTest {
         Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
         Files.writeString(launcherDirectory.resolve("version"), "0-SNAPSHOT")
         val commands = mutableListOf<List<String>>()
-        val executor = CommandExecutor { command, _, _ ->
-            commands += command
-            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
-                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += command
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
             }
-            0
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path) = 4242L
         }
 
         DevServerLauncher(executor, emptyMap()) { }.launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
-        assertEquals(2, commands.size)
+        assertEquals(3, commands.size)
         assertTrue(commands.first().any { it.contains("maven-dependency-plugin") })
-        assertTrue(commands.last().contains(DevLaunchTarget.SERVER.mainClass))
+        assertTrue(commands.last().containsAll(listOf(DevLaunchTarget.CONTROL.mainClass, "attach")))
     }
 
     @Test
@@ -111,6 +128,37 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `bare dev attaches to an existing project session`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
+                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
+        val commands = mutableListOf<Invocation>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
+                return 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                error("existing session must not start a second server")
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
+        )
+
+        assertEquals(0, exitCode)
+        assertEquals(OutputMode.DISCARD, commands.first().outputMode)
+        assertTrue(commands.first().command.contains("probe"))
+        assertTrue(commands.any { it.command.contains("attach") })
+    }
+
+    @Test
     fun `reports one clean stop when snapshot resolution is interrupted`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val messages = mutableListOf<String>()
@@ -121,8 +169,7 @@ class DevServerLauncherTest {
         )
 
         assertEquals(130, exitCode)
-        assertEquals(1, messages.count { it.contains("Fluxzero dev stopped.") })
-        assertTrue(messages.last().endsWith("Fluxzero dev stopped."))
+        assertCleanStop(messages)
     }
 
     @Test
@@ -130,15 +177,20 @@ class DevServerLauncherTest {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         val messages = mutableListOf<String>()
+        val commands = mutableListOf<Invocation>()
         var invocation = 0
         lateinit var shutdown: () -> Unit
         val executor = object : CommandExecutor {
             override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
                 invocation++
                 if (invocation == 1) {
                     command.first { it.startsWith("-Dmdep.outputFile=") }.let {
                         Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
                     }
+                    return 0
+                }
+                if (command.contains("io.fluxzero.devserver.DevServerPreflightMain")) {
                     return 0
                 }
                 shutdown()
@@ -149,14 +201,85 @@ class DevServerLauncherTest {
                 shutdown = onShutdown
                 return action()
             }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path) = 4242L
         }
 
         val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
-        assertEquals(130, exitCode)
-        assertEquals(1, messages.count { it.contains("Fluxzero dev stopped.") })
+        assertEquals(0, exitCode)
+        assertCleanStop(messages)
+        assertTrue(messages.none { it.contains("continues in the background") })
+        assertTrue(commands.any {
+            it.outputMode == OutputMode.DISCARD
+                && it.command.containsAll(listOf(DevLaunchTarget.CONTROL.mainClass, "stop"))
+                && !it.command.contains("--force")
+        })
+    }
+
+    @Test
+    fun `interrupting a bare attach to an active session stops the environment`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
+                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
+        val commands = mutableListOf<Invocation>()
+        val messages = mutableListOf<String>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
+                return when {
+                    command.contains("probe") -> 0
+                    command.contains("attach") -> 130
+                    command.contains("stop") -> 0
+                    else -> error("unexpected command: $command")
+                }
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                error("existing session must not start a second server")
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
+            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
+        )
+
+        assertEquals(0, exitCode)
+        assertTrue(commands.any { it.command.contains("attach") })
+        assertTrue(commands.any { it.command.contains("stop") && !it.command.contains("--force") })
+        assertCleanStop(messages)
+    }
+
+    @Test
+    fun `interrupting an explicit attach stops the environment`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        val commands = mutableListOf<Invocation>()
+        val messages = mutableListOf<String>()
+        val executor = CommandExecutor { command, workingDirectory, outputMode ->
+            commands += Invocation(command, workingDirectory, outputMode)
+            if (command.contains("attach")) 130 else 0
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
+            DevLaunchRequest(
+                projectDirectory, "1.2.3", DevLaunchTarget.CONTROL,
+                listOf("attach", "--project-dir", projectDirectory.toString())
+            )
+        )
+
+        assertEquals(0, exitCode)
+        assertTrue(commands.any { it.command.contains("stop") && !it.command.contains("--force") })
+        assertCleanStop(messages)
     }
 
     @Test
@@ -171,10 +294,17 @@ class DevServerLauncherTest {
                     command.first { it.startsWith("-Dmdep.outputFile=") }.let {
                         Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
                     }
+                } else if (command.contains("io.fluxzero.devserver.DevServerPreflightMain")) {
+                    events += "preflight"
                 } else {
-                    events += "server"
+                    events += "attach"
                 }
                 return 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                events += "server"
+                return 4242
             }
 
             override fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T {
@@ -191,7 +321,7 @@ class DevServerLauncherTest {
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
-        assertEquals(listOf("supervise-start", "resolve", "server", "supervise-end"), events)
+        assertEquals(listOf("supervise-start", "resolve", "preflight", "server", "attach", "supervise-end"), events)
     }
 
     @Test
@@ -229,6 +359,87 @@ class DevServerLauncherTest {
         val wait = commands.last().command
         assertTrue(wait.contains(DevLaunchTarget.CONTROL.mainClass))
         assertTrue(wait.containsAll(listOf("wait", "--pid", "4242")))
+    }
+
+    @Test
+    fun `accepted port fallback starts server on a dynamic port`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        var detachedCommand = emptyList<String>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                    return 0
+                }
+                return if (command.contains("io.fluxzero.devserver.DevServerPreflightMain")) 75 else 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                detachedCommand = command
+                return 4242
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
+                listOf("--project-dir", projectDirectory.toString(), "--port", "4200"), detached = true
+            )
+        )
+
+        assertEquals(0, exitCode)
+        assertEquals(listOf("--port", "0"), detachedCommand.takeLast(2))
+    }
+
+    @Test
+    fun `rejected port fallback does not start server`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                    return 0
+                }
+                return if (command.contains("io.fluxzero.devserver.DevServerPreflightMain")) 2 else 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                error("rejected preflight must not start the server")
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
+        )
+
+        assertEquals(2, exitCode)
+    }
+
+    @Test
+    fun `cancelled port selection exits successfully without starting server`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                    return 0
+                }
+                return if (command.contains("io.fluxzero.devserver.DevServerPreflightMain")) 76 else 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
+                error("cancelled preflight must not start the server")
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
+        )
+
+        assertEquals(0, exitCode)
     }
 
     @Test
@@ -323,4 +534,12 @@ class DevServerLauncherTest {
         val workingDirectory: Path,
         val outputMode: OutputMode
     )
+
+    private fun assertCleanStop(messages: List<String>) {
+        val stopping = messages.indexOfFirst { it.contains("Stopping Fluxzero dev server") }
+        val stopped = messages.indexOfFirst { it.contains("Fluxzero dev server stopped.") }
+        assertEquals(1, messages.count { it.contains("Stopping Fluxzero dev server") })
+        assertEquals(1, messages.count { it.contains("Fluxzero dev server stopped.") })
+        assertTrue(stopping >= 0 && stopped > stopping, messages.toString())
+    }
 }

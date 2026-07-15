@@ -58,6 +58,7 @@ class DevServerClasspathResolver(
             "Maven did not produce a runtime classpath for Fluxzero dev server $version."
         }
         writeAtomically(versionFile, version)
+        messageSink("")
         return Files.readString(classpathFile).trim()
     }
 

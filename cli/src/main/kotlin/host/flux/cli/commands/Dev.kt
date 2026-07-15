@@ -24,7 +24,7 @@ class Dev(
     override fun help(context: Context): String = "Start the local Fluxzero development environment"
 
     private val action by argument(
-        help = "Action: start (default), status, logs, or stop."
+        help = "Action: start (default), attach, status, logs, or stop."
     ).optional()
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
@@ -72,6 +72,14 @@ class Dev(
     ).long()
     private val debounce by option("--debounce-ms", help = "Source watcher debounce in milliseconds.").long()
     private val frontendCommand by option("--frontend-command", help = "Frontend dev-server command.")
+    private val frontendDirectory by option(
+        "--frontend-directory",
+        help = "Working directory for managed frontend commands."
+    )
+    private val frontendSetupCommand by option(
+        "--frontend-setup-command",
+        help = "Optional setup command run once before the managed frontend starts for this dev session."
+    )
     private val frontendUrl by option("--frontend-url", help = "Externally managed frontend URL.")
     private val noFrontend by option(
         "--no-frontend",
@@ -84,7 +92,7 @@ class Dev(
     private val appArgs by option("--app-arg", help = "Application argument; repeatable.").multiple()
     private val background by option(
         "-d", "--background", "--detach",
-        help = "Start in the background. Foreground remains the default."
+        help = "Start without attaching a live view; return after startup completes."
     ).flag(default = false)
     private val follow by option("-f", "--follow", help = "Follow output for the logs action.").flag(default = false)
     private val errors by option("--errors", help = "Show only warning and error log lines.").flag(default = false)
@@ -94,8 +102,8 @@ class Dev(
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
         val selectedAction = action ?: "start"
-        if (selectedAction !in setOf("start", "status", "logs", "stop")) {
-            throw UsageError("Unknown dev action '$selectedAction'. Expected start, status, logs, or stop.")
+        if (selectedAction !in setOf("start", "attach", "status", "logs", "stop")) {
+            throw UsageError("Unknown dev action '$selectedAction'. Expected start, attach, status, logs, or stop.")
         }
         if (selectedAction != "start") {
             val controlArguments = buildList {
@@ -130,6 +138,8 @@ class Dev(
             addOption("--graceful-shutdown-timeout-ms", shutdownTimeout?.toString())
             addOption("--debounce-ms", debounce?.toString())
             addOption("--frontend-command", frontendCommand)
+            addOption("--frontend-directory", frontendDirectory)
+            addOption("--frontend-setup-command", frontendSetupCommand)
             addOption("--frontend-url", frontendUrl)
             addFlag("--no-frontend", noFrontend)
             backendPaths.forEach { addOption("--backend-path", it) }

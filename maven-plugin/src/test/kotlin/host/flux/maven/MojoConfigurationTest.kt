@@ -26,6 +26,8 @@ class MojoConfigurationTest {
         assertNotNull(fields.find { it.name == "port" })
         assertNotNull(fields.find { it.name == "idp" })
         assertNotNull(fields.find { it.name == "frontendCommand" })
+        assertNotNull(fields.find { it.name == "frontendDirectory" })
+        assertNotNull(fields.find { it.name == "frontendSetupCommand" })
         assertNotNull(fields.find { it.name == "frontendEnabled" })
         assertNotNull(fields.find { it.name == "backendPaths" })
         assertNotNull(fields.find { it.name == "fastCompiler" })

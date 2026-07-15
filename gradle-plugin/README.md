@@ -35,11 +35,16 @@ Apply the plugin to the root project and run:
 ./gradlew fluxzeroDev
 ```
 
-The task runs in the foreground by default. Use `Ctrl-C` for controlled cleanup, or explicitly detach it:
+The task starts the environment independently and attaches a live event view. Type `q`/`quit` and press Enter to open
+a menu, use the arrow keys to choose between detaching, stopping the environment, and returning to the view, and press
+Enter to confirm. Type `d`/`detach` and press Enter to leave it running. `Ctrl-C` stops the environment and all
+applications; an unexpected terminal disconnect only detaches the view.
+Skip the attached view entirely with background mode:
 
 ```bash
 ./gradlew fluxzeroDev -Pfluxzero.dev.background=true
 fz dev status
+fz dev attach
 fz dev logs --follow
 fz dev stop
 ```
@@ -49,8 +54,8 @@ The same launch settings are available as native task options, for example
 `./gradlew help --task fluxzeroDev` for the complete, locally installed option reference.
 
 Only one dev session can run per project. The test runtime is currently in-memory, so a stopped or unexpectedly killed
-session loses its data and replays startup commands on the next launch. Background mode is useful for agent-launched
-work, but intentionally remains opt-in because it keeps the environment's processes and memory alive.
+session loses its data and replays startup commands on the next launch. A detached environment keeps its processes and
+memory alive until `fz dev stop`.
 
 Shared defaults normally belong in `.fluxzero/dev.yaml`. Gradle DSL overrides are available when build-owned
 configuration is preferable:

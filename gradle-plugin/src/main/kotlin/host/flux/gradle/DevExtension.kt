@@ -19,6 +19,8 @@ abstract class DevExtension @Inject constructor(objects: ObjectFactory) {
     val testsEnabled: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
     val fastCompiler: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
     val frontendCommand: Property<String> = objects.property(String::class.java)
+    val frontendDirectory: Property<String> = objects.property(String::class.java)
+    val frontendSetupCommand: Property<String> = objects.property(String::class.java)
     val frontendUrl: Property<String> = objects.property(String::class.java)
     val frontendEnabled: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
     val backendPaths: ListProperty<String> = objects.listProperty(String::class.java).convention(emptyList())

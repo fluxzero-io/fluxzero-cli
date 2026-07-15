@@ -35,7 +35,7 @@ class InitSignalHandlingTest {
             reader.join(1_000)
 
             val text = output.toString(Charsets.UTF_8)
-            assertEquals(1, Regex("Fluxzero dev stopped\\.").findAll(text).count(), text)
+            assertEquals(1, Regex("Fluxzero dev server stopped\\.").findAll(text).count(), text)
             assertEquals(130, process.exitValue())
         } finally {
             if (process.isAlive) process.destroyForcibly()
@@ -61,7 +61,7 @@ object InitSignalFixture {
     @JvmStatic
     fun main(args: Array<String>) {
         val devLauncher = DevLauncher {
-            Runtime.getRuntime().addShutdownHook(Thread { println("Fluxzero dev stopped.") })
+            Runtime.getRuntime().addShutdownHook(Thread { println("Fluxzero dev server stopped.") })
             println("ready")
             System.out.flush()
             CountDownLatch(1).await()

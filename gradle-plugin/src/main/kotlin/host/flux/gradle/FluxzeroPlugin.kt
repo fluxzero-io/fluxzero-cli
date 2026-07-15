@@ -131,6 +131,8 @@ class FluxzeroPlugin : Plugin<Project> {
             testsEnabled.set(project.booleanGradleProperty("fluxzero.dev.testsEnabled").orElse(extension.dev.testsEnabled))
             fastCompiler.set(project.booleanGradleProperty("fluxzero.dev.fastCompiler").orElse(extension.dev.fastCompiler))
             frontendCommand.set(project.stringGradleProperty("fluxzero.dev.frontendCommand").orElse(extension.dev.frontendCommand))
+            frontendDirectory.set(project.stringGradleProperty("fluxzero.dev.frontendDirectory").orElse(extension.dev.frontendDirectory))
+            frontendSetupCommand.set(project.stringGradleProperty("fluxzero.dev.frontendSetupCommand").orElse(extension.dev.frontendSetupCommand))
             frontendUrl.set(project.stringGradleProperty("fluxzero.dev.frontendUrl").orElse(extension.dev.frontendUrl))
             frontendEnabled.set(project.booleanGradleProperty("fluxzero.dev.frontendEnabled").orElse(extension.dev.frontendEnabled))
             backendPaths.set(project.listGradleProperty("fluxzero.dev.backendPaths").orElse(extension.dev.backendPaths))

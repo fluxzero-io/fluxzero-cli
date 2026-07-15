@@ -59,6 +59,12 @@ class DevMojo : AbstractMojo() {
     @Parameter(property = "fluxzero.dev.frontendCommand")
     private var frontendCommand: String? = null
 
+    @Parameter(property = "fluxzero.dev.frontendDirectory")
+    private var frontendDirectory: String? = null
+
+    @Parameter(property = "fluxzero.dev.frontendSetupCommand")
+    private var frontendSetupCommand: String? = null
+
     @Parameter(property = "fluxzero.dev.frontendUrl")
     private var frontendUrl: String? = null
 
@@ -109,6 +115,8 @@ class DevMojo : AbstractMojo() {
             addFlag("--no-tests", !testsEnabled)
             addFlag("--fast-compiler", fastCompiler)
             addOption("--frontend-command", frontendCommand)
+            addOption("--frontend-directory", frontendDirectory)
+            addOption("--frontend-setup-command", frontendSetupCommand)
             addOption("--frontend-url", frontendUrl)
             addFlag("--no-frontend", !frontendEnabled)
             addOption("--startup-timeout-ms", startupTimeoutMillis?.toString())

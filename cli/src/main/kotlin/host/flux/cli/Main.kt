@@ -36,9 +36,11 @@ class FluxCli : CliktCommand() {
 fun main(args: Array<String>) {
     try {
         val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
-        val updateInfo = UpdateService.checkForUpdates(currentVersion)
-        if (updateInfo.hasUpdate) {
-            System.err.println("A new version of fluxzero-cli is available: ${updateInfo.latestVersion} (current: $currentVersion)")
+        if (currentVersion != "dev" && !currentVersion.endsWith("SNAPSHOT")) {
+            val updateInfo = UpdateService.checkForUpdates(currentVersion)
+            if (updateInfo.hasUpdate) {
+                System.err.println("A new version of fluxzero-cli is available: ${updateInfo.latestVersion} (current: $currentVersion)")
+            }
         }
         FluxCli()
             .subcommands(

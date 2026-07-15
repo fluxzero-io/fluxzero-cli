@@ -31,6 +31,8 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @get:Input abstract val testsEnabled: Property<Boolean>
     @get:Input abstract val fastCompiler: Property<Boolean>
     @get:Input @get:Optional abstract val frontendCommand: Property<String>
+    @get:Input @get:Optional abstract val frontendDirectory: Property<String>
+    @get:Input @get:Optional abstract val frontendSetupCommand: Property<String>
     @get:Input @get:Optional abstract val frontendUrl: Property<String>
     @get:Input abstract val frontendEnabled: Property<Boolean>
     @get:Input abstract val backendPaths: ListProperty<String>
@@ -79,6 +81,12 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @Option(option = "frontend-command", description = "Managed frontend dev-server command.")
     fun frontendCommandOption(value: String) = frontendCommand.set(value)
 
+    @Option(option = "frontend-directory", description = "Working directory for managed frontend commands.")
+    fun frontendDirectoryOption(value: String) = frontendDirectory.set(value)
+
+    @Option(option = "frontend-setup-command", description = "Setup command run once per dev session.")
+    fun frontendSetupCommandOption(value: String) = frontendSetupCommand.set(value)
+
     @Option(option = "frontend-url", description = "Externally managed frontend URL.")
     fun frontendUrlOption(value: String) = frontendUrl.set(value)
 
@@ -101,7 +109,7 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @Option(option = "debounce-ms", description = "Source watcher debounce in milliseconds.")
     fun debounceOption(value: String) = debounceMillis.set(long(value, "debounce-ms"))
 
-    @Option(option = "background", description = "Start detached; foreground remains the default.")
+    @Option(option = "background", description = "Start without attaching a live view.")
     fun backgroundOption(value: Boolean) = background.set(value)
 
     @TaskAction
@@ -121,6 +129,8 @@ abstract class FluxzeroDevTask : DefaultTask() {
             flag("--no-tests", !testsEnabled.get())
             flag("--fast-compiler", fastCompiler.get())
             option("--frontend-command", frontendCommand.orNull)
+            option("--frontend-directory", frontendDirectory.orNull)
+            option("--frontend-setup-command", frontendSetupCommand.orNull)
             option("--frontend-url", frontendUrl.orNull)
             flag("--no-frontend", !frontendEnabled.get())
             option("--startup-timeout-ms", startupTimeoutMillis.orNull?.toString())

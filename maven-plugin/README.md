@@ -41,15 +41,18 @@ This configuration runs `sync-project-files` during the Maven `initialize` phase
 
 `dev` is the project-local fallback for starting the same environment as `fz dev`, without requiring a globally
 installed CLI. The goal resolves the `io.fluxzero:dev-server` artifact matching the project's Fluxzero SDK version,
-then runs it in the foreground:
+then starts it independently and attaches a live event view:
 
 ```bash
 ./mvnw fluxzero:dev
 ```
 
-Use `Ctrl-C` to stop the application, frontend, IDP, proxy, runtime, and MCP endpoint gracefully.
-Set `-Dfluxzero.dev.background=true` to detach. A detached environment is controlled with `fz dev status`,
-`fz dev logs --follow`, and `fz dev stop`; only one session can run per project.
+Type `q`/`quit` and press Enter to open a menu, use the arrow keys to choose between detaching, stopping everything,
+and returning to the live view, and press Enter to confirm. Type `d`/`detach` and press Enter to leave the environment
+running. `Ctrl-C` stops the environment and all applications; an unexpected terminal disconnect only detaches the view. Set
+`-Dfluxzero.dev.background=true` to skip the attached view.
+A detached environment is controlled with `fz dev attach`, `fz dev status`, `fz dev logs --follow`, and `fz dev stop`;
+only one session can run per project.
 
 | Setting | Command-line property | Default |
 |---------|-----------------------|---------|

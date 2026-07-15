@@ -134,7 +134,10 @@ contains multiple executable entrypoints and the intended one is ambiguous.
 fz dev
 ```
 
-Use `Ctrl-C` to stop the environment and its managed processes gracefully. Common overrides include:
+The default command starts the environment independently from the terminal and attaches a live semantic event view.
+Type `q` or `quit` and press Enter to open a menu, use the arrow keys to select an action, and press Enter to confirm.
+Type `d` or `detach` and press Enter to leave it running. `Ctrl-C` stops the environment and all applications; an
+unexpected terminal disconnect only detaches the view. Common overrides include:
 
 ```bash
 fz dev --fast-compiler
@@ -144,14 +147,18 @@ fz dev --environment dev
 fz dev --port 4200
 fz dev --idp external
 fz dev --frontend-command "npm run dev"
+fz dev --frontend-directory frontend --frontend-setup-command "npm install --prefer-offline --no-audit --no-fund"
 fz dev --frontend-url http://localhost:5173
 fz dev --no-tests
 ```
 
-Foreground is the default because the test runtime currently keeps its data in memory. Background mode is explicit:
+Attach to an existing project environment with `fz dev attach`; a bare `fz dev` does the same when the environment is
+already running. Events produced while detached are replayed from the last attach cursor before live events resume.
+Use background mode to start and return immediately after readiness without opening the attached view:
 
 ```bash
 fz dev --background
+fz dev attach
 fz dev status
 fz dev status --json
 fz dev logs --follow
@@ -165,8 +172,8 @@ fz dev stop --force
 
 Only one dev session may be active per project. `status`, `logs`, `stop`, MCP discovery, and the next `dev` launch
 reconcile stale session state when the supervisor was killed unexpectedly. Because that also means the embedded test
-runtime lost its in-memory data, startup commands run again in the next session. Background mode keeps that state alive
-when a terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop`.
+runtime lost its in-memory data, startup commands run again in the next session. Detaching keeps that state alive when a
+terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop`.
 
 Start options:
 
@@ -181,6 +188,8 @@ Start options:
 | `--idp managed|external` | Start the local IDP or use application-owned IDP configuration. |
 | `--no-idp` | Alias for `--idp external`. |
 | `--frontend-command <command>` | Start a managed frontend; use `{port}` for its private upstream port. |
+| `--frontend-directory <path>` | Working directory for managed frontend commands. |
+| `--frontend-setup-command <command>` | Run setup once before the managed frontend starts for this dev session. |
 | `--frontend-url <url>` | Proxy an externally managed frontend. |
 | `--no-frontend` | Run a backend-only environment. |
 | `--backend-path <path>` | Route an extra public path directly to Fluxzero; repeatable. |
@@ -192,7 +201,7 @@ Start options:
 | `--startup-timeout-ms <ms>` | Override application/frontend readiness timeout. |
 | `--graceful-shutdown-timeout-ms <ms>` | Override rolling app shutdown timeout. |
 | `--debounce-ms <ms>` | Override source-change debounce. |
-| `--background`, `--detach`, `-d` | Start detached and return after startup reaches success or a concrete failure. |
+| `--background`, `--detach`, `-d` | Start without an attached live view and return after startup succeeds or fails. |
 
 Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
 remain ignored under `.fluxzero/dev/`:
