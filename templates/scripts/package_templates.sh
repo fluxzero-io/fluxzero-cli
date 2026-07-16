@@ -12,14 +12,14 @@ fi
 trap 'code=$?; echo "ERROR: Script failed at line $LINENO (cmd: $BASH_COMMAND) with exit $code" >&2; exit $code' ERR
 
 # Inputs (env vars); Gradle passes these when invoking this script
-EXAMPLES_ZIP_URL=${EXAMPLES_ZIP_URL:-}
-EXAMPLES_SOURCE_DIR=${EXAMPLES_SOURCE_DIR:-}
-EXAMPLES_REPO_URL=${EXAMPLES_REPO_URL:-"https://github.com/fluxzero-io/fluxzero-examples.git"}
-EXAMPLES_RELEASE_TAG=${EXAMPLES_RELEASE_TAG:-"latest"}
+TEMPLATES_ZIP_URL=${TEMPLATES_ZIP_URL:-}
+TEMPLATES_SOURCE_DIR=${TEMPLATES_SOURCE_DIR:-}
+TEMPLATES_REPO_URL=${TEMPLATES_REPO_URL:-"https://github.com/fluxzero-io/fluxzero-templates.git"}
+TEMPLATES_RELEASE_TAG=${TEMPLATES_RELEASE_TAG:-"latest"}
 GITHUB_TOKEN=${GITHUB_TOKEN:-}
-CACHE_DIR=${CACHE_DIR:-"./build/examples-snapshot"}
+CACHE_DIR=${CACHE_DIR:-"./build/templates-snapshot"}
 OUTPUT_DIR=${OUTPUT_DIR:-"./build/generated/resources/templates"}
-REFRESH_EXAMPLES=${REFRESH_EXAMPLES:-"false"}
+REFRESH_TEMPLATES=${REFRESH_TEMPLATES:-"false"}
 
 # Extract owner/repo from the repo URL
 extract_owner_repo() {
@@ -91,26 +91,26 @@ require_cmd curl
 
 SOURCE_DIR="$CACHE_DIR"
 
-if [[ -n "$EXAMPLES_SOURCE_DIR" ]]; then
-  [[ -d "$EXAMPLES_SOURCE_DIR" ]] || { echo "ERROR: EXAMPLES_SOURCE_DIR is not a directory: $EXAMPLES_SOURCE_DIR" >&2; exit 1; }
-  SOURCE_DIR="$EXAMPLES_SOURCE_DIR"
-  echo "Using local examples source at $SOURCE_DIR"
+if [[ -n "$TEMPLATES_SOURCE_DIR" ]]; then
+  [[ -d "$TEMPLATES_SOURCE_DIR" ]] || { echo "ERROR: TEMPLATES_SOURCE_DIR is not a directory: $TEMPLATES_SOURCE_DIR" >&2; exit 1; }
+  SOURCE_DIR="$TEMPLATES_SOURCE_DIR"
+  echo "Using local templates source at $SOURCE_DIR"
 # Skip download if cache exists and refresh not requested
-elif [[ -d "$CACHE_DIR" && -n "$(ls -A "$CACHE_DIR" 2>/dev/null || true)" && "$REFRESH_EXAMPLES" != "true" ]]; then
-  echo "Using cached examples at $CACHE_DIR (set REFRESH_EXAMPLES=true to refresh)"
+elif [[ -d "$CACHE_DIR" && -n "$(ls -A "$CACHE_DIR" 2>/dev/null || true)" && "$REFRESH_TEMPLATES" != "true" ]]; then
+  echo "Using cached templates at $CACHE_DIR (set REFRESH_TEMPLATES=true to refresh)"
 else
   rm -rf "$CACHE_DIR"
   mkdir -p "$CACHE_DIR"
 
-  if [[ -n "$EXAMPLES_ZIP_URL" ]]; then
-    ZIP_URL="$EXAMPLES_ZIP_URL"
+  if [[ -n "$TEMPLATES_ZIP_URL" ]]; then
+    ZIP_URL="$TEMPLATES_ZIP_URL"
   else
-    ZIP_URL=$(fetch_release_asset_url "$EXAMPLES_REPO_URL" "$EXAMPLES_RELEASE_TAG")
+    ZIP_URL=$(fetch_release_asset_url "$TEMPLATES_REPO_URL" "$TEMPLATES_RELEASE_TAG")
   fi
-  [[ -n "$ZIP_URL" ]] || { echo "ERROR: Could not determine examples ZIP URL" >&2; exit 1; }
+  [[ -n "$ZIP_URL" ]] || { echo "ERROR: Could not determine templates ZIP URL" >&2; exit 1; }
 
-  echo "Downloading examples ZIP from: $ZIP_URL"
-  tmpzip=$(mktemp -t examples.XXXXXX.zip)
+  echo "Downloading templates ZIP from: $ZIP_URL"
+  tmpzip=$(mktemp -t templates.XXXXXX.zip)
   trap 'rm -f "$tmpzip"' EXIT
 
   # Use token for download if available (release assets may need auth)
@@ -120,7 +120,7 @@ else
   fi
   curl "${download_args[@]}" "$ZIP_URL" -o "$tmpzip"
 
-  echo "Unpacking examples..."
+  echo "Unpacking templates..."
   unzip -q "$tmpzip" -d "$CACHE_DIR"
 
   # Flatten if a single top-level directory exists (safety net for source archives)
@@ -146,31 +146,17 @@ if [[ ! -w "$OUTPUT_DIR" ]]; then
 fi
 INDEX_FILE="$OUTPUT_DIR/templates.csv"
 
-# Gather top-level directories and sort (robust with set -e)
-shopt -s nullglob
-names=()
-for d in "$SOURCE_DIR"/*/; do
-  [[ -d "$d" ]] || continue
-  names+=("$(basename "$d")")
+names=(flux-basic-java flux-basic-kotlin)
+for name in "${names[@]}"; do
+  [[ -d "$SOURCE_DIR/$name" ]] || { echo "ERROR: Missing template $name in $SOURCE_DIR" >&2; exit 1; }
 done
 
-if [[ ${#names[@]} -eq 0 ]]; then
-  echo "ERROR: No templates found in $SOURCE_DIR" >&2
-  exit 1
-fi
-
-# Sort names without relying on Bash 4+ features
-tmpnames=$(mktemp -t templates.XXXX)
-printf '%s\n' "${names[@]}" | sort > "$tmpnames"
-
 true > "$INDEX_FILE"
-while IFS= read -r name; do
-  [[ -z "$name" ]] && continue
+for name in "${names[@]}"; do
   echo "Zipping template: $name"
   (cd "$SOURCE_DIR/$name" && zip -qr "$OUTPUT_DIR/$name.zip" . \
     -x "build/*" "build/**" "target/*" "target/**" ".gradle/*" ".gradle/**" ".idea/*" ".idea/**" ".DS_Store" "**/.DS_Store")
   echo "$name" >> "$INDEX_FILE"
-done < "$tmpnames"
-rm -f "$tmpnames"
+done
 
 echo "Prepared templates in $OUTPUT_DIR"

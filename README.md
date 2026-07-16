@@ -55,7 +55,9 @@ The signed and notarized macOS DMG is published with each release:
 
 Windows and Linux Launchpad apps are planned, but are not published yet.
 
-The app manages its own `fz` binary, checks for the latest CLI release on launch, writes a `START_PROMPT.md` into generated projects, opens local coding agents with the generated project path and prompt, and keeps a local history of generated projects for future SDK and agent-file upgrades. Installed macOS builds register experimental Fluxzero URL schemes:
+The app manages its own `fz` binary, checks for the latest CLI release on launch, writes a `START_PROMPT.md` containing
+the user's project brief, opens local coding agents with the generated project path and prompt, and keeps a local history
+of generated projects. Installed macOS builds register experimental Fluxzero URL schemes:
 
 - `fluxzero://new?...` opens Launchpad and pre-fills the generator.
 - `fluxzero://open?path=...&prompt=...&agent=codex|claude|cursor|finder|none` opens an existing project directly.
@@ -126,7 +128,7 @@ fz init [OPTIONS]
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `--template` | Name of the template to use | `--template flux-kotlin-single` |
+| `--template` | Name of the template to use | `--template flux-basic-kotlin` |
 | `--template-path` | Path to custom template directory or ZIP file | `--template-path ./my-templates` |
 | `--name` | Project name (1-50 chars: 0-9, a-z, -, _) | `--name my-app` |
 | `--dir` | Directory to create project in | `--dir ./projects` |
@@ -186,7 +188,7 @@ deterministic OCI creation and file modification timestamps so unchanged layers 
 fz init
 
 # With built-in template
-fz init --template flux-kotlin-single --name my-app --package com.example.myapp --build gradle
+fz init --template flux-basic-kotlin --name my-app --package com.example.myapp --build gradle
 
 # Using custom template directory
 fz init --template-path ./my-templates --template custom-template --name my-project
@@ -196,7 +198,7 @@ fz init --template-path ./templates/my-template.zip --template my-template --nam
 
 # Full example with all options
 fz init \
-  --template flux-java-single \
+  --template flux-basic-java \
   --name awesome-app \
   --dir ./workspace \
   --package com.company.awesome \
@@ -267,9 +269,9 @@ FluxZero CLI installs to:
 
 ## Templates
 
-Templates are sourced from [fluxzero-examples](https://github.com/fluxzero-io/fluxzero-examples) at build time and packaged for use by the CLI. Local builds automatically use a sibling `../fluxzero-examples` checkout when present, so template changes can be tested without waiting for a published examples release. Override this with `-PexamplesSourceDir=/path/to/fluxzero-examples` or `EXAMPLES_SOURCE_DIR=/path/to/fluxzero-examples`.
+Templates are sourced from [fluxzero-templates](https://github.com/fluxzero-io/fluxzero-templates) at build time and packaged for use by the CLI. Local builds automatically use a sibling `../fluxzero-templates` checkout when present, so template changes can be tested without waiting for a published templates release. Override this with `-PtemplatesSourceDir=/path/to/fluxzero-templates` or `TEMPLATES_SOURCE_DIR=/path/to/fluxzero-templates`.
 
-When no local source directory is available, the build downloads the `templates.zip` release asset and caches it under `templates/build/examples-snapshot`. Use `REFRESH_EXAMPLES=true` or `-PrefreshExamples=true` to force a fresh download.
+When no local source directory is available, the build downloads the `templates.zip` release asset and caches it under `templates/build/templates-snapshot`. Use `REFRESH_TEMPLATES=true` or `-PrefreshTemplates=true` to force a fresh download.
 
 **Template features:**
 - Package name replacement
@@ -278,10 +280,14 @@ When no local source directory is available, the build downloads the `templates.
 - File permission management
 - Interactive customization during project creation
 
-Available templates (see the examples repo for the latest list):
-- `flux-kotlin-single` - Single-module Kotlin project
-- `flux-java-single` - Single-module Java project
-- `gamerental` - Example multi-feature application
+Available templates:
+- `flux-basic-java` - Java starter with Maven and Gradle wrappers
+- `flux-basic-kotlin` - Kotlin starter with Maven and Gradle wrappers
+
+These are generic starters. Generated code must still be adapted to the actual product requirements. The templates do
+not contain local AI-agent manuals; current Fluxzero guidance is distributed by the separately installable Fluxzero
+Codex plugin and its MCP server. Existing projects may still opt into local instruction files through the supported
+Gradle plugin or Maven `sync-project-files` goal described below.
 
 ### Template Customization with `refactor.yaml`
 
@@ -385,10 +391,10 @@ operations:
 ```
 
 Advanced:
-- Override repo URL: `./gradlew -PexamplesRepoUrl=https://github.com/your-org/your-examples.git build`
-- Override release tag: `./gradlew -PexamplesReleaseTag=v1.2.3 build`
-- Pin an explicit ZIP: `./gradlew -PexamplesZipUrl=https://example.com/templates.zip build`
-- Force refresh the cache: `./gradlew -PrefreshExamples=true build`
+- Override repo URL: `./gradlew -PtemplatesRepoUrl=https://github.com/your-org/your-examples.git build`
+- Override release tag: `./gradlew -PtemplatesReleaseTag=v1.2.3 build`
+- Pin an explicit ZIP: `./gradlew -PtemplatesZipUrl=https://example.com/templates.zip build`
+- Force refresh the cache: `./gradlew -PrefreshTemplates=true build`
 
 ## Build Plugins
 

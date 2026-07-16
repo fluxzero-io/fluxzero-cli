@@ -48,14 +48,14 @@ function Get-ReleaseAssetUrl($repoUrl, $tag, $token) {
 }
 
 try {
-    $zipUrl = $env:EXAMPLES_ZIP_URL
-    $sourceDir = $env:EXAMPLES_SOURCE_DIR
-    $repoUrl = if ($env:EXAMPLES_REPO_URL) { $env:EXAMPLES_REPO_URL } else { 'https://github.com/fluxzero-io/fluxzero-examples.git' }
-    $releaseTag = if ($env:EXAMPLES_RELEASE_TAG) { $env:EXAMPLES_RELEASE_TAG } else { 'latest' }
+    $zipUrl = $env:TEMPLATES_ZIP_URL
+    $sourceDir = $env:TEMPLATES_SOURCE_DIR
+    $repoUrl = if ($env:TEMPLATES_REPO_URL) { $env:TEMPLATES_REPO_URL } else { 'https://github.com/fluxzero-io/fluxzero-templates.git' }
+    $releaseTag = if ($env:TEMPLATES_RELEASE_TAG) { $env:TEMPLATES_RELEASE_TAG } else { 'latest' }
     $githubToken = $env:GITHUB_TOKEN
-    $cacheDir = if ($env:CACHE_DIR) { $env:CACHE_DIR } else { './build/examples-snapshot' }
+    $cacheDir = if ($env:CACHE_DIR) { $env:CACHE_DIR } else { './build/templates-snapshot' }
     $outputDir = if ($env:OUTPUT_DIR) { $env:OUTPUT_DIR } else { './build/generated/resources/templates' }
-    $refresh = ($env:REFRESH_EXAMPLES -eq 'true')
+    $refresh = ($env:REFRESH_TEMPLATES -eq 'true')
 
     if ($env:DEBUG_TEMPLATES -eq 'true') {
         Write-Host "DEBUG: Using PowerShell script with:`n  zipUrl=$zipUrl`n  sourceDir=$sourceDir`n  repoUrl=$repoUrl`n  releaseTag=$releaseTag`n  cacheDir=$cacheDir`n  outputDir=$outputDir`n  refresh=$refresh"
@@ -65,10 +65,10 @@ try {
 
     if ($sourceDir) {
         if (-not (Test-Path -LiteralPath $sourceDir -PathType Container)) {
-            throw "EXAMPLES_SOURCE_DIR is not a directory: $sourceDir"
+            throw "TEMPLATES_SOURCE_DIR is not a directory: $sourceDir"
         }
         $templateRoot = (Resolve-Path -LiteralPath $sourceDir).Path
-        Write-Host "Using local examples source at $templateRoot"
+        Write-Host "Using local templates source at $templateRoot"
     } else {
         # Determine cache state without throwing when the directory doesn't exist
         $cacheExists = Test-Path -LiteralPath $cacheDir -PathType Container
@@ -82,7 +82,7 @@ try {
         }
 
         if ($cacheExists -and $hasContent -and -not $refresh) {
-            Write-Host "Using cached examples at $cacheDir (set REFRESH_EXAMPLES=true to refresh)"
+            Write-Host "Using cached templates at $cacheDir (set REFRESH_TEMPLATES=true to refresh)"
         } else {
             if (Test-Path $cacheDir) { Remove-Item -LiteralPath $cacheDir -Recurse -Force }
             New-Item -ItemType Directory -Path $cacheDir | Out-Null
@@ -90,9 +90,9 @@ try {
             if (-not $zipUrl) {
                 $zipUrl = Get-ReleaseAssetUrl $repoUrl $releaseTag $githubToken
             }
-            if (-not $zipUrl) { throw "Could not determine ZIP URL for examples." }
+            if (-not $zipUrl) { throw "Could not determine ZIP URL for templates." }
 
-            Write-Host "Downloading examples ZIP from: $zipUrl"
+            Write-Host "Downloading templates ZIP from: $zipUrl"
             $tmp = New-TemporaryFile
             try {
                 $downloadHeaders = @{}
@@ -101,14 +101,14 @@ try {
                 }
                 Invoke-WebRequest -Uri $zipUrl -OutFile $tmp -Headers $downloadHeaders -UseBasicParsing | Out-Null
             } catch {
-                throw "Failed to download examples ZIP: $($_.Exception.Message)"
+                throw "Failed to download templates ZIP: $($_.Exception.Message)"
             }
 
-            Write-Host "Unpacking examples..."
+            Write-Host "Unpacking templates..."
             Expand-Archive -Path $tmp -DestinationPath $cacheDir -Force
             Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 
-            if (-not (Test-Path $cacheDir -PathType Container)) { throw "Examples cache directory missing after unpack: $cacheDir" }
+            if (-not (Test-Path $cacheDir -PathType Container)) { throw "Templates cache directory missing after unpack: $cacheDir" }
             $entries = Get-ChildItem -LiteralPath $cacheDir -Force
             if ($entries.Count -eq 1 -and $entries[0].PSIsContainer) {
                 $top = $entries[0]
@@ -124,9 +124,15 @@ try {
     if (Test-Path $outputDir) { Remove-Item -LiteralPath $outputDir -Recurse -Force }
     New-Item -ItemType Directory -Path $outputDir | Out-Null
 
-    if (-not (Test-Path $templateRoot -PathType Container)) { throw "Examples directory not found: $templateRoot" }
-    $dirs = Get-ChildItem -LiteralPath $templateRoot -Directory -Force | Where-Object { -not $_.Name.StartsWith('.') } | Sort-Object Name
-    if ($dirs.Count -eq 0) { throw "No templates found in $templateRoot" }
+    if (-not (Test-Path $templateRoot -PathType Container)) { throw "Templates directory not found: $templateRoot" }
+    $requiredTemplateNames = @('flux-basic-java', 'flux-basic-kotlin')
+    $dirs = foreach ($name in $requiredTemplateNames) {
+        $path = Join-Path $templateRoot $name
+        if (-not (Test-Path -LiteralPath $path -PathType Container)) {
+            throw "Missing template $name in $templateRoot"
+        }
+        Get-Item -LiteralPath $path
+    }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $excludedRootEntries = @('build', 'target', '.gradle', '.idea')

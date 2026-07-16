@@ -16,39 +16,64 @@ dependencies {
     testImplementation("io.mockk:mockk:1.14.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
-// Configuration for external examples; these are forwarded to the shell script
-val examplesRepoUrl: String = (findProperty("examplesRepoUrl") as String?)
-    ?: System.getenv("EXAMPLES_REPO_URL")
-    ?: "https://github.com/fluxzero-io/fluxzero-examples.git"
-val examplesReleaseTag: String = (findProperty("examplesReleaseTag") as String?)
-    ?: System.getenv("EXAMPLES_RELEASE_TAG")
+
+fun ZipFile.verifyAgentInstructions(templateName: String) {
+    val agentsEntry = getEntry("AGENTS.md")
+    require(agentsEntry != null) {
+        "$templateName.zip is missing the minimal AGENTS.md plugin instruction."
+    }
+    val agentsText = getInputStream(agentsEntry).bufferedReader().use { it.readText() }
+    require("installed Fluxzero plugin" in agentsText && "repository-local Fluxzero manuals" in agentsText) {
+        "$templateName.zip AGENTS.md must route agents to the installed Fluxzero plugin and reject local manuals."
+    }
+
+    val forbiddenEntries = entries().asSequence()
+        .filterNot { it.isDirectory }
+        .map { it.name }
+        .filter { name ->
+            name == "CLAUDE.md" || name.endsWith("/CLAUDE.md") ||
+                name.endsWith("/AGENTS.md") ||
+                name.startsWith(".fluxzero/agents/") || name.contains("/.fluxzero/agents/")
+        }
+        .toList()
+    require(forbiddenEntries.isEmpty()) {
+        "$templateName.zip contains duplicate or retired agent instructions: ${forbiddenEntries.joinToString()}"
+    }
+}
+
+// Configuration for the separately released template repository.
+val templatesRepoUrl: String = (findProperty("templatesRepoUrl") as String?)
+    ?: System.getenv("TEMPLATES_REPO_URL")
+    ?: "https://github.com/fluxzero-io/fluxzero-templates.git"
+val templatesReleaseTag: String = (findProperty("templatesReleaseTag") as String?)
+    ?: System.getenv("TEMPLATES_RELEASE_TAG")
     ?: "latest"
-val examplesZipUrl: String? = (findProperty("examplesZipUrl") as String?)
-    ?: System.getenv("EXAMPLES_ZIP_URL")
-val configuredExamplesSourceDir: String? = (findProperty("examplesSourceDir") as String?)
-    ?: System.getenv("EXAMPLES_SOURCE_DIR")
-val defaultLocalExamplesDir = rootProject.layout.projectDirectory.dir("../fluxzero-examples").asFile
-val examplesSourceDir = configuredExamplesSourceDir
+val templatesZipUrl: String? = (findProperty("templatesZipUrl") as String?)
+    ?: System.getenv("TEMPLATES_ZIP_URL")
+val configuredTemplatesSourceDir: String? = (findProperty("templatesSourceDir") as String?)
+    ?: System.getenv("TEMPLATES_SOURCE_DIR")
+val defaultLocalTemplatesDir = rootProject.layout.projectDirectory.dir("../fluxzero-templates").asFile
+val templatesSourceDir = configuredTemplatesSourceDir
     ?.let { file(it) }
-    ?: defaultLocalExamplesDir.takeIf { it.isDirectory && it.resolve("flux-basic-java").isDirectory }
+    ?: defaultLocalTemplatesDir.takeIf { it.isDirectory && it.resolve("flux-basic-java").isDirectory }
 val githubToken: String? = (findProperty("githubToken") as String?)
     ?: System.getenv("GITHUB_TOKEN")
-val refreshExamples: Boolean = ((findProperty("refreshExamples") as String?)
-    ?: System.getenv("REFRESH_EXAMPLES"))
+val refreshTemplates: Boolean = ((findProperty("refreshTemplates") as String?)
+    ?: System.getenv("REFRESH_TEMPLATES"))
     ?.toBoolean() ?: false
 
 // Directories used by the script
-val examplesWorkDir = layout.buildDirectory.dir("examples-snapshot")
+val templatesWorkDir = layout.buildDirectory.dir("templates-snapshot")
 val generatedTemplatesDir = layout.buildDirectory.dir("generated/resources/templates")
 
 // Single task that calls the shell script to download, unpack, zip, and index templates
 val packageTemplates by tasks.registering(Exec::class) {
     group = "build"
-    description = "Download examples ZIP, unpack, repackage templates, and write templates.csv"
+    description = "Download templates ZIP, unpack, repackage templates, and write templates.csv"
 
     val isWindows = System.getProperty("os.name").lowercase().contains("win")
-    val bashScript = project.layout.projectDirectory.file("scripts/package_examples.sh").asFile
-    val psScript = project.layout.projectDirectory.file("scripts/package_examples.ps1").asFile
+    val bashScript = project.layout.projectDirectory.file("scripts/package_templates.sh").asFile
+    val psScript = project.layout.projectDirectory.file("scripts/package_templates.ps1").asFile
     if (isWindows) {
         commandLine("pwsh", "-File", psScript.absolutePath)
     } else {
@@ -57,13 +82,13 @@ val packageTemplates by tasks.registering(Exec::class) {
     workingDir = project.layout.projectDirectory.asFile
 
     // Provide environment variables for the script
-    environment("EXAMPLES_REPO_URL", examplesRepoUrl)
-    environment("EXAMPLES_RELEASE_TAG", examplesReleaseTag)
-    if (examplesZipUrl != null) environment("EXAMPLES_ZIP_URL", examplesZipUrl)
-    if (examplesSourceDir != null) environment("EXAMPLES_SOURCE_DIR", examplesSourceDir.absolutePath)
+    environment("TEMPLATES_REPO_URL", templatesRepoUrl)
+    environment("TEMPLATES_RELEASE_TAG", templatesReleaseTag)
+    if (templatesZipUrl != null) environment("TEMPLATES_ZIP_URL", templatesZipUrl)
+    if (templatesSourceDir != null) environment("TEMPLATES_SOURCE_DIR", templatesSourceDir.absolutePath)
     if (githubToken != null) environment("GITHUB_TOKEN", githubToken)
-    if (refreshExamples) environment("REFRESH_EXAMPLES", "true")
-    environment("CACHE_DIR", examplesWorkDir.get().asFile.absolutePath)
+    if (refreshTemplates) environment("REFRESH_TEMPLATES", "true")
+    environment("CACHE_DIR", templatesWorkDir.get().asFile.absolutePath)
     environment("OUTPUT_DIR", generatedTemplatesDir.get().asFile.absolutePath)
     // Pass through PATH for tool resolution (zip/unzip/curl)
     System.getenv("PATH")?.let { environment("PATH", it) }
@@ -73,12 +98,12 @@ val packageTemplates by tasks.registering(Exec::class) {
     }
 
     // Inputs/outputs for task tracking
-    inputs.property("examplesRepoUrl", examplesRepoUrl)
-    inputs.property("examplesReleaseTag", examplesReleaseTag)
-    inputs.property("examplesZipUrl", examplesZipUrl ?: "")
-    inputs.property("examplesSourceDir", examplesSourceDir?.absolutePath ?: "")
-    if (examplesSourceDir != null) {
-        inputs.files(fileTree(examplesSourceDir) {
+    inputs.property("templatesRepoUrl", templatesRepoUrl)
+    inputs.property("templatesReleaseTag", templatesReleaseTag)
+    inputs.property("templatesZipUrl", templatesZipUrl ?: "")
+    inputs.property("templatesSourceDir", templatesSourceDir?.absolutePath ?: "")
+    if (templatesSourceDir != null) {
+        inputs.files(fileTree(templatesSourceDir) {
             exclude(
                 "**/.git/**",
                 "**/.gradle/**",
@@ -88,27 +113,30 @@ val packageTemplates by tasks.registering(Exec::class) {
                 "**/.DS_Store"
             )
         })
-            .withPropertyName("examplesSourceFiles")
+            .withPropertyName("templatesSourceFiles")
             .withPathSensitivity(PathSensitivity.RELATIVE)
     }
-    inputs.property("refreshExamples", refreshExamples)
+    inputs.property("refreshTemplates", refreshTemplates)
     outputs.dir(generatedTemplatesDir)
 }
 
 val verifyPackagedTemplates by tasks.registering {
     group = "verification"
-    description = "Verify packaged templates include the current local login support."
+    description = "Verify packaged templates include current login support and minimal plugin guidance."
 
     dependsOn(packageTemplates)
 
     val javaTemplateZip = generatedTemplatesDir.map { it.file("flux-basic-java.zip") }
-    inputs.file(javaTemplateZip)
+    val kotlinTemplateZip = generatedTemplatesDir.map { it.file("flux-basic-kotlin.zip") }
+    inputs.files(javaTemplateZip, kotlinTemplateZip)
 
     doLast {
         val zipFile = javaTemplateZip.get().asFile
         require(zipFile.isFile) { "Missing packaged template: ${zipFile.absolutePath}" }
 
         ZipFile(zipFile).use { zip ->
+            zip.verifyAgentInstructions("flux-basic-java")
+
             val authEndpoint = zip.getEntry("src/main/java/com/example/app/authentication/AppAuthEndpoint.java")
             require(authEndpoint != null) {
                 "flux-basic-java.zip is missing AppAuthEndpoint.java; generated login cannot work out-of-the-box."
@@ -125,6 +153,12 @@ val verifyPackagedTemplates by tasks.registering {
             require(staleEntries.isEmpty()) {
                 "flux-basic-java.zip still references the removed LocalStubIdp API: ${staleEntries.joinToString()}"
             }
+        }
+
+        val kotlinZipFile = kotlinTemplateZip.get().asFile
+        require(kotlinZipFile.isFile) { "Missing packaged template: ${kotlinZipFile.absolutePath}" }
+        ZipFile(kotlinZipFile).use { zip ->
+            zip.verifyAgentInstructions("flux-basic-kotlin")
         }
     }
 }

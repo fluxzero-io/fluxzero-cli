@@ -46,7 +46,7 @@ public sealed partial class MainWindow : Window
 
         AppWindow.Closing += Window_Closing;
         AppWindow.Changed += Window_Changed;
-        TemplateBox.ItemsSource = new[] { "flux-basic-java", "flux-basic-kotlin", "gamerental" };
+        TemplateBox.ItemsSource = new[] { "flux-basic-java", "flux-basic-kotlin" };
         BuildBox.SelectedIndex = 0;
         AgentComboBoxItems.Populate(OpenDestinationBox);
         LoadDefaults();
