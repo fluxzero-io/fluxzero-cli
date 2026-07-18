@@ -17,27 +17,56 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-fun ZipFile.verifyAgentInstructions(templateName: String) {
-    val agentsEntry = getEntry("AGENTS.md")
-    require(agentsEntry != null) {
-        "$templateName.zip is missing the minimal AGENTS.md plugin instruction."
+fun ZipFile.readRequiredInstruction(templateName: String, entryName: String): String {
+    val entry = getEntry(entryName)
+    require(entry != null) {
+        "$templateName.zip is missing the required $entryName instruction."
     }
-    val agentsText = getInputStream(agentsEntry).bufferedReader().use { it.readText() }
-    require("installed Fluxzero plugin" in agentsText && "repository-local Fluxzero manuals" in agentsText) {
-        "$templateName.zip AGENTS.md must route agents to the installed Fluxzero plugin and reject local manuals."
+    return getInputStream(entry).bufferedReader().use { it.readText() }
+}
+
+fun ZipFile.verifyAgentInstructions(templateName: String) {
+    val agentsText = readRequiredInstruction(templateName, "AGENTS.md")
+    val requiredAgentGuidance = listOf(
+        "installed Fluxzero integration",
+        "Fluxzero MCP server",
+        "build-fluxzero-app",
+        "fluxzero-io/fluxzero-agent-integrations",
+        "repository-local Fluxzero manuals"
+    )
+    require(requiredAgentGuidance.all(agentsText::contains)) {
+        "$templateName.zip AGENTS.md must install or use the Fluxzero integration, route SDK guidance through MCP, and reject local manuals."
+    }
+
+    val claudeText = readRequiredInstruction(templateName, "CLAUDE.md")
+    require(
+        "@AGENTS.md" in claudeText &&
+            "claude plugin marketplace add fluxzero-io/fluxzero-agent-integrations" in claudeText &&
+            "claude plugin install fluxzero@fluxzero" in claudeText
+    ) {
+        "$templateName.zip CLAUDE.md must import the shared instructions and bootstrap the Fluxzero Claude plugin."
+    }
+
+    val geminiText = readRequiredInstruction(templateName, "GEMINI.md")
+    require(
+        "@./AGENTS.md" in geminiText &&
+            "gemini extensions install https://github.com/fluxzero-io/fluxzero-agent-integrations" in geminiText
+    ) {
+        "$templateName.zip GEMINI.md must import the shared instructions and bootstrap the Fluxzero Gemini extension."
     }
 
     val forbiddenEntries = entries().asSequence()
         .filterNot { it.isDirectory }
         .map { it.name }
         .filter { name ->
-            name == "CLAUDE.md" || name.endsWith("/CLAUDE.md") ||
-                name.endsWith("/AGENTS.md") ||
+            name.endsWith("/AGENTS.md") ||
+                name.endsWith("/CLAUDE.md") ||
+                name.endsWith("/GEMINI.md") ||
                 name.startsWith(".fluxzero/agents/") || name.contains("/.fluxzero/agents/")
         }
         .toList()
     require(forbiddenEntries.isEmpty()) {
-        "$templateName.zip contains duplicate or retired agent instructions: ${forbiddenEntries.joinToString()}"
+        "$templateName.zip contains nested duplicate or retired agent instructions: ${forbiddenEntries.joinToString()}"
     }
 }
 
