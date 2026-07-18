@@ -61,7 +61,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: templates-cache
-          path: templates/build/examples-snapshot/
+          path: templates/build/templates-snapshot/
         continue-on-error: true
 
       - name: Set up GraalVM
@@ -167,8 +167,8 @@ jobs:
             exit 1
           fi
 
-          # Verify hidden directories are included in the generated project
-          for hidden_dir in .fluxzero .run; do
+          # Verify retained hidden project metadata is included.
+          for hidden_dir in .run; do
             if [ ! -d "$hidden_dir" ]; then
               echo "ERROR: Hidden directory '$hidden_dir' not found! Template packaging may have stripped dotfiles."
               exit 1

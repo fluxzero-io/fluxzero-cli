@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Templates**: Project starters now come from the dedicated `fluxzero-templates` repository. The CLI only packages
+  `flux-basic-java` and `flux-basic-kotlin`; complete sample applications are no longer offered as scaffolds.
+- **Agent guidance**: Generated starters now contain only a minimal `AGENTS.md` that routes coding agents to the
+  separately installed Fluxzero Codex plugin and MCP manuals. The existing Gradle and Maven project-file sync
+  functionality remains available for projects that deliberately use local manuals.
+
 ### Fixed
 
 - **Native Build**: Fixed hidden directories (`.fluxzero/`, `.run/`, `.gitignore`, etc.) being silently stripped from templates in native image builds. The `upload-artifact@v4` action excludes hidden files by default since September 2024; the templates cache artifact now opts in with `include-hidden-files: true`. This caused the CLI native binary to produce scaffolded projects missing dotfiles, while the JAR and REST API worked correctly.

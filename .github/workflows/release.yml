@@ -2,7 +2,7 @@ name: Auto Release and Version Bump
 
 on:
   repository_dispatch:
-    types: [ examples-updated ]
+    types: [ templates-updated ]
   push:
     branches:
       - main
@@ -104,7 +104,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: templates-cache
-          path: templates/build/examples-snapshot/
+          path: templates/build/templates-snapshot/
           retention-days: 1
           include-hidden-files: true
 

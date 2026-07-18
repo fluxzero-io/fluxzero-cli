@@ -16,9 +16,8 @@ class ListTest {
     fun `should list all available templates`() {
         val mockService = mockk<TemplateService>()
         every { mockService.listTemplates() } returns listOf(
-            TemplateInfo("flux-kotlin-single", "Single module Kotlin template"),
-            TemplateInfo("flux-kotlin-multi", "Multi module Kotlin template"),
-            TemplateInfo("flux-java-spring", "Spring Boot Java template")
+            TemplateInfo("flux-basic-kotlin", "Kotlin starter"),
+            TemplateInfo("flux-basic-java", "Java starter")
         )
 
         val command = List(mockService)
@@ -27,9 +26,8 @@ class ListTest {
         assertEquals(0, result.statusCode)
         assertEquals(
             """
-            flux-kotlin-single: Single module Kotlin template
-            flux-kotlin-multi: Multi module Kotlin template
-            flux-java-spring: Spring Boot Java template
+            flux-basic-kotlin: Kotlin starter
+            flux-basic-java: Java starter
             """.trimIndent(),
             result.output.trim()
         )

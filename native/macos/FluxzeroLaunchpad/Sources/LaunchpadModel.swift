@@ -18,7 +18,7 @@ final class LaunchpadModel: ObservableObject {
     @Published var initGit = true
     @Published var advancedExpanded = false
     @Published var selectedAgent: AgentChoice = .codex
-    @Published var templates = ["flux-basic-java", "flux-basic-kotlin", "gamerental"]
+    @Published var templates = ["flux-basic-java", "flux-basic-kotlin"]
     @Published var projects: [GeneratedProject] = []
     @Published var cliStatus: CliStatus?
     @Published var isBusy = false
