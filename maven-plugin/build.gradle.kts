@@ -20,7 +20,8 @@ group = "io.fluxzero.tools"
 
 val mavenPluginMojoDescriptions = mapOf(
     "sync-project-files" to "Syncs Fluxzero AI agent instruction files for a Maven project.",
-    "publish-package" to "Builds and publishes a layered Java OCI package to the Fluxzero registry."
+    "publish-package" to "Builds and publishes a layered Java OCI package to the Fluxzero registry.",
+    "dev" to "Starts the local Fluxzero development environment for the Maven reactor."
 )
 
 val mavenPluginParameterDescriptions = mapOf(
@@ -42,15 +43,39 @@ val mavenPluginParameterDescriptions = mapOf(
     "javaToolOptions" to "Value written to JAVA_TOOL_OPTIONS for publish-package. Property: fluxzero.package.javaToolOptions.",
     "overrideLanguage" to "Override language detection with kotlin or java. Property: fluxzero.projectFiles.overrideLanguage.",
     "overrideSdkVersion" to "Override Fluxzero SDK version detection. Property: fluxzero.projectFiles.overrideSdkVersion.",
-    "project" to "Read-only Maven project metadata for publish-package.",
-    "projectDir" to "Read-only Maven project base directory where Fluxzero project files are synced.",
+    "project" to "Read-only Maven project metadata.",
+    "projectDir" to "Read-only Maven project or reactor root directory.",
     "registryHost" to "Fluxzero registry host for publish-package. Defaults to registry.fluxzero.io.",
     "registryToken" to "Fluxzero registry token for publish-package.",
     "registryUsername" to "Registry username for publish-package. Defaults to fluxzero.",
     "rootProjectOnly" to "Run only in the Maven execution root. Property: fluxzero.projectFiles.rootProjectOnly.",
     "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
     "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip.",
-    "skipPackagePublish" to "Skip publish-package execution. Property: fluxzero.package.skip."
+    "skipPackagePublish" to "Skip publish-package execution. Property: fluxzero.package.skip.",
+    "devServerVersion" to "Fluxzero dev-server artifact version override. Defaults to the active project pin or newest stable 1.x release. Property: fluxzero.dev.serverVersion.",
+    "devMainClass" to "Optional application main class override for the dev environment. Property: fluxzero.dev.mainClass.",
+    "devApplicationName" to "Fluxzero application name for the dev environment. Property: fluxzero.dev.applicationName.",
+    "applications" to "Applications, modules, or named project configurations to start.",
+    "environment" to "Application environment/profile. Property: fluxzero.dev.environment. Default: local.",
+    "port" to "Preferred public gateway port. Property: fluxzero.dev.port.",
+    "idp" to "IDP mode: managed or external. Property: fluxzero.dev.idp.",
+    "devNamespace" to "Fluxzero namespace for the dev environment. Property: fluxzero.dev.namespace.",
+    "watch" to "Enable source watching in the dev environment. Property: fluxzero.dev.watch.",
+    "compileOnStart" to "Compile and launch the application when dev starts. Property: fluxzero.dev.compileOnStart.",
+    "testsEnabled" to "Run background tests in the dev environment. Property: fluxzero.dev.testsEnabled.",
+    "fastCompiler" to "Enable the Maven-correct fast Java compiler. Property: fluxzero.dev.fastCompiler.",
+    "frontendCommand" to "Frontend dev-server command. Property: fluxzero.dev.frontendCommand.",
+    "frontendDirectory" to "Working directory for managed frontend commands. Property: fluxzero.dev.frontendDirectory.",
+    "frontendSetupCommand" to "Setup command run once before the frontend starts. Property: fluxzero.dev.frontendSetupCommand.",
+    "frontendUrl" to "Externally managed frontend URL. Property: fluxzero.dev.frontendUrl.",
+    "frontendEnabled" to "Enable project frontend integration. Property: fluxzero.dev.frontendEnabled.",
+    "backendPaths" to "Additional frontend paths routed unchanged to Fluxzero.",
+    "appArgs" to "Arguments passed to the application process.",
+    "startupTimeoutMillis" to "Application readiness timeout in milliseconds. Property: fluxzero.dev.startupTimeoutMillis.",
+    "gracefulShutdownTimeoutMillis" to "Graceful app shutdown timeout in milliseconds. Property: fluxzero.dev.gracefulShutdownTimeoutMillis.",
+    "debounceMillis" to "Source watcher debounce in milliseconds. Property: fluxzero.dev.debounceMillis.",
+    "skipDev" to "Skip starting the dev environment. Property: fluxzero.dev.skip.",
+    "background" to "Start the dev environment in the background. Property: fluxzero.dev.background."
 )
 
 fun Element.firstDirectChild(tagName: String): Element? =
@@ -100,6 +125,9 @@ dependencies {
 
     shade(project(":publishing"))
     compileOnly(project(":publishing"))
+
+    shade(project(":dev-launcher"))
+    compileOnly(project(":dev-launcher"))
 
     // Maven Plugin API (compile only - provided at runtime by Maven)
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")

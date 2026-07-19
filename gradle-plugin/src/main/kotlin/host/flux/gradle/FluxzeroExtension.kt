@@ -28,10 +28,17 @@ abstract class FluxzeroExtension @Inject constructor(objects: ObjectFactory) {
      */
     val projectFiles: ProjectFilesExtension = objects.newInstance(ProjectFilesExtension::class.java)
 
+    /** Configuration for the local Fluxzero development environment. */
+    val dev: DevExtension = objects.newInstance(DevExtension::class.java)
+
     /**
      * Configures the project files sync feature.
      */
     fun projectFiles(action: Action<ProjectFilesExtension>) {
         action.execute(projectFiles)
+    }
+
+    fun dev(action: Action<DevExtension>) {
+        action.execute(dev)
     }
 }

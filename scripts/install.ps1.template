@@ -16,6 +16,7 @@ $HOME_DIR = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 $FLUX_DIR = Join-Path $HOME_DIR ".fluxzero"
 $FLUX_BIN_DIR = Join-Path $FLUX_DIR "bin"
 $FLUX_BINARY = Join-Path $FLUX_BIN_DIR "fz.exe"
+$FLUX_ALIAS = Join-Path $FLUX_BIN_DIR "fluxzero.exe"
 $TARGET_DIR = Join-Path $HOME_DIR ".fluxzero\bin"
 
 # Detect architecture
@@ -117,6 +118,13 @@ if ($Binary) {
     Write-Host "Download successful." -ForegroundColor Green
 }
 
+try {
+    Copy-Item $FLUX_BINARY $FLUX_ALIAS -Force
+} catch {
+    Write-Host "Error: Failed to create fluxzero.exe command alias." -ForegroundColor Red
+    exit 1
+}
+
 ## PATH Installation
 
 # Check if already in PATH
@@ -146,11 +154,11 @@ if ($InstallPath -or (-not $pathAdded)) {
             Write-Host "$TARGET_DIR is already in your PATH." -ForegroundColor Yellow
         }
         
-        Write-Host "Installation completed successfully. You can now use the fluxzero-cli by running 'fz' from anywhere." -ForegroundColor Green
+        Write-Host "Installation completed successfully. You can now run either 'fz' or 'fluxzero' from anywhere." -ForegroundColor Green
     } else {
         Write-Host "Skipping PATH installation. You can run the CLI using: $FLUX_BINARY" -ForegroundColor Yellow
         Write-Host "Installation completed successfully." -ForegroundColor Green
     }
 } else {
-    Write-Host "Installation completed successfully. You can now use the fluxzero-cli by running 'fz' from anywhere." -ForegroundColor Green
+    Write-Host "Installation completed successfully. You can now run either 'fz' or 'fluxzero' from anywhere." -ForegroundColor Green
 }

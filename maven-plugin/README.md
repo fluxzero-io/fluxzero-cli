@@ -6,6 +6,7 @@ Maven plugin for Fluxzero project setup and Java package publishing.
 
 - `sync-project-files`: updates `.fluxzero/agents/` for the project's Fluxzero SDK version.
 - `publish-package`: builds and publishes a Java OCI package from Maven output.
+- `dev`: starts the local Fluxzero development environment and keeps it running until interrupted.
 
 ## Quick Start
 
@@ -35,6 +36,55 @@ Add the plugin to your `pom.xml`:
 This configuration runs `sync-project-files` during the Maven `initialize` phase.
 
 ## Configuration
+
+### `dev`
+
+`dev` is the project-local fallback for starting the same environment as `fz dev`, without requiring a globally
+installed CLI. The goal resolves the newest compatible `io.fluxzero.tools:fluxzero-dev-server` release, then starts
+it independently and attaches a live event view:
+
+```bash
+./mvnw fluxzero:dev
+```
+
+Type `q`/`quit` and press Enter to open a menu, use the arrow keys to choose between detaching, stopping everything,
+and returning to the live view, and press Enter to confirm. Type `d`/`detach` and press Enter to leave the environment
+running. `Ctrl-C` stops the environment and all applications; an unexpected terminal disconnect only detaches the view. Set
+`-Dfluxzero.dev.background=true` to skip the attached view.
+A detached environment is controlled with `fz dev attach`, `fz dev status`, `fz dev logs --follow`, and `fz dev stop`;
+only one session can run per project.
+
+| Setting | Command-line property | Default |
+|---------|-----------------------|---------|
+| Dev-server version | `fluxzero.dev.serverVersion` | active project pin or newest stable `1.x` release |
+| Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
+| Application name | `fluxzero.dev.applicationName` | Maven artifact id |
+| Applications/configurations | `fluxzero.dev.applications` | all discovered applications |
+| Environment | `fluxzero.dev.environment` | `local` |
+| Public gateway port | `fluxzero.dev.port` | dynamic |
+| IDP mode | `fluxzero.dev.idp` | `managed` |
+| Namespace | `fluxzero.dev.namespace` | project default |
+| Watch sources | `fluxzero.dev.watch` | `true` |
+| Compile on start | `fluxzero.dev.compileOnStart` | `true` |
+| Background tests | `fluxzero.dev.testsEnabled` | `true` |
+| Fast compiler | `fluxzero.dev.fastCompiler` | `false` |
+| Frontend command | `fluxzero.dev.frontendCommand` | none |
+| Frontend directory | `fluxzero.dev.frontendDirectory` | project root |
+| Frontend setup command | `fluxzero.dev.frontendSetupCommand` | none |
+| External frontend URL | `fluxzero.dev.frontendUrl` | none |
+| Frontend enabled | `fluxzero.dev.frontendEnabled` | `true` |
+| Startup timeout | `fluxzero.dev.startupTimeoutMillis` | `20000` |
+| Graceful app shutdown timeout | `fluxzero.dev.gracefulShutdownTimeoutMillis` | `5000` |
+| Source debounce | `fluxzero.dev.debounceMillis` | `300` |
+| Background/detached | `fluxzero.dev.background` | `false` |
+| Skip dev environment | `fluxzero.dev.skip` | `false` |
+
+`backendPaths` and `appArgs` are repeatable Maven configuration elements. Stable shared environment, frontend,
+application flavor, 1Password-reference, and startup-command configuration belongs in tracked `.fluxzero/dev.yaml`;
+the Maven properties above are local or invocation-specific overrides.
+
+Agent integrations should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
+own stdout would corrupt the MCP protocol stream.
 
 ### `sync-project-files`
 

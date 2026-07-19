@@ -39,7 +39,9 @@ VERSION=@VERSION@
 FLUX_DIR="$HOME/.fluxzero"
 FLUX_BIN_DIR="$FLUX_DIR/bin"
 FLUX_BINARY="$FLUX_BIN_DIR/fz"
+FLUX_ALIAS="$FLUX_BIN_DIR/fluxzero"
 TARGET_SCRIPT="/usr/local/bin/fz"
+TARGET_ALIAS="/usr/local/bin/fluxzero"
 
 # Detect platform and architecture
 OS=$(uname -s)
@@ -169,6 +171,12 @@ if ! chmod +x "$FLUX_BINARY"; then
   exit 1
 fi
 
+echo "Creating fluxzero command alias..."
+if ! ln -sf "fz" "$FLUX_ALIAS"; then
+  echo "Error: Failed to create command alias $FLUX_ALIAS."
+  exit 1
+fi
+
 ## Installation on PATH
 
 # Skip prompt if --install-path was provided
@@ -178,7 +186,7 @@ if [ -z "$INSTALL_PATH" ]; then
 fi
 
 case "${INSTALL_PATH}" in ([Yy]*)
-    echo "Creating ${TARGET_SCRIPT}..."
+    echo "Creating ${TARGET_SCRIPT} and ${TARGET_ALIAS}..."
     if command -v sudo >/dev/null 2>&1; then
       SUDO="sudo"
     else
@@ -190,15 +198,20 @@ case "${INSTALL_PATH}" in ([Yy]*)
       exit 1
     fi
 
-    if ! $SUDO chmod +x "${TARGET_SCRIPT}"; then
-      echo "Error: Failed to set executable permissions for ${TARGET_SCRIPT}. Please check permissions and try again."
+    if ! printf '#!/usr/bin/env sh\nexec ~/.fluxzero/bin/fz "$@"' | $SUDO tee "$TARGET_ALIAS" > /dev/null; then
+      echo "Error: Failed to create ${TARGET_ALIAS}. Please check permissions and try again."
       exit 1
     fi
 
-    echo "${GREEN}Installation completed successfully. You can now use the fluxzero-cli by running fz from anywhere.${NC}"
+    if ! $SUDO chmod +x "${TARGET_SCRIPT}" "${TARGET_ALIAS}"; then
+      echo "Error: Failed to set executable permissions for CLI commands. Please check permissions and try again."
+      exit 1
+    fi
+
+    echo "${GREEN}Installation completed successfully. You can now run either fz or fluxzero from anywhere.${NC}"
     ;;
   *)
-    echo "${YELLOW}Skipping PATH installation. You can run the CLI using ~/.fluxzero/bin/fz${NC}"
+    echo "${YELLOW}Skipping PATH installation. Add ~/.fluxzero/bin to PATH to use fz or fluxzero.${NC}"
     echo "${GREEN}Installation completed successfully.${NC}"
     ;;
 esac

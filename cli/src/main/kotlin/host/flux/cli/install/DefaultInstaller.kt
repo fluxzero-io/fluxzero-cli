@@ -54,7 +54,10 @@ open class DefaultInstaller(
                     )
                 }
             }
-            else -> InstallResult.AlreadyLatest(current)
+            else -> {
+                ensureAlias()
+                InstallResult.AlreadyLatest(current)
+            }
         }
     }
 
@@ -219,11 +222,23 @@ open class DefaultInstaller(
             Files.copy(input, binaryPath, StandardCopyOption.REPLACE_EXISTING)
         }
         binaryPath.toFile().setExecutable(true)
+        val aliasPath = binDir.resolve("fluxzero")
+        Files.copy(binaryPath, aliasPath, StandardCopyOption.REPLACE_EXISTING)
+        aliasPath.toFile().setExecutable(true)
         
         System.err.println("Installation complete!")
         
         // Clean up old installations if they exist
         cleanupLegacyInstallation()
+    }
+
+    private fun ensureAlias() {
+        val binaryPath = homeDir.resolve(".fluxzero/bin/fz")
+        if (Files.isRegularFile(binaryPath)) {
+            val aliasPath = binaryPath.resolveSibling("fluxzero")
+            Files.copy(binaryPath, aliasPath, StandardCopyOption.REPLACE_EXISTING)
+            aliasPath.toFile().setExecutable(true)
+        }
     }
     
     private fun cleanupLegacyInstallation() {

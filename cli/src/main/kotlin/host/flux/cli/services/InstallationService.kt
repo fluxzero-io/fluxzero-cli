@@ -59,7 +59,10 @@ open class DefaultInstallationService(
                 }
             }
 
-            else -> InstallResult.AlreadyLatest(current)
+            else -> {
+                ensureAlias()
+                InstallResult.AlreadyLatest(current)
+            }
         }
     }
 
@@ -82,7 +85,7 @@ open class DefaultInstallationService(
         }
     }
 
-    override fun getCurrentVersion(): String? {
+    open override fun getCurrentVersion(): String? {
         return try {
             // Try to get version from the currently running JAR/native binary
             this::class.java.`package`.implementationVersion?.let { version ->
@@ -129,6 +132,7 @@ open class DefaultInstallationService(
             }
             tempPath.toFile().setExecutable(true)
             Files.move(tempPath, binaryPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            createAlias(binaryPath)
         } catch (e: Exception) {
             Files.deleteIfExists(tempPath)
             throw e
@@ -138,6 +142,19 @@ open class DefaultInstallationService(
 
         // Clean up old installations if they exist
         cleanupLegacyInstallation()
+    }
+
+    private fun ensureAlias() {
+        val binaryPath = homeDir.resolve(".fluxzero/bin/fz")
+        if (Files.isRegularFile(binaryPath)) {
+            createAlias(binaryPath)
+        }
+    }
+
+    private fun createAlias(binaryPath: Path) {
+        val aliasPath = binaryPath.resolveSibling("fluxzero")
+        Files.copy(binaryPath, aliasPath, StandardCopyOption.REPLACE_EXISTING)
+        aliasPath.toFile().setExecutable(true)
     }
 
     private fun detectPlatform(): Pair<String, String> {

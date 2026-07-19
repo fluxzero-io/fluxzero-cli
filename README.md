@@ -96,7 +96,7 @@ The fluxzero-cli uses per-project versioning rather than global installation. Ea
 
 ## Usage
 
-Once installed, you can use the CLI with the `fz` command:
+Once installed, you can use the CLI with either the short `fz` command or the equivalent `fluxzero` command:
 
 ```bash
 # Initialize a new project (interactive template selection)
@@ -108,12 +108,162 @@ fz templates list
 # Build and publish the current Maven project as a Fluxzero package
 FLUXZERO_REGISTRY_TOKEN=... fz publish
 
+# Start the local Fluxzero development environment
+fz dev
+
+# Expose the active environment to an MCP client over stdio
+fz mcp
+
 # Show version
 fz version
 
 # Upgrade CLI to latest version
 fz upgrade
 ```
+
+### Local development
+
+`fz dev` (or `fluxzero dev`) starts the newest compatible stable Fluxzero dev server. It supervises the local runtime,
+proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP endpoint. Ports and
+credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
+
+The application main class is detected from compiled Java or Kotlin classes. Use `--main-class` only when a project
+contains multiple executable entrypoints and the intended one is ambiguous.
+
+```bash
+fz dev
+```
+
+The default command starts the environment independently from the terminal and attaches a live semantic event view.
+Type `q` or `quit` and press Enter to open a menu, use the arrow keys to select an action, and press Enter to confirm.
+Type `d` or `detach` and press Enter to leave it running. `Ctrl-C` stops the environment and all applications; an
+unexpected terminal disconnect only detaches the view. Common overrides include:
+
+```bash
+fz dev --fast-compiler
+fz dev --app app
+fz dev --app app --app audittrail
+fz dev --environment dev
+fz dev --port 4200
+fz dev --idp external
+fz dev --frontend-command "npm run dev"
+fz dev --frontend-directory frontend --frontend-setup-command "npm install --prefer-offline --no-audit --no-fund"
+fz dev --frontend-url http://localhost:5173
+fz dev --no-tests
+```
+
+Attach to an existing project environment with `fz dev attach`; a bare `fz dev` does the same when the environment is
+already running. Events produced while detached are replayed from the last attach cursor before live events resume.
+Use background mode to start and return immediately after readiness without opening the attached view:
+
+```bash
+fz dev --background
+fz dev attach
+fz dev status
+fz dev status --json
+fz dev logs --follow
+fz dev logs --follow --errors
+fz dev logs --follow --app orders
+fz dev stop
+fz dev stop --force
+```
+
+`logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
+
+Only one dev session may be active per project. `status`, `logs`, `stop`, MCP discovery, and the next `dev` launch
+reconcile stale session state when the supervisor was killed unexpectedly. Because that also means the embedded test
+runtime lost its in-memory data, startup commands run again in the next session. Detaching keeps that state alive when a
+terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop`.
+
+Start options:
+
+| Option | Meaning |
+|--------|---------|
+| `--app <selector>` | Start one module, main class, test app, or named app configuration; repeatable. |
+| `--main-class <class>` | Override main-class detection. |
+| `--application-name <name>` | Override the Fluxzero runtime application name. |
+| `--environment <name>` | Set `ENVIRONMENT`; defaults to `local`. |
+| `--namespace <name>` | Set the Fluxzero namespace. |
+| `--port <port>` | Prefer a public browser/gateway port; dynamic by default. |
+| `--idp managed|external` | Start the local IDP or use application-owned IDP configuration. |
+| `--no-idp` | Alias for `--idp external`. |
+| `--frontend-command <command>` | Start a managed frontend; use `{port}` for its private upstream port. |
+| `--frontend-directory <path>` | Working directory for managed frontend commands. |
+| `--frontend-setup-command <command>` | Run setup once before the managed frontend starts for this dev session. |
+| `--frontend-url <url>` | Proxy an externally managed frontend. |
+| `--no-frontend` | Run a backend-only environment. |
+| `--backend-path <path>` | Route an extra public path directly to Fluxzero; repeatable. |
+| `--fast-compiler` | Enable the Maven-correct fast Java path; Maven remains the fallback. |
+| `--no-tests` | Disable background test selection and execution. |
+| `--no-watch` | Disable source watching. |
+| `--no-compile-on-start` | Start infrastructure without compiling applications. |
+| `--app-arg <argument>` | Pass an application argument; repeatable. |
+| `--startup-timeout-ms <ms>` | Override application/frontend readiness timeout. |
+| `--graceful-shutdown-timeout-ms <ms>` | Override rolling app shutdown timeout. |
+| `--debounce-ms <ms>` | Override source-change debounce. |
+| `--background`, `--detach`, `-d` | Start without an attached live view and return after startup succeeds or fails. |
+
+Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
+remain ignored under `.fluxzero/dev/`:
+
+```yaml
+version: 1
+environment: local
+apps:
+  - app
+port: 4200
+idp: external
+frontend:
+  command: "cd frontend && npm start -- --host 127.0.0.1 --port {port}"
+  backendPaths:
+    - /api
+applicationConfig:
+  rebound-encrypted:
+    application: rebound
+    applicationName: rebound
+    env:
+      FEATURE_MODE: local
+    secrets:
+      ENCRYPTION_KEY: "op://Fluxzero Cloud/flux_cloud_flux-encryption-key/local encryption-key"
+commands:
+  create-admin:
+    type: com.example.CreateUser
+    payload:
+      name: Local Admin
+```
+
+`apps` may contain direct selectors or keys from `applicationConfig`. Secret values never belong in this file: only
+tracked `op://` references are allowed, and `op run` injects their values directly into the selected child process.
+YAML commands execute in declaration order, followed by JSON commands under
+`src/test/resources/fluxzero/dev/commands` in filename order.
+
+Command-line options override environment variables, which override `dev.yaml`; built-in defaults apply last.
+Unknown keys and unsupported config versions fail startup instead of being silently ignored.
+
+`fz mcp` or `fluxzero mcp` is intended as the stdio command in an agent's MCP configuration. It discovers the active environment from
+the project directory and reads the dynamic endpoint and token without exposing either in agent configuration:
+
+```bash
+fz mcp --project-dir /path/to/project
+```
+
+`fz dev` resolves the newest stable dev-server `1.x` release for a new environment. The verified standalone JAR is
+cached under `~/.fluxzero/cache/dev-server`, while `.fluxzero/dev/launcher` pins the concrete version used by the
+project. Attach, status, logs, stop, and MCP commands keep using that pinned version. Set
+`FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a specific local or prerelease build.
+
+Project-local launchers provide the same environment without a globally installed CLI:
+
+```bash
+./mvnw fluxzero:dev
+./mvnw fluxzero:dev -Dfluxzero.dev.background=true
+
+./gradlew fluxzeroDev
+./gradlew fluxzeroDev -Pfluxzero.dev.background=true
+```
+
+The Gradle plugin also owns `fluxzeroDevMetadata`, the compile/classpath contract consumed by the dev server. Apply the
+plugin to the root project so multi-project applications are discovered together.
 
 ### CLI Commands & Parameters
 
@@ -524,7 +674,7 @@ For detailed documentation, troubleshooting, and advanced examples:
 ### Building the CLI
 
 ```bash
-./gradlew build shadowJar
+./gradlew build :cli:shadowJar
 ```
 
 ### Building Native Executable
@@ -536,10 +686,10 @@ Requires GraalVM with native-image support:
 jenv local oracle64-21.0.1
 
 # Build native executable
-./gradlew nativeCompile
+./gradlew :cli:nativeCompile
 
 # Test the native executable
-./build/native/nativeCompile/flux version
+./cli/build/native/nativeCompile/flux version
 ```
 
 ### Running
@@ -547,7 +697,7 @@ jenv local oracle64-21.0.1
 ```bash
 ./gradlew run
 # or
-java -jar build/libs/fluxzero-cli-dev-all.jar version
+java -jar cli/build/libs/fluxzero-cli-dev.jar version
 ```
 
 ### Testing
