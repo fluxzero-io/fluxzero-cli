@@ -102,8 +102,8 @@ class DevServerClasspathResolver(
           <version>1</version>
           <dependencies>
             <dependency>
-              <groupId>io.fluxzero</groupId>
-              <artifactId>dev-server</artifactId>
+              <groupId>$DEV_SERVER_GROUP_ID</groupId>
+              <artifactId>$DEV_SERVER_ARTIFACT_ID</artifactId>
               <version>${xml(version)}</version>
               <classifier>standalone</classifier>
               <exclusions>
@@ -129,7 +129,7 @@ class DevServerClasspathResolver(
         }
 
         dependencies {
-            devServer('io.fluxzero:dev-server:${groovy(version)}:standalone') {
+            devServer('$DEV_SERVER_GROUP_ID:$DEV_SERVER_ARTIFACT_ID:${groovy(version)}:standalone') {
                 transitive = false
             }
         }

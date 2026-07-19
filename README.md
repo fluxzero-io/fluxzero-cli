@@ -247,8 +247,9 @@ the project directory and reads the dynamic endpoint and token without exposing 
 fz mcp --project-dir /path/to/project
 ```
 
-Set `FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a dev-server version that differs
-from the project's Fluxzero SDK version.
+`fz dev` resolves the newest stable dev-server `1.x` release for a new environment and records the concrete version
+in the session. Attach, status, logs, stop, and MCP commands keep using that session version. Set
+`FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a specific local or prerelease build.
 
 Project-local launchers provide the same environment without a globally installed CLI:
 

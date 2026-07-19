@@ -40,8 +40,8 @@ This configuration runs `sync-project-files` during the Maven `initialize` phase
 ### `dev`
 
 `dev` is the project-local fallback for starting the same environment as `fz dev`, without requiring a globally
-installed CLI. The goal resolves the `io.fluxzero:dev-server` artifact matching the project's Fluxzero SDK version,
-then starts it independently and attaches a live event view:
+installed CLI. The goal resolves the newest compatible `io.fluxzero.tools:fluxzero-dev-server` release, then starts
+it independently and attaches a live event view:
 
 ```bash
 ./mvnw fluxzero:dev
@@ -56,7 +56,7 @@ only one session can run per project.
 
 | Setting | Command-line property | Default |
 |---------|-----------------------|---------|
-| Dev-server version | `fluxzero.dev.serverVersion` | project Fluxzero SDK version |
+| Dev-server version | `fluxzero.dev.serverVersion` | active session or newest stable `1.x` release |
 | Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
 | Application name | `fluxzero.dev.applicationName` | Maven artifact id |
 | Applications/configurations | `fluxzero.dev.applications` | all discovered applications |

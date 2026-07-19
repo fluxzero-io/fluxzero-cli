@@ -32,7 +32,7 @@ class Dev(
         .default(Path.of(""))
     private val devServerVersion by option(
         "--dev-server-version",
-        help = "Dev-server artifact version. Defaults to FLUXZERO_DEV_SERVER_VERSION or the project Fluxzero version."
+        help = "Dev-server artifact version override. Defaults to the active session or latest compatible release."
     )
     private val mainClass by option("--main-class", help = "Application main class override; auto-detected by default.")
     private val applicationName by option("--application-name", help = "Fluxzero application name.")

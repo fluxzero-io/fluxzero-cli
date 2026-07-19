@@ -52,7 +52,7 @@ val mavenPluginParameterDescriptions = mapOf(
     "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
     "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip.",
     "skipPackagePublish" to "Skip publish-package execution. Property: fluxzero.package.skip.",
-    "devServerVersion" to "Fluxzero dev-server artifact version. Property: fluxzero.dev.serverVersion.",
+    "devServerVersion" to "Fluxzero dev-server artifact version override. Defaults to the active session or newest stable 1.x release. Property: fluxzero.dev.serverVersion.",
     "devMainClass" to "Optional application main class override for the dev environment. Property: fluxzero.dev.mainClass.",
     "devApplicationName" to "Fluxzero application name for the dev environment. Property: fluxzero.dev.applicationName.",
     "applications" to "Applications, modules, or named project configurations to start.",

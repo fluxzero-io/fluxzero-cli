@@ -81,6 +81,30 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `new session resolves the latest compatible stable release`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val executor = CommandExecutor { command, _, _ ->
+            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+            }
+            0
+        }
+        val resolver = DevServerVersionResolver({
+            "<metadata><versioning><versions><version>1.6.2</version></versions></versioning></metadata>"
+        }) { }
+
+        DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+            DevLaunchRequest(projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("status"))
+        )
+
+        assertTrue(
+            Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/pom.xml"))
+                .contains("<version>1.6.2</version>")
+        )
+    }
+
+    @Test
     fun `refreshes snapshot classpath instead of reusing the cache`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
@@ -135,7 +159,7 @@ class DevServerLauncherTest {
         Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
         Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
         Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
-                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
+                          """{"status":"running","pid":${ProcessHandle.current().pid()},"devServerVersion":"1.2.3"}""")
         val commands = mutableListOf<Invocation>()
         val executor = object : CommandExecutor {
             override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
@@ -148,8 +172,9 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
-            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
+        val resolver = DevServerVersionResolver({ error("an active session must not check for updates") }) { }
+        val exitCode = DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+            DevLaunchRequest(projectDirectory, target = DevLaunchTarget.SERVER)
         )
 
         assertEquals(0, exitCode)
@@ -159,10 +184,32 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `control action uses version recorded by active session`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
+                          """{"status":"running","pid":${ProcessHandle.current().pid()},"devServerVersion":"1.2.3"}""")
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
+        val resolver = DevServerVersionResolver({ error("an active session must not check for updates") }) { }
+
+        DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+            DevLaunchRequest(projectDirectory, "1.9.0", DevLaunchTarget.CONTROL, listOf("status"))
+        )
+
+        assertEquals(1, commands.size)
+        assertTrue(commands.single().contains(DevLaunchTarget.CONTROL.mainClass))
+        assertEquals("1.2.3", Files.readString(launcherDirectory.resolve("version")))
+    }
+
+    @Test
     fun `reports one clean stop when snapshot resolution is interrupted`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val messages = mutableListOf<String>()
-        val launcher = DevServerLauncher(CommandExecutor { _, _, _ -> 130 }, emptyMap(), messages::add)
+        val launcher = DevServerLauncher(CommandExecutor { _, _, _ -> 130 }, emptyMap(), messageSink = messages::add)
 
         val exitCode = launcher.launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
@@ -205,7 +252,7 @@ class DevServerLauncherTest {
             override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path) = 4242L
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
+        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -246,7 +293,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
+        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
             DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
         )
 
@@ -270,7 +317,7 @@ class DevServerLauncherTest {
             if (command.contains("attach")) 130 else 0
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messages::add).launch(
+        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
             DevLaunchRequest(
                 projectDirectory, "1.2.3", DevLaunchTarget.CONTROL,
                 listOf("attach", "--project-dir", projectDirectory.toString())
@@ -526,7 +573,7 @@ class DevServerLauncherTest {
         assertTrue(commands.first().contains("resolveFluxzeroDevServer"))
         assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
         val launcherBuild = Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/build.gradle"))
-        assertTrue(launcherBuild.contains("io.fluxzero:dev-server:0-SNAPSHOT:standalone"))
+        assertTrue(launcherBuild.contains("io.fluxzero.tools:fluxzero-dev-server:0-SNAPSHOT:standalone"))
     }
 
     private data class Invocation(

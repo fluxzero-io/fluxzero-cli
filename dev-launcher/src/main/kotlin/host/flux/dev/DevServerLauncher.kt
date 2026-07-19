@@ -19,19 +19,23 @@ fun interface DevLauncher {
 class DevServerLauncher(
     executor: CommandExecutor? = null,
     private val environment: Map<String, String> = System.getenv(),
+    versionResolver: DevServerVersionResolver? = null,
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) : DevLauncher {
     private val executor = executor ?: InheritedIoCommandExecutor()
+    private val versionResolver = versionResolver ?: DevServerVersionResolver(messageSink = messageSink)
 
     override fun launch(request: DevLaunchRequest): Int {
         val projectDirectory = request.projectDirectory.toAbsolutePath().normalize()
-        val version = request.devServerVersion?.takeIf { it.isNotBlank() }
+        val activeSession = activeSession(projectDirectory)
+        val requestedVersion = request.devServerVersion?.takeIf { it.isNotBlank() }
             ?: environment["FLUXZERO_DEV_SERVER_VERSION"]?.takeIf { it.isNotBlank() }
-            ?: FluxzeroProjectVersion.detect(projectDirectory)
-            ?: error(
-                "Could not detect the Fluxzero SDK version from the build in $projectDirectory. " +
-                    "Set --dev-server-version or FLUXZERO_DEV_SERVER_VERSION."
-            )
+        val sessionVersion = activeSession?.devServerVersion?.takeIf { it.isNotBlank() }
+        val version = when {
+            sessionVersion != null && (request.target != DevLaunchTarget.SERVER || activeSession.active) -> sessionVersion
+            requestedVersion != null -> requestedVersion
+            else -> versionResolver.latestCompatible(projectDirectory)
+        }
         require(!request.detached || request.target == DevLaunchTarget.SERVER) {
             "Only the Fluxzero dev server can be started in the background"
         }
@@ -41,7 +45,7 @@ class DevServerLauncher(
         return executor.supervise(shutdown::begin, shutdown::complete) {
             try {
                 val resolver = DevServerClasspathResolver(executor, messageSink)
-                val likelyActive = request.target == DevLaunchTarget.SERVER && likelyActive(projectDirectory)
+                val likelyActive = request.target == DevLaunchTarget.SERVER && activeSession?.active == true
                 var classpath = resolver.resolve(
                     projectDirectory, version,
                     reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive
@@ -125,17 +129,24 @@ class DevServerLauncher(
         OutputMode.DISCARD
     ) == 0
 
-    private fun likelyActive(projectDirectory: Path): Boolean {
+    private fun activeSession(projectDirectory: Path): ActiveSession? {
         val sessionFile = projectDirectory.resolve(".fluxzero/dev/session.json")
-        if (!Files.isRegularFile(sessionFile)) return false
+        if (!Files.isRegularFile(sessionFile)) return null
         return runCatching {
             val content = Files.readString(sessionFile)
             val status = Regex("\"status\"\\s*:\\s*\"([^\"]+)\"").find(content)?.groupValues?.get(1)
             val pid = Regex("\"pid\"\\s*:\\s*(\\d+)").find(content)?.groupValues?.get(1)?.toLongOrNull()
-            status !in setOf(null, "stopped", "stopped-unexpectedly") && pid != null &&
-                ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
-        }.getOrDefault(false)
+            val version = Regex("\"devServerVersion\"\\s*:\\s*\"([^\"]+)\"")
+                .find(content)?.groupValues?.get(1)
+            ActiveSession(
+                version,
+                status !in setOf(null, "stopped", "stopped-unexpectedly") && pid != null &&
+                    ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
+            )
+        }.getOrNull()
     }
+
+    private data class ActiveSession(val devServerVersion: String?, val active: Boolean)
 
     private fun launchAttached(command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome): Int {
         val bootstrapLog = projectDirectory.resolve(".fluxzero/dev/bootstrap.log")

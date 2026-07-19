@@ -3,20 +3,15 @@ package host.flux.maven
 import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevServerLauncher
-import host.flux.dev.FluxzeroProjectVersion
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugin.MojoFailureException
 import org.apache.maven.plugins.annotations.Mojo
 import org.apache.maven.plugins.annotations.Parameter
-import org.apache.maven.project.MavenProject
 import java.io.File
 
 @Mojo(name = "dev", aggregator = true, threadSafe = false)
 class DevMojo : AbstractMojo() {
-    @Parameter(defaultValue = "\${project}", readonly = true)
-    private lateinit var project: MavenProject
-
     @Parameter(defaultValue = "\${session.executionRootDirectory}", readonly = true)
     private lateinit var projectDir: File
 
@@ -99,8 +94,6 @@ class DevMojo : AbstractMojo() {
         }
         val root = projectDir.toPath().toAbsolutePath().normalize()
         val version = devServerVersion?.takeIf { it.isNotBlank() }
-            ?: configuredProjectVersion()
-            ?: FluxzeroProjectVersion.detect(root)
         val arguments = buildList {
             addOption("--project-dir", root.toString())
             addOption("--main-class", devMainClass)
@@ -137,18 +130,6 @@ class DevMojo : AbstractMojo() {
         } catch (e: Exception) {
             throw MojoExecutionException("Failed to start Fluxzero dev environment", e)
         }
-    }
-
-    private fun configuredProjectVersion(): String? {
-        project.properties.getProperty("fluxzero.version")?.takeIf { it.isNotBlank() }?.let { return it }
-        project.properties.getProperty("fluxzero-sdk.version")?.takeIf { it.isNotBlank() }?.let { return it }
-        return (project.dependencies + project.dependencyManagement?.dependencies.orEmpty())
-            .firstOrNull {
-                it.groupId == "io.fluxzero" &&
-                    it.artifactId in setOf("dev-server", "fluxzero-bom", "sdk", "fluxzero-sdk")
-            }
-            ?.version
-            ?.takeIf { it.isNotBlank() }
     }
 
     private fun MutableList<String>.addFlag(name: String, enabled: Boolean) {

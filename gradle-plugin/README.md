@@ -77,7 +77,7 @@ fluxzero {
 
 | Setting | Gradle property | Default |
 |---------|-----------------|---------|
-| `serverVersion` | explicit DSL or `FLUXZERO_DEV_SERVER_VERSION` | detected SDK version |
+| `serverVersion` | explicit DSL or `FLUXZERO_DEV_SERVER_VERSION` | active session or newest stable `1.x` release |
 | `mainClass` | `fluxzero.dev.mainClass` | auto-detected |
 | `applicationName` | `fluxzero.dev.applicationName` | project name |
 | `applications` | `fluxzero.dev.applications` (comma-separated) | all discovered apps |

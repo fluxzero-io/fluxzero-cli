@@ -42,7 +42,7 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @get:Input @get:Optional abstract val debounceMillis: Property<Long>
     @get:Input abstract val background: Property<Boolean>
 
-    @Option(option = "dev-server-version", description = "Fluxzero dev-server artifact version.")
+    @Option(option = "dev-server-version", description = "Fluxzero dev-server artifact version override.")
     fun devServerVersionOption(value: String) = serverVersion.set(value)
 
     @Option(option = "main-class", description = "Application main class override; auto-detected by default.")

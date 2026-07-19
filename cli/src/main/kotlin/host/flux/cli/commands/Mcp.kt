@@ -21,7 +21,7 @@ class Mcp(
         .default(Path.of(""))
     private val devServerVersion by option(
         "--dev-server-version",
-        help = "Dev-server artifact version. Defaults to FLUXZERO_DEV_SERVER_VERSION or the project Fluxzero version."
+        help = "Dev-server artifact version override. Defaults to the active session or latest compatible release."
     )
 
     override fun run() {
