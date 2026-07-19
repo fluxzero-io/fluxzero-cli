@@ -21,20 +21,20 @@ class DevServerVersionResolverTest {
 
     @Test
     fun `uses cached compatible release when metadata is unavailable`() {
-        val cache = projectDirectory.resolve(".fluxzero/dev/launcher/latest-major-1.txt")
+        val cache = projectDirectory.resolve("latest-major-1.txt")
         Files.createDirectories(cache.parent)
         Files.writeString(cache, "1.3.7")
         val messages = mutableListOf<String>()
-        val resolver = DevServerVersionResolver({ error("offline") }, messages::add)
+        val resolver = DevServerVersionResolver({ error("offline") }, projectDirectory, messages::add)
 
-        assertEquals("1.3.7", resolver.latestCompatible(projectDirectory))
+        assertEquals("1.3.7", resolver.latestCompatible())
         assertTrue(messages.single().contains("cached version 1.3.7"))
     }
 
     @Test
     fun `fails clearly without metadata or compatible cache`() {
         val error = assertFailsWith<IllegalStateException> {
-            DevServerVersionResolver({ error("offline") }) { }.latestCompatible(projectDirectory)
+            DevServerVersionResolver({ error("offline") }, projectDirectory) { }.latestCompatible()
         }
 
         assertTrue(error.message.orEmpty().contains("--dev-server-version"))

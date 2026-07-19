@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -82,26 +83,24 @@ class DevServerLauncherTest {
 
     @Test
     fun `new session resolves the latest compatible stable release`() {
-        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
-        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
-        val executor = CommandExecutor { command, _, _ ->
-            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
-                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
-            }
-            0
-        }
+        val executor = CommandExecutor { _, _, _ -> 0 }
         val resolver = DevServerVersionResolver({
             "<metadata><versioning><versions><version>1.6.2</version></versions></versioning></metadata>"
+        }, projectDirectory.resolve("metadata-cache")) { }
+        val bytes = "dev-server".encodeToByteArray()
+        val artifacts = DevServerArtifactCache(projectDirectory.resolve("artifact-cache"), { uri ->
+            if (uri.toString().endsWith(".sha256")) sha256(bytes).encodeToByteArray() else bytes
         }) { }
+        val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
 
-        DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+        DevServerLauncher(
+            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
+        ) { }.launch(
             DevLaunchRequest(projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("status"))
         )
 
-        assertTrue(
-            Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/pom.xml"))
-                .contains("<version>1.6.2</version>")
-        )
+        assertEquals("1.6.2", Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/version")))
+        assertEquals("1.6.2", classpathResolver.resolvedVersion(projectDirectory))
     }
 
     @Test
@@ -159,7 +158,7 @@ class DevServerLauncherTest {
         Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
         Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
         Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
-                          """{"status":"running","pid":${ProcessHandle.current().pid()},"devServerVersion":"1.2.3"}""")
+                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
         val commands = mutableListOf<Invocation>()
         val executor = object : CommandExecutor {
             override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
@@ -184,14 +183,14 @@ class DevServerLauncherTest {
     }
 
     @Test
-    fun `control action uses version recorded by active session`() {
+    fun `control action uses version pinned by active launcher`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
         Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
         Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
-                          """{"status":"running","pid":${ProcessHandle.current().pid()},"devServerVersion":"1.2.3"}""")
+                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
         val commands = mutableListOf<List<String>>()
         val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
         val resolver = DevServerVersionResolver({ error("an active session must not check for updates") }) { }
@@ -581,6 +580,9 @@ class DevServerLauncherTest {
         val workingDirectory: Path,
         val outputMode: OutputMode
     )
+
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+        .digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun assertCleanStop(messages: List<String>) {
         val stopping = messages.indexOfFirst { it.contains("Stopping Fluxzero dev server") }

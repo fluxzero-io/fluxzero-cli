@@ -20,12 +20,14 @@ internal const val SUPPORTED_DEV_SERVER_MAJOR = 1
 
 class DevServerVersionResolver(
     private val metadataLoader: () -> String = { downloadMetadata() },
+    private val cacheDirectory: Path = defaultDevServerCacheDirectory(),
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) {
-    fun latestCompatible(projectDirectory: Path): String {
-        val cache = projectDirectory.resolve(
-            ".fluxzero/dev/launcher/latest-major-$SUPPORTED_DEV_SERVER_MAJOR.txt"
-        )
+    constructor(metadataLoader: () -> String, messageSink: (String) -> Unit) :
+        this(metadataLoader, defaultDevServerCacheDirectory(), messageSink)
+
+    fun latestCompatible(): String {
+        val cache = cacheDirectory.resolve("latest-major-$SUPPORTED_DEV_SERVER_MAJOR.txt")
         return try {
             latestCompatible(metadataLoader(), SUPPORTED_DEV_SERVER_MAJOR).also { version ->
                 Files.createDirectories(cache.parent)
@@ -103,20 +105,20 @@ class DevServerVersionResolver(
             return response.body()
         }
     }
+}
 
-    private data class StableVersion(val value: String, val major: Int, val minor: Int, val patch: Int) :
-        Comparable<StableVersion> {
-        override fun compareTo(other: StableVersion): Int =
-            compareValuesBy(this, other, StableVersion::major, StableVersion::minor, StableVersion::patch)
+internal data class StableVersion(val value: String, val major: Int, val minor: Int, val patch: Int) :
+    Comparable<StableVersion> {
+    override fun compareTo(other: StableVersion): Int =
+        compareValuesBy(this, other, StableVersion::major, StableVersion::minor, StableVersion::patch)
 
-        companion object {
-            private val pattern = Regex("(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)")
+    companion object {
+        private val pattern = Regex("(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)")
 
-            fun parse(value: String): StableVersion? {
-                val match = pattern.matchEntire(value) ?: return null
-                return StableVersion(value, match.groupValues[1].toInt(), match.groupValues[2].toInt(),
-                                     match.groupValues[3].toInt())
-            }
+        fun parse(value: String): StableVersion? {
+            val match = pattern.matchEntire(value) ?: return null
+            return StableVersion(value, match.groupValues[1].toInt(), match.groupValues[2].toInt(),
+                                 match.groupValues[3].toInt())
         }
     }
 }

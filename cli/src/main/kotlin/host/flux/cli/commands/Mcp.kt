@@ -16,12 +16,12 @@ class Mcp(
 ) : CliktCommand() {
     override fun help(context: Context): String = "Connect stdio MCP to the active Fluxzero dev environment"
 
-    private val projectDirectory by option("--project-dir", "--dir", help = "Maven project directory.")
+    private val projectDirectory by option("--project-dir", "--dir", help = "Fluxzero project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)
         .default(Path.of(""))
     private val devServerVersion by option(
         "--dev-server-version",
-        help = "Dev-server artifact version override. Defaults to the active session or latest compatible release."
+        help = "Dev-server artifact version override. Defaults to the active project pin or latest stable 1.x release."
     )
 
     override fun run() {

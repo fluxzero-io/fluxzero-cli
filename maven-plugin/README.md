@@ -56,7 +56,7 @@ only one session can run per project.
 
 | Setting | Command-line property | Default |
 |---------|-----------------------|---------|
-| Dev-server version | `fluxzero.dev.serverVersion` | active session or newest stable `1.x` release |
+| Dev-server version | `fluxzero.dev.serverVersion` | active project pin or newest stable `1.x` release |
 | Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
 | Application name | `fluxzero.dev.applicationName` | Maven artifact id |
 | Applications/configurations | `fluxzero.dev.applications` | all discovered applications |
@@ -69,6 +69,8 @@ only one session can run per project.
 | Background tests | `fluxzero.dev.testsEnabled` | `true` |
 | Fast compiler | `fluxzero.dev.fastCompiler` | `false` |
 | Frontend command | `fluxzero.dev.frontendCommand` | none |
+| Frontend directory | `fluxzero.dev.frontendDirectory` | project root |
+| Frontend setup command | `fluxzero.dev.frontendSetupCommand` | none |
 | External frontend URL | `fluxzero.dev.frontendUrl` | none |
 | Frontend enabled | `fluxzero.dev.frontendEnabled` | `true` |
 | Startup timeout | `fluxzero.dev.startupTimeoutMillis` | `20000` |

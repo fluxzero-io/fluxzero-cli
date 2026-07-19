@@ -6,15 +6,13 @@ import java.nio.file.StandardCopyOption
 
 class DevServerClasspathResolver(
     private val executor: CommandExecutor,
+    private val stableArtifacts: DevServerArtifactCache = DevServerArtifactCache(),
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) {
+    constructor(executor: CommandExecutor, messageSink: (String) -> Unit) :
+        this(executor, DevServerArtifactCache(messageSink = messageSink), messageSink)
+
     fun resolve(projectDirectory: Path, version: String, reuseSnapshotCache: Boolean = false): String {
-        val maven = Files.isRegularFile(projectDirectory.resolve("pom.xml"))
-        val gradle = Files.isRegularFile(projectDirectory.resolve("build.gradle")) ||
-            Files.isRegularFile(projectDirectory.resolve("build.gradle.kts")) ||
-            Files.isRegularFile(projectDirectory.resolve("settings.gradle")) ||
-            Files.isRegularFile(projectDirectory.resolve("settings.gradle.kts"))
-        require(maven || gradle) { "No Maven or Gradle build found in $projectDirectory." }
         val launcherDirectory = projectDirectory.resolve(".fluxzero/dev/launcher")
         val classpathFile = launcherDirectory.resolve("classpath.txt")
         val versionFile = launcherDirectory.resolve("version")
@@ -22,6 +20,20 @@ class DevServerClasspathResolver(
             && isValidCache(classpathFile, versionFile, version)) {
             return Files.readString(classpathFile).trim()
         }
+
+        if (StableVersion.parse(version) != null) {
+            val artifact = stableArtifacts.resolve(version).toAbsolutePath().normalize().toString()
+            writeAtomically(classpathFile, artifact)
+            writeAtomically(versionFile, version)
+            return artifact
+        }
+
+        val maven = Files.isRegularFile(projectDirectory.resolve("pom.xml"))
+        val gradle = Files.isRegularFile(projectDirectory.resolve("build.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("build.gradle.kts")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle.kts"))
+        require(maven || gradle) { "No Maven or Gradle build found in $projectDirectory." }
 
         Files.createDirectories(launcherDirectory)
         Files.deleteIfExists(classpathFile)
@@ -55,11 +67,20 @@ class DevServerClasspathResolver(
             "Could not resolve Fluxzero dev server $version (${if (maven) "Maven" else "Gradle"} exit code $exitCode)."
         }
         check(Files.isRegularFile(classpathFile) && Files.readString(classpathFile).isNotBlank()) {
-            "Maven did not produce a runtime classpath for Fluxzero dev server $version."
+            "${if (maven) "Maven" else "Gradle"} did not produce a runtime classpath for Fluxzero dev server $version."
         }
         writeAtomically(versionFile, version)
         messageSink("")
         return Files.readString(classpathFile).trim()
+    }
+
+    fun resolvedVersion(projectDirectory: Path): String? {
+        val launcherDirectory = projectDirectory.resolve(".fluxzero/dev/launcher")
+        val classpathFile = launcherDirectory.resolve("classpath.txt")
+        val versionFile = launcherDirectory.resolve("version")
+        if (!Files.isRegularFile(versionFile)) return null
+        val version = Files.readString(versionFile).trim()
+        return version.takeIf { it.isNotBlank() && isValidCache(classpathFile, versionFile, version) }
     }
 
     internal fun mavenCommand(projectDirectory: Path): List<String> {
@@ -78,7 +99,10 @@ class DevServerClasspathResolver(
         if (!Files.isRegularFile(classpathFile) || !Files.isRegularFile(versionFile)) return false
         if (Files.readString(versionFile).trim() != version) return false
         val entries = Files.readString(classpathFile).trim().split(System.getProperty("path.separator"))
-        return entries.isNotEmpty() && entries.all { it.isNotBlank() && Files.exists(Path.of(it)) }
+        return entries.isNotEmpty() && entries.all {
+            it.isNotBlank() && Files.exists(Path.of(it)) &&
+                (StableVersion.parse(version) == null || stableArtifacts.isUsablePinnedArtifact(version, Path.of(it)))
+        }
     }
 
     private fun writeAtomically(target: Path, content: String) {

@@ -77,7 +77,7 @@ fluxzero {
 
 | Setting | Gradle property | Default |
 |---------|-----------------|---------|
-| `serverVersion` | explicit DSL or `FLUXZERO_DEV_SERVER_VERSION` | active session or newest stable `1.x` release |
+| `serverVersion` | explicit DSL or `FLUXZERO_DEV_SERVER_VERSION` | active project pin or newest stable `1.x` release |
 | `mainClass` | `fluxzero.dev.mainClass` | auto-detected |
 | `applicationName` | `fluxzero.dev.applicationName` | project name |
 | `applications` | `fluxzero.dev.applications` (comma-separated) | all discovered apps |
@@ -90,6 +90,8 @@ fluxzero {
 | `testsEnabled` | `fluxzero.dev.testsEnabled` | `true` |
 | `fastCompiler` | `fluxzero.dev.fastCompiler` | `false`; Maven-only optimization |
 | `frontendCommand` / `frontendUrl` | `fluxzero.dev.frontendCommand` / `fluxzero.dev.frontendUrl` | none |
+| `frontendDirectory` | `fluxzero.dev.frontendDirectory` | project root |
+| `frontendSetupCommand` | `fluxzero.dev.frontendSetupCommand` | none |
 | `frontendEnabled` | `fluxzero.dev.frontendEnabled` | `true` |
 | `backendPaths` / `appArgs` | comma-separated properties with the same names | empty |
 | `startupTimeoutMillis` | `fluxzero.dev.startupTimeoutMillis` | `20000` |

@@ -123,9 +123,9 @@ fz upgrade
 
 ### Local development
 
-`fz dev` (or `fluxzero dev`) starts the Fluxzero dev server version that matches the SDK version in a Maven or Gradle project. It supervises the
-local runtime, proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP
-endpoint. Ports and credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
+`fz dev` (or `fluxzero dev`) starts the newest compatible stable Fluxzero dev server. It supervises the local runtime,
+proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP endpoint. Ports and
+credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
 
 The application main class is detected from compiled Java or Kotlin classes. Use `--main-class` only when a project
 contains multiple executable entrypoints and the intended one is ambiguous.
@@ -247,8 +247,9 @@ the project directory and reads the dynamic endpoint and token without exposing 
 fz mcp --project-dir /path/to/project
 ```
 
-`fz dev` resolves the newest stable dev-server `1.x` release for a new environment and records the concrete version
-in the session. Attach, status, logs, stop, and MCP commands keep using that session version. Set
+`fz dev` resolves the newest stable dev-server `1.x` release for a new environment. The verified standalone JAR is
+cached under `~/.fluxzero/cache/dev-server`, while `.fluxzero/dev/launcher` pins the concrete version used by the
+project. Attach, status, logs, stop, and MCP commands keep using that pinned version. Set
 `FLUXZERO_DEV_SERVER_VERSION` or pass `--dev-server-version` only when testing a specific local or prerelease build.
 
 Project-local launchers provide the same environment without a globally installed CLI:
@@ -673,7 +674,7 @@ For detailed documentation, troubleshooting, and advanced examples:
 ### Building the CLI
 
 ```bash
-./gradlew build shadowJar
+./gradlew build :cli:shadowJar
 ```
 
 ### Building Native Executable
@@ -685,10 +686,10 @@ Requires GraalVM with native-image support:
 jenv local oracle64-21.0.1
 
 # Build native executable
-./gradlew nativeCompile
+./gradlew :cli:nativeCompile
 
 # Test the native executable
-./build/native/nativeCompile/flux version
+./cli/build/native/nativeCompile/flux version
 ```
 
 ### Running
@@ -696,7 +697,7 @@ jenv local oracle64-21.0.1
 ```bash
 ./gradlew run
 # or
-java -jar build/libs/fluxzero-cli-dev-all.jar version
+java -jar cli/build/libs/fluxzero-cli-dev.jar version
 ```
 
 ### Testing

@@ -20,21 +20,26 @@ class DevServerLauncher(
     executor: CommandExecutor? = null,
     private val environment: Map<String, String> = System.getenv(),
     versionResolver: DevServerVersionResolver? = null,
+    classpathResolver: DevServerClasspathResolver? = null,
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) : DevLauncher {
     private val executor = executor ?: InheritedIoCommandExecutor()
     private val versionResolver = versionResolver ?: DevServerVersionResolver(messageSink = messageSink)
+    private val classpathResolver = classpathResolver ?: DevServerClasspathResolver(
+        this.executor, messageSink = messageSink
+    )
 
     override fun launch(request: DevLaunchRequest): Int {
         val projectDirectory = request.projectDirectory.toAbsolutePath().normalize()
         val activeSession = activeSession(projectDirectory)
         val requestedVersion = request.devServerVersion?.takeIf { it.isNotBlank() }
             ?: environment["FLUXZERO_DEV_SERVER_VERSION"]?.takeIf { it.isNotBlank() }
-        val sessionVersion = activeSession?.devServerVersion?.takeIf { it.isNotBlank() }
+        val pinnedVersion = classpathResolver.resolvedVersion(projectDirectory)
         val version = when {
-            sessionVersion != null && (request.target != DevLaunchTarget.SERVER || activeSession.active) -> sessionVersion
+            pinnedVersion != null && (request.target != DevLaunchTarget.SERVER || activeSession?.active == true) ->
+                pinnedVersion
             requestedVersion != null -> requestedVersion
-            else -> versionResolver.latestCompatible(projectDirectory)
+            else -> versionResolver.latestCompatible()
         }
         require(!request.detached || request.target == DevLaunchTarget.SERVER) {
             "Only the Fluxzero dev server can be started in the background"
@@ -44,9 +49,8 @@ class DevServerLauncher(
         }
         return executor.supervise(shutdown::begin, shutdown::complete) {
             try {
-                val resolver = DevServerClasspathResolver(executor, messageSink)
                 val likelyActive = request.target == DevLaunchTarget.SERVER && activeSession?.active == true
-                var classpath = resolver.resolve(
+                var classpath = classpathResolver.resolve(
                     projectDirectory, version,
                     reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive
                 )
@@ -54,7 +58,7 @@ class DevServerLauncher(
                 if (request.target == DevLaunchTarget.SERVER) {
                     var active = likelyActive && probe(command, projectDirectory)
                     if (likelyActive && !active) {
-                        classpath = resolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
+                        classpath = classpathResolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
                         command = command(classpath, request)
                         active = false
                     }
@@ -136,17 +140,14 @@ class DevServerLauncher(
             val content = Files.readString(sessionFile)
             val status = Regex("\"status\"\\s*:\\s*\"([^\"]+)\"").find(content)?.groupValues?.get(1)
             val pid = Regex("\"pid\"\\s*:\\s*(\\d+)").find(content)?.groupValues?.get(1)?.toLongOrNull()
-            val version = Regex("\"devServerVersion\"\\s*:\\s*\"([^\"]+)\"")
-                .find(content)?.groupValues?.get(1)
             ActiveSession(
-                version,
                 status !in setOf(null, "stopped", "stopped-unexpectedly") && pid != null &&
                     ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
             )
         }.getOrNull()
     }
 
-    private data class ActiveSession(val devServerVersion: String?, val active: Boolean)
+    private data class ActiveSession(val active: Boolean)
 
     private fun launchAttached(command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome): Int {
         val bootstrapLog = projectDirectory.resolve(".fluxzero/dev/bootstrap.log")
