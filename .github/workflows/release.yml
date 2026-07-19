@@ -260,6 +260,10 @@ jobs:
           cp native-artifacts/flux-macos-arm64/flux build/native-releases/flux-macos-arm64
           cp native-artifacts/flux-windows-amd64/flux.exe build/native-releases/flux-windows-amd64.exe
           chmod +x build/native-releases/flux-*
+          mkdir -p build/winget
+          cp build/native-releases/flux-windows-amd64.exe build/winget/fz.exe
+          zip -j -9 build/native-releases/flux-windows-amd64.zip build/winget/fz.exe
+          unzip -t build/native-releases/flux-windows-amd64.zip
 
       - name: Verify install scripts
         run: |
@@ -426,5 +430,13 @@ jobs:
             build/native-releases/flux-macos-amd64
             build/native-releases/flux-macos-arm64
             build/native-releases/flux-windows-amd64.exe
+            build/native-releases/flux-windows-amd64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-package-managers:
+    needs: [version, release]
+    uses: ./.github/workflows/publish-package-managers.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit

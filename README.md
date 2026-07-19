@@ -4,7 +4,21 @@ A command-line interface for [Flux](https://fluxcapacitor.io/) that helps you sc
 
 ## Installation
 
-### Option 1: Automated Installation (Recommended)
+### Option 1: Package Managers (Recommended)
+
+**macOS or Linux with Homebrew:**
+```bash
+brew install fluxzero-io/tap/fluxzero
+```
+
+**Windows with WinGet:**
+```powershell
+winget install --exact --id Fluxzero.FluxzeroCLI
+```
+
+Package-manager installations receive normal `brew upgrade` and `winget upgrade` support.
+
+### Option 2: Automated Installation
 
 **Unix/Linux/macOS:**
 ```bash
@@ -23,7 +37,7 @@ The installer will:
 - 🔗 **Add to PATH** (optional - you'll be prompted)
 - ✅ **Verify installation** with test commands
 
-### Option 2: Manual Native Executable Download
+### Option 3: Manual Native Executable Download
 
 Download the native executable for your platform from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases):
 
@@ -45,7 +59,7 @@ sudo mv fz /usr/local/bin/fz
 - 🚀 **Instant execution** (no JVM warm-up time)
 - 🌍 **Cross-platform** (Linux, macOS, Windows)
 
-### Option 3: Fluxzero Launchpad
+### Option 4: Fluxzero Launchpad
 
 Fluxzero also ships a macOS app, Fluxzero Launchpad, for generating projects locally and opening them in coding agents.
 
@@ -63,7 +77,7 @@ of generated projects. Installed macOS builds register experimental Fluxzero URL
 - `fluxzero://open?path=...&prompt=...&agent=codex|claude|cursor|finder|none` opens an existing project directly.
 - `fluxzero://create?name=...&prompt=...&agent=codex|claude|cursor|finder|none` creates a project with defaults and opens it directly.
 
-### Option 4: Manual JAR Installation (Legacy)
+### Option 5: Manual JAR Installation (Legacy)
 
 1. Download the latest `fluxzero-cli.jar` from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases)
 2. Run it with Java: `java -jar fluxzero-cli.jar`
@@ -725,6 +739,7 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 
 - **Native Build Workflow**: Builds native executables for Linux, macOS, and Windows with integration testing
 - **Release Workflow**: Auto-versioning with git tags and comprehensive artifact releases
+- **Package-manager publishing**: Opens tested Homebrew formula updates and submits WinGet manifests from immutable release assets without rebuilding the CLI
 - **Automated testing**: 
   - Unit tests with MockK
   - Integration tests (CLI functionality + project generation)
@@ -732,12 +747,18 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
   - Cross-platform build verification
 - **Release Artifacts**:
   - Native executables for all platforms
+  - WinGet-compatible portable Windows archive
   - JAR for cross-platform compatibility
   - Installation and uninstallation scripts
 
+Package-manager publishing requires the organization secrets `FLUXZERO_BOT_APP_ID` and
+`FLUXZERO_BOT_PRIVATE_KEY` for the `fluxzero-io/homebrew-tap` repository, plus a
+`WINGET_CREATE_GITHUB_TOKEN` classic PAT with `public_repo` scope from the account that has accepted
+Microsoft's contributor license agreement.
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the EUPL-1.2 - see the LICENSE file for details.
 
 ## Contributing
 
