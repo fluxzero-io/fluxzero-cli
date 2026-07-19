@@ -81,6 +81,12 @@ jobs:
             test -x "$OUTPUT_DIRECTORY/flux"
           fi
 
+      - name: Set up dev server Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
       - name: Verify native image
         shell: bash
         run: |
@@ -181,7 +187,18 @@ jobs:
           fi
           mkdir -p dev-smoke
           printf '<project><modelVersion>4.0.0</modelVersion><groupId>test</groupId><artifactId>dev-smoke</artifactId><version>1</version></project>\n' > dev-smoke/pom.xml
-          trap '"$CLI" dev stop --project-dir dev-smoke --force >/dev/null 2>&1 || true' EXIT
+          cleanup_dev_smoke() {
+            status=$?
+            trap - EXIT
+            if [[ $status -ne 0 ]]; then
+              echo "Dev environment lifecycle failed; bootstrap diagnostics follow."
+              cat dev-smoke/.fluxzero/dev/bootstrap.log 2>/dev/null || true
+              cat dev-smoke/.fluxzero/dev/diagnostics.json 2>/dev/null || true
+            fi
+            "$CLI" dev stop --project-dir dev-smoke --force >/dev/null 2>&1 || true
+            exit "$status"
+          }
+          trap cleanup_dev_smoke EXIT
           "$CLI" dev --project-dir dev-smoke --background --no-compile-on-start --no-tests --no-frontend
           "$CLI" dev status --project-dir dev-smoke
           "$CLI" dev stop --project-dir dev-smoke --force
