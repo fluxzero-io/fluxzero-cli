@@ -58,8 +58,13 @@ jobs:
           fi
           CLI_JAR="build/cli/build/libs/${{ inputs.jar-name }}"
           OUTPUT_DIRECTORY="cli/build/native/nativeCompile"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            NATIVE_IMAGE="$(cygpath -u "$JAVA_HOME")/bin/native-image.cmd"
+          else
+            NATIVE_IMAGE="$JAVA_HOME/bin/native-image"
+          fi
           mkdir -p "$OUTPUT_DIRECTORY"
-          native-image \
+          "$NATIVE_IMAGE" \
             --no-fallback \
             --install-exit-handlers \
             --enable-url-protocols=https \
