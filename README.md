@@ -414,8 +414,9 @@ FluxZero CLI installs to:
 
 ## Requirements
 
-- **Native executables**: No requirements (self-contained)
-- **JAR version**: Java 21 or higher
+- **Native executables**: Self-contained for regular CLI commands
+- **Development server**: Java 25 or higher available through `JAVA_HOME` or `PATH`
+- **JAR version**: Java 21 or higher for regular CLI commands; `fz dev` has the development-server requirement above
 
 ## Templates
 
