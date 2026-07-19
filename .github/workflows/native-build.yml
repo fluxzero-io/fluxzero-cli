@@ -73,8 +73,13 @@ jobs:
             --initialize-at-build-time=kotlin \
             --initialize-at-run-time=org.jline \
             -H:+AddAllCharsets \
-            -o "$OUTPUT_DIRECTORY/flux" \
-            -jar "$CLI_JAR"
+            -jar "$CLI_JAR" \
+            "$OUTPUT_DIRECTORY/flux"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test -f "$OUTPUT_DIRECTORY/flux.exe"
+          else
+            test -x "$OUTPUT_DIRECTORY/flux"
+          fi
 
       - name: Verify native image
         shell: bash
