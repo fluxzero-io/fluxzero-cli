@@ -18,7 +18,7 @@ dependencies {
     shade(project(":project-files"))
     shade(project(":dev-launcher"))
     compileOnly(project(":project-files"))
-    implementation(project(":dev-launcher"))
+    compileOnly(project(":dev-launcher"))
 
     implementation(gradleApi())
     implementation(gradleKotlinDsl())
@@ -106,6 +106,18 @@ mavenPublishing {
     }
 }
 
+val verifyPublishedPom by tasks.registering {
+    dependsOn(tasks.named("generatePomFileForPluginMavenPublication"))
+    val pom = layout.buildDirectory.file("publications/pluginMaven/pom-default.xml")
+    inputs.file(pom)
+    doLast {
+        val content = pom.get().asFile.readText()
+        check("<groupId>host.flux</groupId>" !in content) {
+            "Published Gradle plugin POM must not expose shaded reactor dependencies"
+        }
+    }
+}
+
 // Ensure all outgoing variants use the shadow JAR instead of the plain JAR
 listOf(configurations.apiElements, configurations.runtimeElements).forEach {
     it.configure {
@@ -130,6 +142,7 @@ val functionalTestTask = tasks.register<Test>("functionalTest") {
 
 tasks.check {
     dependsOn(functionalTestTask)
+    dependsOn(verifyPublishedPom)
 }
 
 tasks.test {
