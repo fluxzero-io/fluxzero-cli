@@ -19,3 +19,6 @@ jobs:
 
       - name: Build and test
         run: ./gradlew build
+
+      - name: Test release versioning
+        run: scripts/test-determine-release-version.sh

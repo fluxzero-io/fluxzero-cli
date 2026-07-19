@@ -3,41 +3,17 @@ name: Native Image Build
 on:
   workflow_call:
     inputs:
-      version:
-        description: 'Version to build (e.g., 1.2.3)'
-        required: false
-        type: string
-        default: 'dev'
       jar-name:
         description: 'JAR filename to use for native build'
         required: false
         type: string
-        default: 'fluxzero-cli-dev-all.jar'
+        default: 'fluxzero-cli-dev.jar'
       targets-json:
         description: 'JSON matrix for native build targets'
         required: false
         type: string
         default: >-
           {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to build (e.g., 1.2.3)'
-        required: false
-        type: string
-        default: 'dev'
-      jar-name:
-        description: 'JAR filename to use for native build'
-        required: false
-        type: string
-        default: 'fluxzero-cli-dev-all.jar'
-      targets-json:
-        description: 'JSON matrix for native build targets'
-        required: false
-        type: string
-        default: >-
-          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
-
 jobs:
   native-build:
     name: Build Native Image - ${{ matrix.os }}
@@ -57,13 +33,6 @@ jobs:
           name: jar-artifact
           path: build/
 
-      - name: Download templates cache
-        uses: actions/download-artifact@v7
-        with:
-          name: templates-cache
-          path: templates/build/templates-snapshot/
-        continue-on-error: true
-
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
@@ -73,9 +42,6 @@ jobs:
           java-version: '21'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
 
       - name: Build native image
         timeout-minutes: 15
@@ -90,11 +56,20 @@ jobs:
           else
             echo "Host: $(uname -m), CPU cores: $(nproc), Memory: $(free -h | head -2)"
           fi
-          # Native compilation needs to compile classes but can reuse cached artifacts
-          # Skip tests since we already ran them, but allow compilation for native-image
-          ./gradlew :cli:nativeCompile -x test --info -PappVersion=${{ inputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLI_JAR="build/cli/build/libs/${{ inputs.jar-name }}"
+          OUTPUT_DIRECTORY="cli/build/native/nativeCompile"
+          mkdir -p "$OUTPUT_DIRECTORY"
+          native-image \
+            --no-fallback \
+            --install-exit-handlers \
+            --enable-url-protocols=https \
+            --enable-native-access=ALL-UNNAMED \
+            --report-unsupported-elements-at-runtime \
+            --initialize-at-build-time=kotlin \
+            --initialize-at-run-time=org.jline \
+            -H:+AddAllCharsets \
+            -o "$OUTPUT_DIRECTORY/flux" \
+            -jar "$CLI_JAR"
 
       - name: Verify native image
         shell: bash
@@ -186,13 +161,26 @@ jobs:
 
           echo "Integration test successful - example project generated correctly!"
 
+      - name: Integration test - Dev environment lifecycle
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            CLI="$(pwd)/cli/build/native/nativeCompile/flux.exe"
+          else
+            CLI="$(pwd)/cli/build/native/nativeCompile/flux"
+          fi
+          mkdir -p dev-smoke
+          printf '<project><modelVersion>4.0.0</modelVersion><groupId>test</groupId><artifactId>dev-smoke</artifactId><version>1</version></project>\n' > dev-smoke/pom.xml
+          trap '"$CLI" dev stop --project-dir dev-smoke --force >/dev/null 2>&1 || true' EXIT
+          "$CLI" dev --project-dir dev-smoke --background --no-compile-on-start --no-tests --no-frontend
+          "$CLI" dev status --project-dir dev-smoke
+          "$CLI" dev stop --project-dir dev-smoke --force
+          trap - EXIT
+
       - name: Test installation script
         shell: bash
         run: |
           echo "Testing installation script with native binary..."
-          
-          # Generate scripts with correct version for testing
-          ./gradlew :cli:generateScripts -PappVersion=${{ inputs.version }}
           
           # Create a test home directory to avoid conflicts
           TEST_HOME=$(mktemp -d)
@@ -201,7 +189,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell script
             BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux.exe"
-            INSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/install.ps1"
+            INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.ps1"
             
             echo "Testing PowerShell installation script..."
             pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
@@ -231,7 +219,7 @@ jobs:
           else
             # Test bash script
             BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux"
-            INSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/install.sh"
+            INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.sh"
             
             echo "Testing bash installation script..."
             bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path
@@ -281,9 +269,6 @@ jobs:
         run: |
           echo "Testing uninstall script..."
           
-          # Generate scripts with correct version for testing  
-          ./gradlew :cli:generateScripts -PappVersion=${{ inputs.version }}
-          
           # Create a test home directory and install first
           TEST_HOME=$(mktemp -d)
           export HOME=$TEST_HOME
@@ -291,8 +276,8 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell scripts
             BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux.exe"
-            INSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/install.ps1"
-            UNINSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/uninstall.ps1"
+            INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.ps1"
+            UNINSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/uninstall.ps1"
             
             echo "Installing first..."
             pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
@@ -315,8 +300,8 @@ jobs:
           else
             # Test bash scripts
             BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux"
-            INSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/install.sh"
-            UNINSTALL_SCRIPT="$(pwd)/cli/build/release-scripts/uninstall.sh"
+            INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.sh"
+            UNINSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/uninstall.sh"
             
             echo "Installing first..."
             bash "$INSTALL_SCRIPT" --binary="$BINARY_PATH" --install-path

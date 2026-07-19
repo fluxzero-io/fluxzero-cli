@@ -1,4 +1,4 @@
-name: Auto Release and Version Bump
+name: Release
 
 on:
   repository_dispatch:
@@ -8,41 +8,30 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
   version:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
-      version: ${{ steps.tag_version.outputs.new_tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Bump version and push tag
-        id: tag_version
+      - name: Determine release version
+        id: version
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           git fetch --tags --force
-
-          latest_tag="$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
-          if [ -z "$latest_tag" ]; then
-            new_tag="0.0.1"
-          else
-            IFS=. read -r major minor patch <<< "$latest_tag"
-            new_tag="${major}.${minor}.$((patch + 1))"
-          fi
-
-          if git rev-parse -q --verify "refs/tags/${new_tag}" >/dev/null; then
-            echo "Tag ${new_tag} already exists" >&2
-            exit 1
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$new_tag"
-          git push origin "refs/tags/${new_tag}"
-          echo "new_tag=${new_tag}" >> "$GITHUB_OUTPUT"
+          scripts/determine-release-version.sh "$EVENT_NAME" "$RUN_ID" >> "$GITHUB_OUTPUT"
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -60,7 +49,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       - name: Build and test
-        run: ./gradlew build shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
+        run: ./gradlew build :cli:shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -76,14 +65,8 @@ jobs:
           timeout 30s bash -c '
             java -jar api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar &
             API_PID=$!
-            sleep 15
-            if curl -f http://localhost:8080/api/health; then
-              echo "API health check successful!"
-            else
-              echo "API health check failed!"
-              kill $API_PID 2>/dev/null || true
-              exit 1
-            fi
+            until curl -fsS http://localhost:8080/api/health; do sleep 0.5; done
+            echo "API health check successful!"
             kill $API_PID 2>/dev/null || true
           ' || {
             echo "API JAR test failed!"
@@ -100,14 +83,6 @@ jobs:
             api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
             cli/build/release-scripts/
 
-      - name: Upload templates cache
-        uses: actions/upload-artifact@v6
-        with:
-          name: templates-cache
-          path: templates/build/templates-snapshot/
-          retention-days: 1
-          include-hidden-files: true
-
   publish-plugins:
     runs-on: ubuntu-latest
     needs: [version, build-and-test, native-build-macos, native-build-cli]
@@ -122,21 +97,67 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       - name: Publish to Maven Central
+        id: publish
+        shell: bash
         run: |
+          version="${{ needs.version.outputs.version }}"
+          base="https://repo.maven.apache.org/maven2/io/fluxzero/tools"
+          maven_pom="$base/fluxzero-maven-plugin/$version/fluxzero-maven-plugin-$version.pom"
+          gradle_pom="$base/fluxzero-gradle-plugin/$version/fluxzero-gradle-plugin-$version.pom"
+          marker_pom="$base/gradle/plugin/io.fluxzero.tools.gradle.plugin.gradle.plugin/$version/io.fluxzero.tools.gradle.plugin.gradle.plugin-$version.pom"
+          existing=0
+          curl -fsS "$maven_pom" >/dev/null && existing=$((existing + 1)) || true
+          curl -fsS "$gradle_pom" >/dev/null && existing=$((existing + 1)) || true
+          curl -fsS "$marker_pom" >/dev/null && existing=$((existing + 1)) || true
+          if [[ "$existing" == "3" ]]; then
+            echo "Fluxzero plugins $version are already available from Maven Central."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$existing" != "0" ]]; then
+            echo "Fluxzero plugin release $version is only partially present in Maven Central; refusing an unsafe retry." >&2
+            exit 1
+          fi
           ./gradlew :maven-plugin:publishAndReleaseToMavenCentral \
                     :gradle-plugin:publishAndReleaseToMavenCentral \
-                    -PappVersion=${{ needs.version.outputs.version }}
+                    -PappVersion="$version"
+          echo "published=true" >> "$GITHUB_OUTPUT"
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
 
+      - name: Verify published plugins from clean clients
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          base="https://repo.maven.apache.org/maven2/io/fluxzero/tools"
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$base/fluxzero-maven-plugin/$version/fluxzero-maven-plugin-$version.pom" >/dev/null \
+               && curl -fsS "$base/fluxzero-gradle-plugin/$version/fluxzero-gradle-plugin-$version.pom" >/dev/null \
+               && curl -fsS "$base/gradle/plugin/io.fluxzero.tools.gradle.plugin.gradle.plugin/$version/io.fluxzero.tools.gradle.plugin.gradle.plugin-$version.pom" >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == "60" ]]; then
+              echo "Plugins $version did not become available from Maven Central within 20 minutes." >&2
+              exit 1
+            fi
+            sleep 20
+          done
+
+          mkdir -p build/plugin-smoke/maven build/plugin-smoke/gradle
+          printf '<project><modelVersion>4.0.0</modelVersion><groupId>test</groupId><artifactId>smoke</artifactId><version>1</version></project>\n' > build/plugin-smoke/maven/pom.xml
+          mvn -q -Dmaven.repo.local="$RUNNER_TEMP/maven-smoke" \
+            -f build/plugin-smoke/maven/pom.xml help:describe \
+            -Dplugin="io.fluxzero.tools:fluxzero-maven-plugin:$version" -Ddetail
+          printf 'plugins { id("io.fluxzero.tools.gradle.plugin") version "%s" }\n' "$version" > build/plugin-smoke/gradle/build.gradle.kts
+          ./gradlew -g "$RUNNER_TEMP/gradle-smoke" -p build/plugin-smoke/gradle help --refresh-dependencies
+
   native-build-macos:
     needs: [version, build-and-test]
     uses: ./.github/workflows/native-build.yml
     with:
-      version: ${{ needs.version.outputs.version }}
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
       targets-json: >-
         {"include":[{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"}]}
@@ -145,13 +166,43 @@ jobs:
     needs: [version, build-and-test]
     uses: ./.github/workflows/native-build.yml
     with:
-      version: ${{ needs.version.outputs.version }}
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
       targets-json: >-
         {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 
+  tag-release:
+    runs-on: ubuntu-latest
+    needs: [version, build-and-test, publish-plugins, native-build-macos, native-build-cli]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create verified release tag
+        shell: bash
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$version")"
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $version points to $tag_sha instead of $GITHUB_SHA." >&2
+              exit 1
+            fi
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$version" "$GITHUB_SHA" \
+            -m "Fluxzero CLI $version" \
+            -m "Release run: $GITHUB_RUN_ID"
+          git push origin "refs/tags/$version"
+
   macos-launchpad-build:
-    needs: [version, native-build-macos]
+    needs: [version, native-build-macos, tag-release]
     uses: ./.github/workflows/macos-launchpad-build.yml
     with:
       version: ${{ needs.version.outputs.version }}
@@ -159,7 +210,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build-macos, native-build-cli, macos-launchpad-build]
+    needs: [version, build-and-test, native-build-macos, native-build-cli, tag-release]
     permissions:
       contents: write
 
