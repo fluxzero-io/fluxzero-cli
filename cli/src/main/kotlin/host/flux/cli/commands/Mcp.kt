@@ -3,6 +3,7 @@ package host.flux.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import host.flux.dev.DevLaunchRequest
@@ -23,9 +24,21 @@ class Mcp(
         "--dev-server-version",
         help = "Dev-server artifact version override. Defaults to the active project pin or latest stable 1.x release."
     )
+    private val ensureDev by option(
+        "--ensure-dev",
+        help = "Start one background dev environment when this project does not already have an active session."
+    ).flag(default = false)
 
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
+        if (ensureDev) {
+            val startExitCode = launcher.launch(
+                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, detached = true)
+            )
+            check(startExitCode == 0) {
+                "Fluxzero dev environment could not be started (exit code $startExitCode)."
+            }
+        }
         val exitCode = launcher.launch(
             DevLaunchRequest(
                 root,

@@ -83,7 +83,7 @@ only one session can run per project.
 application flavor, 1Password-reference, and startup-command configuration belongs in tracked `.fluxzero/dev.yaml`;
 the Maven properties above are local or invocation-specific overrides.
 
-Agent integrations should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
+Agent plugins should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
 own stdout would corrupt the MCP protocol stream.
 
 ### `sync-project-files`

@@ -70,6 +70,23 @@ class DevTest {
     }
 
     @Test
+    fun `mcp command can ensure one background environment before connecting`() {
+        val requests = mutableListOf<DevLaunchRequest>()
+        val launcher = DevLauncher { captured -> requests += captured; 0 }
+
+        val result = Mcp(launcher).test(
+            listOf("--project-dir", projectDirectory.toString(), "--dev-server-version", "1-SNAPSHOT", "--ensure-dev")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(2, requests.size)
+        assertEquals(DevLaunchTarget.SERVER, requests[0].target)
+        assertTrue(requests[0].detached)
+        assertEquals(DevLaunchTarget.MCP_STDIO, requests[1].target)
+        assertEquals("1-SNAPSHOT", requests[1].devServerVersion)
+    }
+
+    @Test
     fun `forwards backend only override`() {
         var request: DevLaunchRequest? = null
         val launcher = DevLauncher { captured -> request = captured; 0 }
