@@ -241,7 +241,7 @@ Command-line options override environment variables, which override `dev.yaml`; 
 Unknown keys and unsupported config versions fail startup instead of being silently ignored.
 
 `fz mcp` or `fluxzero mcp` is intended as the stdio command in an agent's MCP configuration. It discovers the active environment from
-the project directory and reads the dynamic endpoint and token without exposing either in agent configuration. Agent integrations can
+the project directory and reads the dynamic endpoint and token without exposing either in agent configuration. Agent plugins can
 use `--ensure-dev` to start exactly one background environment when needed; an already active project session is reused:
 
 ```bash
