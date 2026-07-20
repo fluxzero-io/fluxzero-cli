@@ -25,10 +25,15 @@ open class DefaultInstallationService(
         .followRedirects(HttpClient.Redirect.ALWAYS)
         .build(),
     private val homeDir: Path = Paths.get(System.getProperty("user.home")),
-    private val updateService: UpdateService = UpdateService
+    private val updateService: UpdateService = UpdateService,
+    private val executablePath: Path? = ManagedPackageInstallation.currentExecutablePath(),
 ) : InstallationService {
 
     override fun install(): InstallResult {
+        ManagedPackageInstallation.detect(executablePath)?.let {
+            return InstallResult.ExternallyManaged(it.displayName, it.upgradeCommand)
+        }
+
         val latest = fetchLatestTag() ?: throw IllegalStateException(
             "Could not determine latest release. Please check your internet connection or try reinstalling using the installation script at https://fluxzero.io/docs/getting-started"
         )
