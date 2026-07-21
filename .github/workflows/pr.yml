@@ -22,3 +22,6 @@ jobs:
 
       - name: Test release versioning
         run: scripts/test-determine-release-version.sh
+
+      - name: Test Homebrew formula generation
+        run: scripts/test-render-homebrew-formula.sh

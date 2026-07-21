@@ -1,0 +1,180 @@
+name: Publish package managers
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Stable CLI release version to publish
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable CLI release version to publish
+        required: true
+        type: string
+
+concurrency:
+  group: package-managers-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  homebrew:
+    name: Submit Homebrew formula
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CLI
+        uses: actions/checkout@v6
+
+      - name: Download immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p build/package-managers/assets
+          gh release download "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir build/package-managers/assets \
+            --pattern flux-macos-arm64 \
+            --pattern flux-macos-amd64 \
+            --pattern flux-linux-amd64
+
+      - name: Render formula from release checksums
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          assets="$PWD/build/package-managers/assets"
+          arm_sha="$(sha256sum "$assets/flux-macos-arm64" | cut -d ' ' -f 1)"
+          intel_sha="$(sha256sum "$assets/flux-macos-amd64" | cut -d ' ' -f 1)"
+          linux_sha="$(sha256sum "$assets/flux-linux-amd64" | cut -d ' ' -f 1)"
+          scripts/render-homebrew-formula.sh \
+            "$VERSION" "$arm_sha" "$intel_sha" "$linux_sha" \
+            build/package-managers/fluxzero.rb
+          ruby -c build/package-managers/fluxzero.rb
+
+      - name: Create Fluxzero bot token
+        id: bot-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.FLUXZERO_BOT_APP_ID }}
+          private-key: ${{ secrets.FLUXZERO_BOT_PRIVATE_KEY }}
+          owner: fluxzero-io
+          repositories: homebrew-tap
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v6
+        with:
+          repository: fluxzero-io/homebrew-tap
+          token: ${{ steps.bot-token.outputs.token }}
+          path: build/package-managers/homebrew-tap
+
+      - name: Open tested formula update
+        env:
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+        working-directory: build/package-managers/homebrew-tap
+        run: |
+          branch="release/fluxzero-$VERSION"
+          pr_url="$(gh pr list --repo fluxzero-io/homebrew-tap --head "$branch" --state open --json url --jq '.[0].url')"
+          if [[ -n "$pr_url" ]]; then
+            gh pr merge "$pr_url" --auto --squash --delete-branch
+            echo "Homebrew update already pending: $pr_url"
+            exit 0
+          fi
+
+          git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
+          git checkout -B "$branch"
+          cp ../fluxzero.rb Formula/fluxzero.rb
+          git diff --check
+          git add Formula/fluxzero.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew already publishes Fluxzero $VERSION."
+            exit 0
+          fi
+
+          git config user.name "fluxzero-bot[bot]"
+          git config user.email "fluxzero-bot[bot]@users.noreply.github.com"
+          git commit -m "chore(fluxzero): update to $VERSION"
+          git push --force-with-lease origin "$branch"
+
+          pr_url="$(gh pr create \
+            --repo fluxzero-io/homebrew-tap \
+            --base main \
+            --head "$branch" \
+            --title "chore(fluxzero): update to $VERSION" \
+            --body "Updates the Fluxzero formula from immutable CLI release $VERSION artifacts. Platform installation tests must pass before merge.")"
+          gh pr merge "$pr_url" --auto --squash --delete-branch
+          echo "Homebrew update: $pr_url"
+
+  winget:
+    name: Submit WinGet manifest
+    runs-on: windows-2022
+    timeout-minutes: 10
+    env:
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+    steps:
+      - name: Require WinGet publisher token
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
+            throw "WINGET_CREATE_GITHUB_TOKEN is required to submit Fluxzero releases to microsoft/winget-pkgs."
+          }
+
+      - name: Set up WingetCreate runtime
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Download WingetCreate
+        shell: pwsh
+        run: Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+      - name: Submit manifest update
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $manifestUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/f/Fluxzero/FluxzeroCLI/$env:VERSION/Fluxzero.FluxzeroCLI.yaml"
+          curl.exe -fsS -o NUL $manifestUrl
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "WinGet already publishes Fluxzero CLI $env:VERSION."
+            exit 0
+          }
+
+          $existingPr = gh pr list `
+            --repo microsoft/winget-pkgs `
+            --state open `
+            --search "Fluxzero.FluxzeroCLI $env:VERSION in:title" `
+            --json url `
+            --jq '.[0].url'
+          if (-not [string]::IsNullOrWhiteSpace($existingPr)) {
+            Write-Host "WinGet update already pending: $existingPr"
+            exit 0
+          }
+
+          $packageUrl = "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/f/Fluxzero/FluxzeroCLI"
+          curl.exe -fsS -o NUL $packageUrl
+          if ($LASTEXITCODE -ne 0) {
+            $bootstrapPr = gh pr list `
+              --repo microsoft/winget-pkgs `
+              --state open `
+              --search "Fluxzero.FluxzeroCLI in:title" `
+              --json url `
+              --jq '.[0].url'
+            if (-not [string]::IsNullOrWhiteSpace($bootstrapPr)) {
+              Write-Host "::notice title=WinGet bootstrap pending::The initial Fluxzero CLI package is awaiting Microsoft review: $bootstrapPr. Homebrew publishing is unaffected."
+              exit 0
+            }
+            throw "Fluxzero.FluxzeroCLI is not published in WinGet and no bootstrap pull request is open. Submit the initial package before releasing $env:VERSION."
+          }
+
+          $url = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$env:VERSION/flux-windows-amd64.zip"
+          .\wingetcreate.exe update Fluxzero.FluxzeroCLI `
+            --urls $url `
+            --version $env:VERSION `
+            --submit
