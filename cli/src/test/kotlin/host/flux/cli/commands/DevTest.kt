@@ -149,6 +149,20 @@ class DevTest {
     }
 
     @Test
+    fun `forwards global list action outside a build project`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("list", "--project-dir", projectDirectory.toString(), "--json")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.CONTROL, request?.target)
+        assertTrue(request!!.arguments.containsAll(listOf("list", "--json")))
+    }
+
+    @Test
     fun `forwards attach action to control target`() {
         var request: DevLaunchRequest? = null
         val launcher = DevLauncher { captured -> request = captured; 0 }
