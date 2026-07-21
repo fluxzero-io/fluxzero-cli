@@ -111,8 +111,7 @@ jobs:
           curl -fsS "$marker_pom" >/dev/null && existing=$((existing + 1)) || true
           decision="$(scripts/central-publish-decision.sh \
             "$existing" \
-            "${{ needs.reserve-version.outputs.created }}" \
-            "${{ github.run_attempt }}")"
+            "${{ needs.reserve-version.outputs.created }}")"
           case "$decision" in
             complete)
               echo "Fluxzero plugins $version are already available from Maven Central."
