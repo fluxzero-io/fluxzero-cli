@@ -276,6 +276,36 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun placesDependenciesBelowApplicationWhileKeepingApplicationFirstOnClasspath() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        Files.writeString(classesDirectory.resolve("Application.class"), "compiled-application")
+        val dependenciesDirectory = Files.createTempDirectory("fluxzero-publish-dependencies")
+        val firstDependency = dependenciesDirectory.resolve("first.jar")
+        val secondDependency = dependenciesDirectory.resolve("second.jar")
+        Files.writeString(firstDependency, "first-dependency")
+        Files.writeString(secondDependency, "second-dependency")
+
+        val plan = JavaPackagePublisher().buildPlan(
+            publishSpec(
+                classesDirectory = classesDirectory,
+                dependencies = listOf(
+                    JavaPackageDependency(firstDependency),
+                    JavaPackageDependency(secondDependency)
+                )
+            )
+        )
+
+        assertEquals(
+            listOf("dependencies", "application"),
+            plan.layers.filterIsInstance<FileEntriesLayer>().map { it.name }
+        )
+        assertEquals(
+            listOf("java", "-cp", "/app/classes:/app/libs/first.jar:/app/libs/second.jar", "com.example.Application"),
+            plan.entrypoint
+        )
+    }
+
+    @Test
     fun buildsContainerPlanWithReproducibleTimestampsAndSortedApplicationEntries() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
         Files.createDirectories(classesDirectory.resolve("z"))
@@ -299,13 +329,11 @@ class JavaPackagePublishSpecTest {
         )
 
         val fileEntriesLayers = plan.layers.filterIsInstance<FileEntriesLayer>()
-        val entrypoint = plan.entrypoint
         val dependencyEntries = fileEntriesLayers.first { it.name == "dependencies" }.entries
         val applicationEntries = fileEntriesLayers.first { it.name == "application" }.entries
 
         assertEquals(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP, plan.creationTime)
         assertTrue(fileEntriesLayers.flatMap { it.entries }.all { it.modificationTime == JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP })
-        assertEquals(listOf("application", "dependencies"), fileEntriesLayers.map { it.name })
         assertEquals(
             listOf("/app/classes/a/A.class", "/app/classes/z/Z.class"),
             applicationEntries.map { it.extractionPath.toString() }
@@ -313,10 +341,6 @@ class JavaPackagePublishSpecTest {
         assertEquals(
             listOf("/app/libs/direct.jar", "/app/libs/transitive.jar"),
             dependencyEntries.map { it.extractionPath.toString() }
-        )
-        assertEquals(
-            listOf("java", "-cp", "/app/classes:/app/libs/direct.jar:/app/libs/transitive.jar", "com.example.Application"),
-            entrypoint
         )
     }
 

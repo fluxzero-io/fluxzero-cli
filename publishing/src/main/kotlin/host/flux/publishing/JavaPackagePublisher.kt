@@ -106,8 +106,8 @@ class JavaPackagePublisher : PackagePublisher {
             }
         }
 
-        addApplicationLayer(builder, spec.classesDirectory)
         addDependencyLayer(builder, "dependencies", dependencies)
+        addApplicationLayer(builder, spec.classesDirectory)
         return builder
     }
 

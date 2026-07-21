@@ -24,9 +24,8 @@ import java.util.jar.JarFile
  * Builds a Java OCI package from Maven output and publishes it to a Fluxzero registry.
  *
  * The package is assembled locally from deterministic layers:
- * - release dependencies
- * - snapshot dependencies
- * - compiled application classes/resources
+ * - Maven runtime dependencies
+ * - compiled application classes/resources as the top application layer
  *
  * Jib pushes these layers through the OCI/Docker Registry V2 protocol. Existing blobs are discovered by digest and are
  * not uploaded again, so repeated Fluxzero applications can share dependency layers without sending fat JARs.

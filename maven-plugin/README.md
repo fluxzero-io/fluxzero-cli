@@ -257,6 +257,7 @@ Generated Maven projects set `project.build.outputTimestamp` to `2000-01-01T00:0
 value. The package publisher also uses deterministic OCI creation and file modification timestamps for Fluxzero layers.
 Runtime dependencies are written to the container classpath explicitly. Application classes come first, then Maven runtime
 dependencies in Maven's runtime classpath order, comparable to `exec:java`; the dependency layer uses the same order.
+The dependency layer is placed below the application layer so source changes can reuse the stable dependency layer.
 
 The package contains these labels:
 
