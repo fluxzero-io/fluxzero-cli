@@ -18,6 +18,7 @@ internal fun defaultDevServerCacheDirectory(): Path =
 class DevServerArtifactCache(
     private val cacheDirectory: Path = defaultDevServerCacheDirectory(),
     private val downloader: (URI) -> ByteArray = ::download,
+    private val retryWait: (Long) -> Unit = Thread::sleep,
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) {
     fun resolve(version: String): Path {
@@ -50,14 +51,38 @@ class DevServerArtifactCache(
     private fun downloadVerified(version: String, artifact: Path, checksum: Path) {
         val base = "$CENTRAL_REPOSITORY/${DEV_SERVER_GROUP_ID.replace('.', '/')}/$DEV_SERVER_ARTIFACT_ID/$version"
         val artifactName = "$DEV_SERVER_ARTIFACT_ID-$version-standalone.jar"
-        val expected = parseChecksum(downloader(URI.create("$base/$artifactName.sha256")).decodeToString())
-        val bytes = downloader(URI.create("$base/$artifactName"))
+        val expected = parseChecksum(downloadWithRetry(version, URI.create("$base/$artifactName.sha256")).decodeToString())
+        val bytes = downloadWithRetry(version, URI.create("$base/$artifactName"))
         val actual = sha256(bytes)
         check(actual.equals(expected, ignoreCase = true)) {
             "Checksum verification failed for Fluxzero dev server $version: expected $expected, got $actual."
         }
         writeAtomically(artifact, bytes)
         writeAtomically(checksum, "$actual\n".encodeToByteArray())
+    }
+
+    private fun downloadWithRetry(version: String, uri: URI): ByteArray {
+        var lastFailure: Exception? = null
+        repeat(DOWNLOAD_ATTEMPTS) { attempt ->
+            try {
+                return downloader(uri)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw e
+            } catch (e: Exception) {
+                lastFailure = e
+                if (attempt < DOWNLOAD_ATTEMPTS - 1) {
+                    messageSink("Retrying Fluxzero dev server $version download (${attempt + 2}/$DOWNLOAD_ATTEMPTS)...")
+                    retryWait(RETRY_DELAYS_MS[attempt])
+                }
+            }
+        }
+        val cause = requireNotNull(lastFailure)
+        val detail = cause.message?.takeIf(String::isNotBlank) ?: cause.javaClass.simpleName
+        throw IllegalStateException(
+            "Could not download Fluxzero dev server $version from $uri after $DOWNLOAD_ATTEMPTS attempts: $detail",
+            cause
+        )
     }
 
     private fun isValid(artifact: Path, checksum: Path): Boolean = runCatching {
@@ -102,6 +127,8 @@ class DevServerArtifactCache(
 
     companion object {
         private const val CENTRAL_REPOSITORY = "https://repo.maven.apache.org/maven2"
+        private const val DOWNLOAD_ATTEMPTS = 3
+        private val RETRY_DELAYS_MS = longArrayOf(250, 1_000)
         private val CHECKSUM = Regex("(?i)[a-f0-9]{64}")
 
         private fun download(uri: URI): ByteArray {
