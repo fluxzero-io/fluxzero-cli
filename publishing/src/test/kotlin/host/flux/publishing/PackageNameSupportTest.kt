@@ -13,10 +13,10 @@ import java.util.jar.Manifest
 
 class PackageNameSupportTest {
     @Test
-    fun buildsPackageReferenceFromRegistryHostWithScheme() {
+    fun buildsPackageReferenceFromRegistryHost() {
         assertEquals(
             "registry.fluxzero.io/service:1.2.3",
-            PackageNameSupport.packageReference("https://registry.fluxzero.io", "service", "1.2.3")
+            PackageNameSupport.packageReference("registry.fluxzero.io", "service", "1.2.3")
         )
     }
 
@@ -24,19 +24,16 @@ class PackageNameSupportTest {
     fun buildsPackageReferenceWithTeamId() {
         assertEquals(
             "registry.fluxzero.io/team-a/service:1.2.3",
-            PackageNameSupport.packageReference("https://registry.fluxzero.io", "team-a", "service", "1.2.3")
+            PackageNameSupport.packageReference("registry.fluxzero.io", "team-a", "service", "1.2.3")
         )
     }
 
     @Test
-    fun preservesRegistryPortAndDetectsPlainHttpRegistryHost() {
+    fun preservesRegistryPort() {
         assertEquals(
             "localhost:8443/service:dev",
-            PackageNameSupport.packageReference("https://localhost:8443", "service", "dev")
+            PackageNameSupport.packageReference("localhost:8443", "service", "dev")
         )
-        assertTrue(PackageNameSupport.isPlainHttpRegistryHost("http://localhost:8080"))
-        assertFalse(PackageNameSupport.isPlainHttpRegistryHost("https://registry.fluxzero.io"))
-        assertFalse(PackageNameSupport.isPlainHttpRegistryHost("registry.fluxzero.io"))
     }
 
     @Test

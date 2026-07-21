@@ -21,7 +21,7 @@ In another terminal, publish the local plugin and push an example:
 ./gradlew :maven-plugin:publishToMavenLocal
 
 export MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/.local-registry/certs/truststore-with-defaults.jks -Djavax.net.ssl.trustStorePassword=changeit"
-export FLUXZERO_REGISTRY_HOST="https://127.0.0.1:8443"
+export FLUXZERO_REGISTRY_HOST="127.0.0.1:8443"
 export FLUXZERO_REGISTRY_TOKEN="$(node maven-plugin/local-registry/generate-token.js team-a plain-java)"
 export FLUXZERO_PACKAGE_VERSION="local-dev"
 

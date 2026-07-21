@@ -31,23 +31,19 @@ val mavenPluginParameterDescriptions = mapOf(
     "forceUpdate" to "Force project files to be downloaded and rewritten. Property: fluxzero.projectFiles.forceUpdate.",
     "allowDirty" to "Allow publish-package to publish from a dirty git worktree. Property: fluxzero.package.allowDirty.",
     "applicationId" to "Optional Fluxzero application id stored as OCI package metadata.",
-    "credentials" to "Registry credentials for publish-package.",
-    "images" to "Image repositories for publish-package.",
+    "authentications" to "Optional host-bound registry authentication for publish-package; unmatched targets use anonymous access.",
+    "images" to "Required image repositories for publish-package.",
     "packageName" to "Required public package name for publish-package.",
     "packageVersion" to "Package version for publish-package. Defaults to a generated git/time-based tag.",
     "tags" to "Tags for publish-package.",
     "publishAttempts" to "Maximum publish attempts per image for transient registry blob-upload failures. Property: fluxzero.package.publishAttempts.",
     "publishRetryDelayMillis" to "Base delay between publish attempts in milliseconds. Property: fluxzero.package.publishRetryDelayMillis.",
-    "teamId" to "Fluxzero team id for publish-package.",
     "mainClass" to "Application main class for publish-package. Property: fluxzero.package.mainClass.",
     "javaToolOptions" to "Value written to JAVA_TOOL_OPTIONS for publish-package. Property: fluxzero.package.javaToolOptions.",
     "overrideLanguage" to "Override language detection with kotlin or java. Property: fluxzero.projectFiles.overrideLanguage.",
     "overrideSdkVersion" to "Override Fluxzero SDK version detection. Property: fluxzero.projectFiles.overrideSdkVersion.",
     "project" to "Read-only Maven project metadata.",
     "projectDir" to "Read-only Maven project or reactor root directory.",
-    "registryHost" to "Fluxzero registry host for publish-package. Defaults to registry.fluxzero.io.",
-    "registryToken" to "Fluxzero registry token for publish-package.",
-    "registryUsername" to "Registry username for publish-package. Defaults to fluxzero.",
     "rootProjectOnly" to "Run only in the Maven execution root. Property: fluxzero.projectFiles.rootProjectOnly.",
     "session" to "Read-only Maven session used to determine the execution root in multi-module builds.",
     "skip" to "Legacy opt-out flag. Prefer enabled=false. Property: fluxzero.projectFiles.skip.",
@@ -135,6 +131,7 @@ dependencies {
     compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
 
     // Test dependencies
+    testImplementation(project(":publishing"))
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0")

@@ -45,22 +45,10 @@ class PublishPackageMojo : AbstractMojo() {
     @Parameter(defaultValue = "\${session}", readonly = true)
     private var session: MavenSession? = null
 
-    @Parameter
-    private var registryHost: String? = null
-
-    @Parameter
-    private var registryUsername: String? = null
-
     /**
-     * Fluxzero registry token. In CI this can be the registry token returned by the Fluxzero GitHub OIDC exchange.
+     * Required image repositories.
      */
-    @Parameter
-    private var registryToken: String? = null
-
-    /**
-     * Optional image repositories.
-     */
-    @Parameter
+    @Parameter(required = true)
     private var images: List<String> = emptyList()
 
     /**
@@ -70,22 +58,16 @@ class PublishPackageMojo : AbstractMojo() {
     private var tags: List<String> = emptyList()
 
     /**
-     * Optional registry credentials. When omitted, the legacy single-target registry settings are used.
+     * Optional host-bound registry authentication. Target registries without a matching configuration use anonymous access.
      */
     @Parameter
-    private var credentials: List<RegistryCredentialConfiguration> = emptyList()
+    private var authentications: List<Authentication> = emptyList()
 
     /**
      * Public package name.
      */
     @Parameter
     private var packageName: String? = null
-
-    /**
-     * Fluxzero team id used as the first registry path segment.
-     */
-    @Parameter
-    private var teamId: String? = null
 
     /**
      * Package version to push. When omitted, a git/time-based tag is generated.
@@ -157,35 +139,10 @@ class PublishPackageMojo : AbstractMojo() {
             return
         }
 
-        val resolvedRegistryHost = registryHost?.takeIf { it.isNotBlank() }
-            ?: PackageNameSupport.DEFAULT_REGISTRY_HOST
-        val resolvedRegistryUsername = registryUsername?.takeIf { it.isNotBlank() }
-            ?: JavaPackagePublishSpec.DEFAULT_REGISTRY_USERNAME
-        val resolvedToken = registryToken?.takeIf { it.isNotBlank() }
-        if (resolvedRegistryHost.isNullOrBlank()) {
-            throw MojoFailureException("Missing registry host. Configure <registryHost> in the fluxzero-maven-plugin.")
-        }
-        if (resolvedRegistryUsername.isBlank()) {
-            throw MojoFailureException("Missing registry username. Configure <registryUsername> in the fluxzero-maven-plugin.")
-        }
-        if (resolvedToken.isNullOrBlank() && credentials.isEmpty()) {
-            throw MojoFailureException(
-                "Missing registry token. Configure <registryToken>, for example with Maven interpolation like " +
-                    "<registryToken>\${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>."
-            )
-        }
-        if (PackageNameSupport.isPlainHttpRegistryHost(resolvedRegistryHost)) {
-            throw MojoFailureException(
-                "Fluxzero registry host must use HTTPS when a registry token is sent. " +
-                    "Use an https:// registry host or the local registry proxy for end-to-end tests."
-            )
-        }
-
         val resolvedPackageName = packageName?.takeIf { it.isNotBlank() }
             ?: throw MojoFailureException(
                 "Missing package name. Configure <packageName> in the fluxzero-maven-plugin."
             )
-        val resolvedTeamId = teamId?.takeIf { it.isNotBlank() }
         val gitInfo = PackageNameSupport.gitInfo(project.basedir.toPath())
         ensureCleanGitWorktree(gitInfo)
         val resolvedTags = resolveTags(gitInfo)
@@ -193,9 +150,6 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedApplicationId = applicationId?.takeIf { it.isNotBlank() }
         if (!PackageNameSupport.isValidPackageName(resolvedPackageName)) {
             throw MojoFailureException("Invalid package name '$resolvedPackageName'.")
-        }
-        if (resolvedTeamId != null && !PackageNameSupport.isValidTeamId(resolvedTeamId)) {
-            throw MojoFailureException("Invalid team id '$resolvedTeamId'.")
         }
         if (!PackageNameSupport.isValidTag(resolvedVersion)) {
             throw MojoFailureException("Invalid package version '$resolvedVersion'.")
@@ -222,25 +176,14 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedJavaToolOptions = configuredValue("fluxzero.package.javaToolOptions", "JAVA_TOOL_OPTIONS", javaToolOptions)
             ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
 
-        val resolvedImages = resolveImages(
-            defaultRegistryHost = resolvedRegistryHost,
-            defaultPackageName = resolvedPackageName
-        )
-        val resolvedCredentials = resolveCredentials(
-            defaultRegistryHost = resolvedRegistryHost,
-            defaultRegistryUsername = resolvedRegistryUsername,
-            defaultRegistryToken = resolvedToken
-        )
+        val resolvedImages = resolveImages()
+        val resolvedCredentials = resolveAuthentications()
         val packageReferences = resolvedImages.flatMap { image -> resolvedTags.map { tag -> "$image:$tag" } }.joinToString(", ")
         log.info("Building Fluxzero Java package $packageReferences")
 
         try {
             val results = JavaPackagePublisher().publish(
                 JavaPackagePublishSpec(
-                    registryHost = resolvedRegistryHost,
-                    registryUsername = resolvedRegistryUsername,
-                    registryToken = resolvedToken,
-                    teamId = resolvedTeamId,
                     packageName = resolvedPackageName,
                     packageVersion = resolvedVersion,
                     applicationId = resolvedApplicationId,
@@ -328,63 +271,34 @@ class PublishPackageMojo : AbstractMojo() {
         )
     }
 
-    private fun resolveImages(defaultRegistryHost: String, defaultPackageName: String): List<String> {
-        val configuredImages = images.map { it.trim() }.filter { it.isNotBlank() }
-        return configuredImages.ifEmpty {
-            listOf(
-                PackageNameSupport.packageRepository(
-                    defaultRegistryHost,
-                    teamId?.takeIf { it.isNotBlank() },
-                    defaultPackageName
-                )
-            )
-        }
+    private fun resolveImages(): List<String> = PackageImageSupport.resolve(images)
+
+    private fun resolveAuthentications(): List<JavaPackageRegistryCredential> = try {
+        RegistryAuthenticationSupport.resolve(
+            authentications = authentications,
+            githubToken = ::resolveGitHubToken
+        )
+    } catch (exception: IllegalArgumentException) {
+        throw MojoFailureException(exception.message)
+    } catch (exception: GitHubOidcException) {
+        throw MojoFailureException(exception.message)
     }
 
-    private fun resolveCredentials(
-        defaultRegistryHost: String,
-        defaultRegistryUsername: String,
-        defaultRegistryToken: String?
-    ): List<JavaPackageRegistryCredential> {
-        if (credentials.isEmpty()) {
-            return listOf(
-                JavaPackageRegistryCredential(
-                    registryHost = defaultRegistryHost,
-                    registryUsername = defaultRegistryUsername,
-                    registryToken = defaultRegistryToken.orEmpty()
-                )
-            )
-        }
-        return credentials.mapIndexed { index, credential ->
-            val registryHost = credential.registryHost?.takeIf { it.isNotBlank() }
-                ?: defaultRegistryHost
-            val registryUsername = credential.registryUsername?.takeIf { it.isNotBlank() }
-                ?: defaultRegistryUsername
-            val registryToken = credential.registryToken?.takeIf { it.isNotBlank() }
-                ?: defaultRegistryToken
-            if (registryToken.isNullOrBlank()) {
-                throw MojoFailureException(
-                    "Missing registry token for registry credential ${index + 1}. " +
-                        "Configure <registryToken>, for example with Maven interpolation like " +
-                        "<registryToken>\${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>."
-                )
-            }
-            JavaPackageRegistryCredential(
-                registryHost = registryHost,
-                registryUsername = registryUsername,
-                registryToken = registryToken
-            )
-        }
-    }
+    private fun resolveGitHubToken(audience: String): String =
+        GitHubOidcTokenResolver().resolve(audience)
 
     private fun runtimeDependencyPaths(): List<Path> =
         MavenRuntimeClasspathOrder.runtimeJars(project.runtimeClasspathElements)
 }
 
-class RegistryCredentialConfiguration {
-    var registryHost: String? = null
-    var registryUsername: String? = null
-    var registryToken: String? = null
+internal object PackageImageSupport {
+    fun resolve(configuredImages: List<String>): List<String> {
+        val images = configuredImages.map { it.trim() }.filter { it.isNotBlank() }
+        if (images.isEmpty()) {
+            throw MojoFailureException("Configure at least one <image> under <images>.")
+        }
+        return images
+    }
 }
 
 internal object MavenRuntimeClasspathOrder {

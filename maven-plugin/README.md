@@ -54,34 +54,35 @@ running. `Ctrl-C` stops the environment and all applications; an unexpected term
 A detached environment is controlled with `fz dev attach`, `fz dev status`, `fz dev logs --follow`, and `fz dev stop`;
 only one session can run per project.
 
-| Setting | Command-line property | Default |
-|---------|-----------------------|---------|
-| Dev-server version | `fluxzero.dev.serverVersion` | active project pin or newest stable `1.x` release |
-| Main class override | `fluxzero.dev.mainClass` | `FLUXZERO_MAIN_CLASS`, otherwise auto-detected |
-| Application name | `fluxzero.dev.applicationName` | Maven artifact id |
-| Applications/configurations | `fluxzero.dev.applications` | all discovered applications |
-| Environment | `fluxzero.dev.environment` | `local` |
-| Public gateway port | `fluxzero.dev.port` | dynamic |
-| IDP mode | `fluxzero.dev.idp` | `managed` |
-| Namespace | `fluxzero.dev.namespace` | project default |
-| Watch sources | `fluxzero.dev.watch` | `true` |
-| Compile on start | `fluxzero.dev.compileOnStart` | `true` |
-| Background tests | `fluxzero.dev.testsEnabled` | `true` |
-| Fast compiler | `fluxzero.dev.fastCompiler` | `false` |
-| Frontend command | `fluxzero.dev.frontendCommand` | none |
-| Frontend directory | `fluxzero.dev.frontendDirectory` | project root |
-| Frontend setup command | `fluxzero.dev.frontendSetupCommand` | none |
-| External frontend URL | `fluxzero.dev.frontendUrl` | none |
-| Frontend enabled | `fluxzero.dev.frontendEnabled` | `true` |
-| Startup timeout | `fluxzero.dev.startupTimeoutMillis` | `20000` |
-| Graceful app shutdown timeout | `fluxzero.dev.gracefulShutdownTimeoutMillis` | `5000` |
-| Source debounce | `fluxzero.dev.debounceMillis` | `300` |
-| Background/detached | `fluxzero.dev.background` | `false` |
-| Skip dev environment | `fluxzero.dev.skip` | `false` |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `devServerVersion` | No | Active project pin or newest stable `1.x` release | Dev-server version override; property `fluxzero.dev.serverVersion`. |
+| `devMainClass` | No | Auto-detected | Main-class override; property `fluxzero.dev.mainClass`, with `FLUXZERO_MAIN_CLASS` as environment fallback. |
+| `devApplicationName` | No | Maven artifact id | Application name; property `fluxzero.dev.applicationName`. |
+| `applications` | No | All discovered applications | Applications or named configurations to start; property `fluxzero.dev.applications`. |
+| `environment` | No | `local` | Application environment/profile; property `fluxzero.dev.environment`. |
+| `port` | No | Dynamic | Preferred public gateway port; property `fluxzero.dev.port`. |
+| `idp` | No | `managed` | IDP mode; property `fluxzero.dev.idp`. |
+| `devNamespace` | No | Project default | Fluxzero namespace; property `fluxzero.dev.namespace`. |
+| `watch` | No | `true` | Watch backend sources; property `fluxzero.dev.watch`. |
+| `compileOnStart` | No | `true` | Compile before the initial launch; property `fluxzero.dev.compileOnStart`. |
+| `testsEnabled` | No | `true` | Run background tests; property `fluxzero.dev.testsEnabled`. |
+| `fastCompiler` | No | `false` | Enable the Maven-correct fast Java compiler; property `fluxzero.dev.fastCompiler`. |
+| `frontendCommand` | No | — | Managed frontend command; property `fluxzero.dev.frontendCommand`. |
+| `frontendDirectory` | No | Project root | Working directory for frontend commands; property `fluxzero.dev.frontendDirectory`. |
+| `frontendSetupCommand` | No | — | One-time frontend setup command; property `fluxzero.dev.frontendSetupCommand`. |
+| `frontendUrl` | No | — | URL of an externally managed frontend; property `fluxzero.dev.frontendUrl`. |
+| `frontendEnabled` | No | `true` | Enable frontend integration; property `fluxzero.dev.frontendEnabled`. |
+| `backendPaths` | No | Empty | Repeatable backend paths routed unchanged to Fluxzero. |
+| `appArgs` | No | Empty | Repeatable arguments passed to the application process. |
+| `startupTimeoutMillis` | No | `20000` | Application readiness timeout; property `fluxzero.dev.startupTimeoutMillis`. |
+| `gracefulShutdownTimeoutMillis` | No | `5000` | Graceful application shutdown timeout; property `fluxzero.dev.gracefulShutdownTimeoutMillis`. |
+| `debounceMillis` | No | `300` | Source-watcher debounce; property `fluxzero.dev.debounceMillis`. |
+| `background` | No | `false` | Start detached instead of attaching a live view; property `fluxzero.dev.background`. |
+| `skipDev` | No | `false` | Skip the dev environment; property `fluxzero.dev.skip`. |
 
-`backendPaths` and `appArgs` are repeatable Maven configuration elements. Stable shared environment, frontend,
-application flavor, 1Password-reference, and startup-command configuration belongs in tracked `.fluxzero/dev.yaml`;
-the Maven properties above are local or invocation-specific overrides.
+Stable shared environment, frontend, application flavor, 1Password-reference, and startup-command configuration belongs
+in tracked `.fluxzero/dev.yaml`; the Maven settings above are local or invocation-specific overrides.
 
 Agent plugins should use `fz mcp` directly. Maven is deliberately not used as an MCP stdio launcher because its
 own stdout would corrupt the MCP protocol stream.
@@ -95,14 +96,14 @@ own stdout would corrupt the MCP protocol stream.
 mvn fluxzero:sync-project-files
 ```
 
-| Setting | Command-line property | Default |
-|---------|-----------------------|---------|
-| `enabled` | `fluxzero.projectFiles.enabled` | `true` |
-| `rootProjectOnly` | `fluxzero.projectFiles.rootProjectOnly` | `true` |
-| `forceUpdate` | `fluxzero.projectFiles.forceUpdate` | `false` |
-| `overrideLanguage` | `fluxzero.projectFiles.overrideLanguage` | auto-detected |
-| `overrideSdkVersion` | `fluxzero.projectFiles.overrideSdkVersion` | auto-detected |
-| `skip` | `fluxzero.projectFiles.skip` | `false` |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `enabled` | No | `true` | Enable project-file synchronization; property `fluxzero.projectFiles.enabled`. |
+| `rootProjectOnly` | No | `true` | Run only for the Maven execution root; property `fluxzero.projectFiles.rootProjectOnly`. |
+| `forceUpdate` | No | `false` | Re-download and rewrite project files; property `fluxzero.projectFiles.forceUpdate`. |
+| `overrideLanguage` | No | Auto-detected | Override language detection with `kotlin` or `java`; property `fluxzero.projectFiles.overrideLanguage`. |
+| `overrideSdkVersion` | No | Auto-detected | Override SDK-version detection; property `fluxzero.projectFiles.overrideSdkVersion`. |
+| `skip` | No | `false` | Legacy opt-out; property `fluxzero.projectFiles.skip`. Prefer `enabled=false`. |
 
 ### `publish-package`
 
@@ -126,46 +127,44 @@ come from CI or the local environment.
     <tag>${project.version}</tag>
     <tag>sha-${env.GITHUB_SHA}</tag>
   </tags>
-  <credentials>
-    <credential>
-      <registryHost>registry.fluxzero.io</registryHost>
-      <registryUsername>github-ci</registryUsername>
-      <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
-    </credential>
-  </credentials>
+  <authentications>
+    <authentication>
+      <host>registry.fluxzero.io</host>
+      <github-oidc>
+        <audience>https://cloud.fluxzero.io</audience>
+      </github-oidc>
+    </authentication>
+  </authentications>
 </configuration>
 ```
 
-Keep literal registry tokens and user credentials out of the POM. Refer to environment variables or Maven settings
-instead.
+Grant the GitHub Actions job `id-token: write` when using `github-oidc`. Keep literal registry tokens and user credentials
+out of the POM. Refer to environment variables through Maven interpolation instead.
 
 General behavior can still be overridden from the command line or environment:
 
-| Setting | Command-line property | Environment fallback | Default |
-|---------|-----------------------|----------------------|---------|
-| Allow dirty worktree | `fluxzero.package.allowDirty` | — | `false` |
-| Main class | `fluxzero.package.mainClass` | `FLUXZERO_MAIN_CLASS` | `Start-Class` or `Main-Class` from built artifact manifest |
-| Base image | `fluxzero.package.baseImage` | `FLUXZERO_BASE_IMAGE` | Fluxzero Java distroless runtime |
-| Base image source | `fluxzero.package.baseImageSource` | `FLUXZERO_BASE_IMAGE_SOURCE` | `registry` |
-| Skip publish | `fluxzero.package.skip` | — | `false` |
-| Java tool options | `fluxzero.package.javaToolOptions` | `JAVA_TOOL_OPTIONS` | process env var, then Fluxzero JVM defaults |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `allowDirty` | No | `false` | Permit publishing a dirty worktree; property `fluxzero.package.allowDirty`. |
+| `mainClass` | No | Built artifact `Start-Class` or `Main-Class` | Main class; property `fluxzero.package.mainClass`, environment fallback `FLUXZERO_MAIN_CLASS`. |
+| `baseImage` | No | Fluxzero Java distroless runtime | Runtime base image; property `fluxzero.package.baseImage`, with `FLUXZERO_BASE_IMAGE` as environment fallback. |
+| `baseImageSource` | No | `registry` | Base-image source; property `fluxzero.package.baseImageSource`, environment fallback `FLUXZERO_BASE_IMAGE_SOURCE`. |
+| `skipPackagePublish` | No | `false` | Skip package publishing; property `fluxzero.package.skip`. |
+| `javaToolOptions` | No | Process `JAVA_TOOL_OPTIONS`, then Fluxzero JVM defaults | Value written to `JAVA_TOOL_OPTIONS`; property `fluxzero.package.javaToolOptions`. |
 
 Package and registry configuration is Maven configuration only:
 
-| Setting | Default |
-|---------|---------|
-| `packageName` | required |
-| `applicationId` | omitted |
-| `registryHost` | `registry.fluxzero.io`, used only when `images` is omitted |
-| `registryUsername` | `fluxzero`, used only when `credentials` is omitted |
-| `registryToken` | required when `credentials` is omitted |
-| `teamId` | omitted, used only when `images` is omitted |
-| `packageVersion` | generated git/time-based tag, used only when `tags` is omitted |
-| `images` | `${registryHost}/${teamId}/${packageName}` or `${registryHost}/${packageName}` |
-| `tags` | `${packageVersion}` or generated git/time-based tag |
-| `credentials` | single credential from `registryHost`, `registryUsername`, and `registryToken` |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `packageName` | Yes | — | Public package name. |
+| `applicationId` | No | — | Fluxzero application id stored as package metadata. |
+| `packageVersion` | No | Generated git/time-based tag | Primary package tag when `tags` is omitted. |
+| `images` | Yes | — | One or more explicit image repositories. |
+| `tags` | No | `packageVersion`, or its generated value | Tags applied to every configured image. |
+| `authentications` | No | Anonymous access | Optional host-bound authentication; unmatched target registries remain anonymous. |
 
-To publish the same package to multiple repositories or tags, configure `images`, `tags`, and `credentials`.
+To publish the same package to multiple repositories or tags, configure `images` and `tags`. Add authentication only
+for target registries that require it.
 
 ```xml
 <configuration>
@@ -178,26 +177,71 @@ To publish the same package to multiple repositories or tags, configure `images`
     <tag>${project.version}</tag>
     <tag>sha-${env.GITHUB_SHA}</tag>
   </tags>
-  <credentials>
-    <credential>
-      <registryHost>registry.fluxzero.io</registryHost>
-      <registryUsername>github-ci</registryUsername>
-      <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
-    </credential>
-    <credential>
-      <registryHost>ghcr.io</registryHost>
-      <registryUsername>${env.GITHUB_ACTOR}</registryUsername>
-      <registryToken>${env.GITHUB_TOKEN}</registryToken>
-    </credential>
-  </credentials>
+  <authentications>
+    <authentication>
+      <host>registry.fluxzero.io</host>
+      <github-oidc>
+        <audience>https://cloud.fluxzero.io</audience>
+      </github-oidc>
+    </authentication>
+    <authentication>
+      <host>ghcr.io</host>
+      <basic>
+        <username>${env.GITHUB_ACTOR}</username>
+        <token>${env.GITHUB_TOKEN}</token>
+      </basic>
+    </authentication>
+  </authentications>
 </configuration>
 ```
 
-| Credential setting | Description |
-|--------------------|-------------|
-| `registryHost` | Registry host for this credential |
-| `registryUsername` | Registry username |
-| `registryToken` | Registry token |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `authentication.host` | Yes | — | Lowercase registry host with optional port; schemes and paths are rejected. |
+| `authentication.basic` | No | — | Basic username/password mechanism. Configure exactly one of `basic` or `github-oidc`. |
+| `authentication.github-oidc` | No | — | GitHub Actions OIDC mechanism. Configure exactly one of `basic` or `github-oidc`. |
+| `basic.username` | No | Empty | Registry username. |
+| `basic.token` | Yes | — | Registry password or token; required when `basic` is configured. |
+| `github-oidc.username` | No | Empty | Registry username associated with the requested token. |
+| `github-oidc.audience` | Yes | — | OIDC audience; required when `github-oidc` is configured. |
+
+Authentication is optional. Every configured image is matched to an authentication by exact registry host and port;
+when no match exists, Jib accesses that target anonymously. This also permits an authenticated private registry and an
+anonymous public registry in the same publish execution. Duplicate authentications for the same host and configured
+authentications that match no image are configuration errors. Authentications describe how the plugin obtains a
+username/password credential for Jib; they are not themselves necessarily long-lived credentials. Tags and images form
+a Cartesian product: every tag is published to every image. Jib performs one containerization per image and attaches the
+remaining tags to that same push.
+
+`basic` sends the configured username and token to Jib as registry username/password credentials. Its username defaults
+to empty; configure it for registries that use the username as part of authentication:
+
+```xml
+<authentication>
+  <host>registry.example.com</host>
+  <basic>
+    <username>${env.REGISTRY_USERNAME}</username>
+    <token>${env.REGISTRY_TOKEN}</token>
+  </basic>
+</authentication>
+```
+
+`github-oidc` asks GitHub Actions for a short-lived OIDC token and uses it as the registry password. The request URL and
+request bearer token are read only from `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN`, which GitHub
+injects when the job has `id-token: write`. They cannot be redirected through POM configuration.
+
+```xml
+<authentication>
+  <host>registry.fluxzero.io</host>
+  <github-oidc>
+    <audience>https://cloud.fluxzero.io</audience>
+  </github-oidc>
+</authentication>
+```
+
+The `github-oidc` username also defaults to empty and can be overridden with an optional `<username>` child. Its
+`<audience>` is required: it identifies the Fluxzero OIDC verifier and is intentionally not derived from the target
+registry host. A directly available CI OIDC token is a `basic` token; use Maven interpolation to put it in `<token>`.
 
 The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.package.allowDirty=true` for local experiments; dirty
 pushes get a `-dirty` tag suffix.
@@ -238,7 +282,7 @@ In another terminal:
 ./gradlew :maven-plugin:publishToMavenLocal
 
 export MAVEN_OPTS="-Djavax.net.ssl.trustStore=$PWD/.local-registry/certs/truststore-with-defaults.jks -Djavax.net.ssl.trustStorePassword=changeit"
-export FLUXZERO_REGISTRY_HOST="https://127.0.0.1:8443"
+export FLUXZERO_REGISTRY_HOST="127.0.0.1:8443"
 export FLUXZERO_REGISTRY_TOKEN="$(node maven-plugin/local-registry/generate-token.js team-a plain-java)"
 export FLUXZERO_PACKAGE_VERSION="local-dev"
 
@@ -452,14 +496,14 @@ mvn fluxzero:sync-project-files
 
 **Parameters**:
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `enabled` | boolean | `true` | Enable/disable plugin execution |
-| `skip` | boolean | `false` | Skip plugin execution (backward compatibility) |
-| `rootProjectOnly` | boolean | `true` | Only run on root project in multi-module builds |
-| `forceUpdate` | boolean | `false` | Force re-download even if files exist |
-| `overrideLanguage` | String | (auto) | Override language detection (`kotlin` or `java`) |
-| `overrideSdkVersion` | String | (auto) | Override SDK version detection |
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `enabled` | No | `true` | Boolean that enables or disables plugin execution. |
+| `skip` | No | `false` | Legacy Boolean opt-out retained for compatibility. |
+| `rootProjectOnly` | No | `true` | Boolean that limits execution to the Maven execution root. |
+| `forceUpdate` | No | `false` | Boolean that forces a re-download even when files exist. |
+| `overrideLanguage` | No | Auto-detected | String override: `kotlin` or `java`. |
+| `overrideSdkVersion` | No | Auto-detected | String SDK-version override. |
 
 **Properties**:
 

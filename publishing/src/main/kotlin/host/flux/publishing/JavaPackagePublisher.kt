@@ -34,10 +34,11 @@ class JavaPackagePublisher : PackagePublisher {
     ): List<PackagePublishResult> {
         var attempt = 1
         while (true) {
-            val credential = spec.credentialFor(publishTarget.image)
             val builder = createContainerBuilder(spec)
             val targetImage = RegistryImage.named(publishTarget.primaryReference.reference)
-                .addCredential(credential.registryUsername, credential.registryToken)
+            spec.credentialFor(publishTarget.image)?.let { credential ->
+                targetImage.addCredential(credential.username, credential.password)
+            }
             val containerizer = Containerizer.to(targetImage)
                 .setToolName(spec.toolName)
             publishTarget.additionalTags.forEach { tag ->
@@ -189,23 +190,19 @@ enum class BaseImageSource {
 }
 
 data class JavaPackagePublishSpec(
-    val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
-    val registryUsername: String = DEFAULT_REGISTRY_USERNAME,
-    val registryToken: String? = null,
-    val teamId: String? = null,
     val packageName: String,
     val packageVersion: String,
-    val applicationId: String? = null,
     val mainClass: String,
+    val classesDirectory: Path,
+    val images: List<String>,
+    val credentials: List<JavaPackageRegistryCredential> = emptyList(),
+    val applicationId: String? = null,
     val baseImage: String = DEFAULT_BASE_IMAGE,
     val baseImageSource: BaseImageSource = BaseImageSource.REGISTRY,
     val javaToolOptions: String = DEFAULT_JAVA_TOOL_OPTIONS,
-    val classesDirectory: Path,
     val dependencies: List<JavaPackageDependency> = emptyList(),
     val labels: Map<String, String> = emptyMap(),
-    val images: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
-    val credentials: List<JavaPackageRegistryCredential> = emptyList(),
     val toolName: String = "fluxzero-publishing",
     val publishAttempts: Int = DEFAULT_PUBLISH_ATTEMPTS,
     val publishRetryDelayMillis: Long = DEFAULT_PUBLISH_RETRY_DELAY_MILLIS
@@ -213,8 +210,6 @@ data class JavaPackagePublishSpec(
     companion object {
         val REPRODUCIBLE_CONTAINER_TIMESTAMP: Instant = Instant.EPOCH
         val REPRODUCIBLE_FILE_TIMESTAMP: Instant = Instant.EPOCH
-
-        const val DEFAULT_REGISTRY_USERNAME = "fluxzero"
 
         const val DEFAULT_PUBLISH_ATTEMPTS = 3
         const val DEFAULT_PUBLISH_RETRY_DELAY_MILLIS = 2000L
@@ -229,11 +224,11 @@ data class JavaPackagePublishSpec(
     fun validate() {
         require(PackageNameSupport.isValidPackageName(packageName)) { "Invalid package name '$packageName'." }
         require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }
-        teamId?.takeIf { it.isNotBlank() }?.let {
-            require(PackageNameSupport.isValidTeamId(it)) { "Invalid team id '$it'." }
-        }
         require(mainClass.isNotBlank()) { "Missing application main class." }
         require(baseImage.isNotBlank()) { "Missing Java runtime base image." }
+        require(images.isNotEmpty()) { "Configure at least one package image." }
+        require(images.distinct().size == images.size) { "Package images must be unique." }
+        require(resolvedTags().distinct().size == resolvedTags().size) { "Package tags must be unique." }
         require(publishAttempts >= 1) { "Publish attempts must be at least 1." }
         require(publishRetryDelayMillis >= 0) { "Publish retry delay must be at least 0." }
         require(classesDirectory.toFile().isDirectory) {
@@ -244,8 +239,20 @@ data class JavaPackagePublishSpec(
                 "Dependency JAR does not exist: ${dependency.source.toAbsolutePath()}."
             }
         }
-        packageReferences().forEach { credentialFor(it.image) }
-        resolvedCredentials().forEach { it.validate() }
+        credentials.forEach { it.validate() }
+        val duplicateCredentialHosts = credentials
+            .groupBy { it.host }
+            .filterValues { it.size > 1 }
+            .keys
+        require(duplicateCredentialHosts.isEmpty()) {
+            "Configure exactly one registry credential per host. Duplicate: ${duplicateCredentialHosts.sorted().joinToString()}."
+        }
+        val references = packageReferences()
+        val targetHosts = references.map { PackageNameSupport.registryAuthority(it.image) }.toSet()
+        val unusedCredentialHosts = credentials.map { it.host }.toSet() - targetHosts
+        require(unusedCredentialHosts.isEmpty()) {
+            "Registry credentials must match a package image. Unused: ${unusedCredentialHosts.sorted().joinToString()}."
+        }
     }
 
     fun packageReferences(): List<JavaPackageReference> =
@@ -253,7 +260,7 @@ data class JavaPackagePublishSpec(
 
     internal fun publishTargets(): List<JavaPackagePublishTarget> {
         val tags = resolvedTags()
-        return resolvedImages().map { image ->
+        return images.map { image ->
             val references = tags.map { tag ->
                 JavaPackageReference(image, "$image:$tag")
             }
@@ -266,29 +273,15 @@ data class JavaPackagePublishSpec(
         }
     }
 
-    fun credentialFor(image: String): JavaPackageRegistryCredential {
-        val registryHost = PackageNameSupport.registryAuthority(image)
-        return resolvedCredentials().firstOrNull { credential ->
-            PackageNameSupport.registryAuthority(credential.registryHost) == registryHost
-        } ?: throw IllegalArgumentException("Missing registry credential for '$registryHost'.")
+    fun credentialFor(image: String): JavaPackageRegistryCredential? {
+        val targetHost = PackageNameSupport.registryAuthority(image)
+        return credentials.firstOrNull { credential ->
+            credential.host == targetHost
+        }
     }
-
-    private fun resolvedImages(): List<String> =
-        images.takeIf { it.isNotEmpty() }
-            ?: listOf(PackageNameSupport.packageRepository(registryHost, teamId, packageName))
 
     private fun resolvedTags(): List<String> =
         tags.takeIf { it.isNotEmpty() } ?: listOf(packageVersion)
-
-    private fun resolvedCredentials(): List<JavaPackageRegistryCredential> =
-        credentials.takeIf { it.isNotEmpty() }
-            ?: listOf(
-                JavaPackageRegistryCredential(
-                    registryHost = registryHost,
-                    registryUsername = registryUsername,
-                    registryToken = registryToken.orEmpty()
-                )
-            )
 
     internal fun orderedDependencies(): List<JavaPackageDependency> = dependencies
 }
@@ -314,18 +307,15 @@ data class JavaPackageReference(
 }
 
 data class JavaPackageRegistryCredential(
-    val registryHost: String = PackageNameSupport.DEFAULT_REGISTRY_HOST,
-    val registryUsername: String = JavaPackagePublishSpec.DEFAULT_REGISTRY_USERNAME,
-    val registryToken: String
+    val host: String,
+    val username: String = "",
+    val password: String
 ) {
     fun validate() {
-        require(registryHost.isNotBlank()) { "Missing registry host." }
-        require(registryUsername.isNotBlank()) { "Missing registry username." }
-        require(registryToken.isNotBlank()) { "Missing registry token." }
-        require(!PackageNameSupport.isPlainHttpRegistryHost(registryHost)) {
-            "Fluxzero registry host must use HTTPS when a registry token is sent. " +
-                "Use an https:// registry host or the local TLS proxy for end-to-end tests."
+        require(PackageNameSupport.isValidRegistryHost(host)) {
+            "Invalid registry credential host '$host'. Configure a lowercase host with an optional port, without a scheme or path."
         }
+        require(password.isNotBlank()) { "Missing registry password or token." }
     }
 }
 

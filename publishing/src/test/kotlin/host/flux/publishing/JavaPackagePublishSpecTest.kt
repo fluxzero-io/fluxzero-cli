@@ -1,27 +1,49 @@
 package host.flux.publishing
 
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
+import com.google.cloud.tools.jib.http.Authorization
 import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Base64
+import kotlin.text.Charsets.UTF_8
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class JavaPackagePublishSpecTest {
     @Test
-    fun rejectsPlainHttpRegistryHost() {
-        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+    fun defaultsBasicUsernameToEmpty() {
+        val credential = credential(password = "registry-token")
 
-        assertThrows(IllegalArgumentException::class.java) {
-            JavaPackagePublishSpec(
-                registryHost = "http://localhost:8080",
-                registryToken = "token",
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
-                classesDirectory = classesDirectory
-            ).validate()
+        credential.validate()
+
+        assertEquals("", credential.username)
+        assertEquals(
+            "Basic " + Base64.getEncoder().encodeToString(":registry-token".toByteArray(UTF_8)),
+            Authorization.fromBasicCredentials(credential.username, credential.password).toString()
+        )
+    }
+
+    @Test
+    fun acceptsOnlyLowercaseRegistryHostsWithOptionalPorts() {
+        listOf("registry.fluxzero.io", "127.0.0.1:8443", "registry.fluxzero.io:443").forEach { host ->
+            credential(host = host).validate()
+        }
+
+        listOf(
+            "https://registry.fluxzero.io",
+            "registry.fluxzero.io/path",
+            "Registry.fluxzero.io",
+            " registry.fluxzero.io",
+            "registry.fluxzero.io ",
+            "user@registry.fluxzero.io",
+            "registry.fluxzero.io:0",
+            "registry.fluxzero.io:65536"
+        ).forEach { host ->
+            assertThrows(IllegalArgumentException::class.java, { credential(host = host).validate() }, host)
         }
     }
 
@@ -30,43 +52,27 @@ class JavaPackagePublishSpecTest {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
 
         assertThrows(IllegalArgumentException::class.java) {
-            JavaPackagePublishSpec(
-                registryHost = "registry.fluxzero.io",
-                registryToken = "token",
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
-                baseImage = "",
-                classesDirectory = classesDirectory
-            ).validate()
+            publishSpec(classesDirectory, baseImage = "").validate()
         }
     }
 
     @Test
-    fun rejectsInvalidTeamId() {
+    fun requiresExplicitImagesButAllowsAnonymousAccess() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
 
         assertThrows(IllegalArgumentException::class.java) {
-            JavaPackagePublishSpec(
-                registryHost = "registry.fluxzero.io",
-                registryToken = "token",
-                teamId = "team-a/service",
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
-                classesDirectory = classesDirectory
-            ).validate()
+            publishSpec(classesDirectory, images = emptyList()).validate()
         }
+
+        val anonymousSpec = publishSpec(classesDirectory, credentials = emptyList())
+        anonymousSpec.validate()
+        assertNull(anonymousSpec.credentialFor("registry.fluxzero.io/team/service"))
     }
 
     @Test
-    fun resolvesMultipleImagesAndTags() {
+    fun resolvesEveryTagForEveryImage() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
-
-        val spec = JavaPackagePublishSpec(
-            packageName = "service",
-            packageVersion = "1.0.0",
-            mainClass = "com.example.Application",
+        val spec = publishSpec(
             classesDirectory = classesDirectory,
             images = listOf(
                 "registry.fluxzero.io/org-a/service",
@@ -74,8 +80,8 @@ class JavaPackagePublishSpecTest {
             ),
             tags = listOf("1.0.0", "sha-1234567"),
             credentials = listOf(
-                JavaPackageRegistryCredential("registry.fluxzero.io", "github-ci", "fluxzero-token"),
-                JavaPackageRegistryCredential("ghcr.io", "github-actor", "github-token")
+                credential("registry.fluxzero.io", "registry-user", "fluxzero-token"),
+                credential("ghcr.io", "github-actor", "github-token")
             )
         )
 
@@ -88,17 +94,16 @@ class JavaPackagePublishSpecTest {
             ),
             spec.packageReferences().map { it.reference }
         )
-        assertEquals("github-token", spec.credentialFor("ghcr.io/fluxzero-io/dashboard-fluxzero-io-service").registryToken)
+        assertEquals(
+            "github-token",
+            spec.credentialFor("ghcr.io/fluxzero-io/dashboard-fluxzero-io-service")?.password
+        )
     }
 
     @Test
     fun resolvesOnePublishTargetPerImageWithAdditionalTags() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
-
-        val spec = JavaPackagePublishSpec(
-            packageName = "service",
-            packageVersion = "1.0.0",
-            mainClass = "com.example.Application",
+        val spec = publishSpec(
             classesDirectory = classesDirectory,
             images = listOf(
                 "registry.fluxzero.io/org-a/service",
@@ -106,8 +111,8 @@ class JavaPackagePublishSpecTest {
             ),
             tags = listOf("1.0.0", "sha-1234567"),
             credentials = listOf(
-                JavaPackageRegistryCredential("registry.fluxzero.io", "github-ci", "fluxzero-token"),
-                JavaPackageRegistryCredential("ghcr.io", "github-actor", "github-token")
+                credential("registry.fluxzero.io", "registry-user", "fluxzero-token"),
+                credential("ghcr.io", "github-actor", "github-token")
             )
         )
 
@@ -125,53 +130,52 @@ class JavaPackagePublishSpecTest {
         )
         assertEquals("ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:1.0.0", targets[1].primaryReference.reference)
         assertEquals(listOf("sha-1234567"), targets[1].additionalTags)
+    }
+
+    @Test
+    fun matchesAuthenticationByExactHostAndPort() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        val spec = publishSpec(
+            classesDirectory = classesDirectory,
+            images = listOf("registry.fluxzero.io:8443/team/service"),
+            credentials = listOf(
+                credential("registry.fluxzero.io", password = "default-port"),
+                credential("registry.fluxzero.io:8443", password = "custom-port")
+            )
+        )
+
         assertEquals(
-            listOf(
-                "ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:1.0.0",
-                "ghcr.io/fluxzero-io/dashboard-fluxzero-io-service:sha-1234567"
-            ),
-            targets[1].references.map { it.reference }
+            "custom-port",
+            spec.credentialFor("registry.fluxzero.io:8443/team/service")?.password
         )
     }
 
     @Test
-    fun resolvesLegacySingleTargetReferenceAndCredential() {
+    fun allowsAnonymousAccessForImagesWithoutMatchingCredential() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
-
-        val spec = JavaPackagePublishSpec(
-            registryHost = "registry.fluxzero.io",
-            registryUsername = "github-ci",
-            registryToken = "registry-token",
-            teamId = "958e1ee2f6c64facbc7765026a9a6e09",
-            packageName = "service",
-            packageVersion = "1.0.0",
-            mainClass = "com.example.Application",
-            classesDirectory = classesDirectory
-        )
-
-        assertEquals(
-            listOf("registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/service:1.0.0"),
-            spec.packageReferences().map { it.reference }
-        )
-        assertEquals("github-ci", spec.credentialFor("registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/service").registryUsername)
-        assertEquals("registry-token", spec.credentialFor("registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/service").registryToken)
-    }
-
-    @Test
-    fun rejectsImageWithoutMatchingCredentialDuringValidation() {
-        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
-
-        val spec = JavaPackagePublishSpec(
-            packageName = "service",
-            packageVersion = "1.0.0",
-            mainClass = "com.example.Application",
+        val spec = publishSpec(
             classesDirectory = classesDirectory,
             images = listOf(
-                "registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/service",
+                "registry.fluxzero.io/team/service",
                 "ghcr.io/fluxzero-io/service"
             ),
+            credentials = listOf(credential("registry.fluxzero.io"))
+        )
+
+        spec.validate()
+
+        assertEquals("registry-token", spec.credentialFor("registry.fluxzero.io/team/service")?.password)
+        assertNull(spec.credentialFor("ghcr.io/fluxzero-io/service"))
+    }
+
+    @Test
+    fun rejectsDuplicateCredentialsForOneHost() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        val spec = publishSpec(
+            classesDirectory = classesDirectory,
             credentials = listOf(
-                JavaPackageRegistryCredential("registry.fluxzero.io", "github-ci", "fluxzero-token")
+                credential("registry.fluxzero.io", password = "first"),
+                credential("registry.fluxzero.io", password = "second")
             )
         )
 
@@ -181,26 +185,41 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun rejectsUnusedCredentialsAndDuplicateTargets() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory = classesDirectory,
+                credentials = listOf(credential(), credential("ghcr.io"))
+            ).validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory = classesDirectory,
+                images = listOf(
+                    "registry.fluxzero.io/team/service",
+                    "registry.fluxzero.io/team/service"
+                )
+            ).validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory = classesDirectory,
+                tags = listOf("1.0.0", "1.0.0")
+            ).validate()
+        }
+    }
+
+    @Test
     fun rejectsInvalidPublishRetrySettings() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
 
         assertThrows(IllegalArgumentException::class.java) {
-            JavaPackagePublishSpec(
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
-                classesDirectory = classesDirectory,
-                publishAttempts = 0
-            ).validate()
+            publishSpec(classesDirectory, publishAttempts = 0).validate()
         }
         assertThrows(IllegalArgumentException::class.java) {
-            JavaPackagePublishSpec(
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
-                classesDirectory = classesDirectory,
-                publishRetryDelayMillis = -1
-            ).validate()
+            publishSpec(classesDirectory, publishRetryDelayMillis = -1).validate()
         }
     }
 
@@ -211,6 +230,7 @@ class JavaPackagePublishSpecTest {
             "registry.fluxzero.io/org/service:tag",
             "registry.fluxzero.io/org/service@sha256:abc",
             "registry.fluxzero.io/org/service name",
+            "registry.fluxzero.io:0/org/service",
             "registry.fluxzero.io"
         ).forEach { image ->
             assertThrows(IllegalArgumentException::class.java, {
@@ -269,12 +289,7 @@ class JavaPackagePublishSpecTest {
         Files.writeString(transitiveDependency, "transitive-dependency")
 
         val plan = JavaPackagePublisher().buildPlan(
-            JavaPackagePublishSpec(
-                registryHost = "registry.fluxzero.io",
-                registryToken = "token",
-                packageName = "service",
-                packageVersion = "1.0.0",
-                mainClass = "com.example.Application",
+            publishSpec(
                 classesDirectory = classesDirectory,
                 dependencies = listOf(
                     JavaPackageDependency(directDependency),
@@ -285,12 +300,8 @@ class JavaPackagePublishSpecTest {
 
         val fileEntriesLayers = plan.layers.filterIsInstance<FileEntriesLayer>()
         val entrypoint = plan.entrypoint
-        val dependencyEntries = fileEntriesLayers
-            .first { it.name == "dependencies" }
-            .entries
-        val applicationEntries = fileEntriesLayers
-            .first { it.name == "application" }
-            .entries
+        val dependencyEntries = fileEntriesLayers.first { it.name == "dependencies" }.entries
+        val applicationEntries = fileEntriesLayers.first { it.name == "application" }.entries
 
         assertEquals(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP, plan.creationTime)
         assertTrue(fileEntriesLayers.flatMap { it.entries }.all { it.modificationTime == JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP })
@@ -308,4 +319,33 @@ class JavaPackagePublishSpecTest {
             entrypoint
         )
     }
+
+    private fun publishSpec(
+        classesDirectory: Path,
+        images: List<String> = listOf("registry.fluxzero.io/team/service"),
+        credentials: List<JavaPackageRegistryCredential> = listOf(credential()),
+        tags: List<String> = emptyList(),
+        baseImage: String = JavaPackagePublishSpec.DEFAULT_BASE_IMAGE,
+        dependencies: List<JavaPackageDependency> = emptyList(),
+        publishAttempts: Int = JavaPackagePublishSpec.DEFAULT_PUBLISH_ATTEMPTS,
+        publishRetryDelayMillis: Long = JavaPackagePublishSpec.DEFAULT_PUBLISH_RETRY_DELAY_MILLIS
+    ): JavaPackagePublishSpec = JavaPackagePublishSpec(
+        packageName = "service",
+        packageVersion = "1.0.0",
+        mainClass = "com.example.Application",
+        classesDirectory = classesDirectory,
+        images = images,
+        credentials = credentials,
+        tags = tags,
+        baseImage = baseImage,
+        dependencies = dependencies,
+        publishAttempts = publishAttempts,
+        publishRetryDelayMillis = publishRetryDelayMillis
+    )
+
+    private fun credential(
+        host: String = "registry.fluxzero.io",
+        username: String = "",
+        password: String = "registry-token"
+    ): JavaPackageRegistryCredential = JavaPackageRegistryCredential(host, username, password)
 }

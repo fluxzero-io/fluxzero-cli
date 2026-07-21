@@ -44,50 +44,35 @@ class MojoConfigurationTest {
     }
 
     @Test
-    fun testPublishPackageRegistryHostParameterExists() {
-        val mojoClass = PublishPackageMojo::class.java
-        val fields = mojoClass.declaredFields
-
-        val registryHostField = fields.find { it.name == "registryHost" }
-        assertNotNull("registryHost parameter should exist for registry override", registryHostField)
-    }
-
-    @Test
-    fun testPublishPackageRegistryUsernameParameterExists() {
-        val mojoClass = PublishPackageMojo::class.java
-        val fields = mojoClass.declaredFields
-
-        val registryUsernameField = fields.find { it.name == "registryUsername" }
-        assertNotNull("registryUsername parameter should exist for non-Fluxzero registries", registryUsernameField)
-    }
-
-    @Test
-    fun testPublishPackageImagesTagsAndCredentialsParametersExist() {
+    fun testPublishPackageImagesTagsAndAuthenticationsParametersExist() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
 
         assertNotNull("images parameter should exist for multi-registry publishing", fields.find { it.name == "images" })
         assertNotNull("tags parameter should exist for multi-tag publishing", fields.find { it.name == "tags" })
-        assertNotNull("credentials parameter should exist for registry credentials", fields.find { it.name == "credentials" })
+        assertNotNull("authentications parameter should exist for registry authentication", fields.find { it.name == "authentications" })
     }
 
     @Test
-    fun testRegistryCredentialConfigurationFieldsExist() {
-        val fields = RegistryCredentialConfiguration::class.java.declaredFields
+    fun testAuthenticationFieldsExist() {
+        val fields = Authentication::class.java.declaredFields
 
-        assertNotNull(fields.find { it.name == "registryHost" })
-        assertNotNull(fields.find { it.name == "registryUsername" })
-        assertNotNull(fields.find { it.name == "registryToken" })
-        assertFalse(fields.any { it.name.endsWith("EnvironmentVariable") })
+        assertEquals(BasicAuthenticationConfiguration::class.java, fields.find { it.name == "basic" }?.type)
+        assertEquals(GitHubOidcAuthenticationConfiguration::class.java, fields.find { it.name == "githubOidc" }?.type)
+        assertEquals(setOf("host", "basic", "githubOidc"), fields.map { it.name }.toSet())
     }
 
     @Test
-    fun testPublishPackageTeamIdParameterExists() {
-        val mojoClass = PublishPackageMojo::class.java
-        val fields = mojoClass.declaredFields
+    fun testRegistryAuthenticationMechanismsHaveDistinctFields() {
+        val basicFields = BasicAuthenticationConfiguration::class.java.declaredFields
+        assertNotNull(basicFields.find { it.name == "username" })
+        assertNotNull(basicFields.find { it.name == "token" })
+        assertEquals(setOf("username", "token"), basicFields.map { it.name }.toSet())
 
-        val teamIdField = fields.find { it.name == "teamId" }
-        assertNotNull("teamId parameter should exist for team-prefixed package paths", teamIdField)
+        val githubOidcFields = GitHubOidcAuthenticationConfiguration::class.java.declaredFields
+        assertNotNull(githubOidcFields.find { it.name == "username" })
+        assertNotNull(githubOidcFields.find { it.name == "audience" })
+        assertEquals(setOf("username", "audience"), githubOidcFields.map { it.name }.toSet())
     }
 
     @Test

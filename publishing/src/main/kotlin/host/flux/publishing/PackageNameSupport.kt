@@ -9,8 +9,6 @@ import java.util.Locale
 import java.util.jar.Attributes
 
 object PackageNameSupport {
-    const val DEFAULT_REGISTRY_HOST = "registry.fluxzero.io"
-
     private val packageNamePattern = Regex("[a-z0-9]([-a-z0-9_.]*[a-z0-9])?")
     private val tagPattern = Regex("[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")
     private val generatedTagTimestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC)
@@ -21,31 +19,37 @@ object PackageNameSupport {
         val dirty: Boolean
     )
 
-    fun packageReference(registryHost: String, packageName: String, version: String): String =
-        packageReference(registryHost, null, packageName, version)
+    fun packageReference(host: String, packageName: String, version: String): String =
+        packageReference(host, null, packageName, version)
 
-    fun packageReference(registryHost: String, teamId: String?, packageName: String, version: String): String {
-        return "${packageRepository(registryHost, teamId, packageName)}:$version"
+    fun packageReference(host: String, teamId: String?, packageName: String, version: String): String {
+        return "${packageRepository(host, teamId, packageName)}:$version"
     }
 
-    fun packageRepository(registryHost: String, teamId: String?, packageName: String): String {
-        val registry = registryAuthority(registryHost)
+    fun packageRepository(host: String, teamId: String?, packageName: String): String {
+        val registry = registryAuthority(host)
         val teamPath = teamId?.trim('/')?.takeIf { it.isNotBlank() }
         return if (teamPath == null) "$registry/$packageName" else "$registry/$teamPath/$packageName"
     }
 
-    fun registryAuthority(registryHost: String): String {
-        val trimmed = registryHost.trim().removeSuffix("/")
-        val lower = trimmed.lowercase(Locale.ROOT)
-        if (lower.startsWith("http://") || lower.startsWith("https://")) {
-            val uri = URI.create(trimmed)
-            return if (uri.port >= 0) "${uri.host}:${uri.port}" else uri.host
-        }
-        return trimmed.substringBefore("/")
+    fun registryAuthority(registryReference: String): String {
+        return registryReference.trim().removeSuffix("/").substringBefore("/")
     }
 
-    fun isPlainHttpRegistryHost(registryHost: String): Boolean =
-        registryHost.trim().startsWith("http://", ignoreCase = true)
+    fun isValidRegistryHost(host: String): Boolean {
+        val normalized = host.trim()
+        if (host != normalized || normalized.isBlank() || normalized != normalized.lowercase(Locale.ROOT)) {
+            return false
+        }
+        if (normalized.contains('/') || normalized.contains('@') || normalized.contains('?') || normalized.contains('#')) {
+            return false
+        }
+        return runCatching {
+            val uri = URI.create("https://$normalized")
+            uri.host?.isNotBlank() == true && uri.userInfo == null && uri.path.isBlank() &&
+                uri.query == null && uri.fragment == null && (uri.port == -1 || uri.port in 1..65535)
+        }.getOrDefault(false)
+    }
 
     fun defaultPackageVersion(projectVersion: String): String {
         if (isValidTag(projectVersion)) {
@@ -138,9 +142,9 @@ object PackageNameSupport {
         if (normalized.substringAfterLast("/").contains(":")) {
             return false
         }
-        val registryHost = registryAuthority(normalized)
+        val targetHost = registryAuthority(normalized)
         val path = normalized.substringAfter("/")
-        return registryHost.isNotBlank() && path.split("/").all { isValidPackageName(it) }
+        return isValidRegistryHost(targetHost) && path.split("/").all { isValidPackageName(it) }
     }
 
     fun isValidTag(version: String): Boolean = tagPattern.matches(version)

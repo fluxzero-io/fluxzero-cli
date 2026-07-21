@@ -54,12 +54,20 @@
         <artifactId>fluxzero-maven-plugin</artifactId>
         <version>${fluxzero.maven.plugin.version}</version>
         <configuration>
-          <registryHost>${env.FLUXZERO_REGISTRY_HOST}</registryHost>
-          <registryToken>${env.FLUXZERO_REGISTRY_TOKEN}</registryToken>
-          <teamId>team-a</teamId>
           <packageName>plain-java</packageName>
           <packageVersion>${env.FLUXZERO_PACKAGE_VERSION}</packageVersion>
           <applicationId>local-plain-app</applicationId>
+          <images>
+            <image>${env.FLUXZERO_REGISTRY_HOST}/team-a/plain-java</image>
+          </images>
+          <authentications>
+            <authentication>
+              <host>${env.FLUXZERO_REGISTRY_HOST}</host>
+              <basic>
+                <token>${env.FLUXZERO_REGISTRY_TOKEN}</token>
+              </basic>
+            </authentication>
+          </authentications>
         </configuration>
       </plugin>
     </plugins>
