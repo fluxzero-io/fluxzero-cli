@@ -157,6 +157,22 @@ jobs:
             exit 0
           }
 
+          $packageUrl = "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/f/Fluxzero/FluxzeroCLI"
+          curl.exe -fsS -o NUL $packageUrl
+          if ($LASTEXITCODE -ne 0) {
+            $bootstrapPr = gh pr list `
+              --repo microsoft/winget-pkgs `
+              --state open `
+              --search "Fluxzero.FluxzeroCLI in:title" `
+              --json url `
+              --jq '.[0].url'
+            if (-not [string]::IsNullOrWhiteSpace($bootstrapPr)) {
+              Write-Host "::notice title=WinGet bootstrap pending::The initial Fluxzero CLI package is awaiting Microsoft review: $bootstrapPr. Homebrew publishing is unaffected."
+              exit 0
+            }
+            throw "Fluxzero.FluxzeroCLI is not published in WinGet and no bootstrap pull request is open. Submit the initial package before releasing $env:VERSION."
+          }
+
           $url = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$env:VERSION/flux-windows-amd64.zip"
           .\wingetcreate.exe update Fluxzero.FluxzeroCLI `
             --urls $url `
