@@ -39,5 +39,8 @@ assert_version 1.4.1 repository_dispatch 42
 
 commit "fix(dev): improve startup"
 assert_version 1.4.2 push 1
+git -C "$repository" tag -a 1.4.2 -m $'Fluxzero CLI 1.4.2\n\nRelease run: 51'
+commit "fix(dev): recover after reserved release"
+assert_version 1.4.3 push 52
 commit "feat(dev)!: replace launcher protocol"
 assert_version 2.0.0 push 1
