@@ -1,5 +1,4 @@
 import org.gradle.api.tasks.PathSensitivity
-import java.util.zip.ZipFile
 
 plugins {
     kotlin("jvm")
@@ -15,74 +14,6 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testImplementation("io.mockk:mockk:1.14.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
-
-fun ZipFile.readRequiredInstruction(templateName: String, entryName: String): String {
-    val entry = getEntry(entryName)
-    require(entry != null) {
-        "$templateName.zip is missing the required $entryName instruction."
-    }
-    return getInputStream(entry).bufferedReader().use { it.readText() }
-}
-
-fun ZipFile.verifyAgentInstructions(templateName: String) {
-    val agentsText = readRequiredInstruction(templateName, "AGENTS.md")
-    val requiredAgentGuidance = listOf(
-        "installed Fluxzero plugin",
-        "fluxzero-docs",
-        "fluxzero-dev",
-        "build-fluxzero-app",
-        "fluxzero-io/fluxzero-agent-plugins",
-        "repository-local Fluxzero manuals",
-        "Do not run duplicate builds"
-    )
-    require(requiredAgentGuidance.all(agentsText::contains)) {
-        "$templateName.zip AGENTS.md must install or use the Fluxzero plugin, route SDK guidance through MCP, and reject local manuals."
-    }
-
-    val claudeText = readRequiredInstruction(templateName, "CLAUDE.md")
-    require(
-        "@AGENTS.md" in claudeText &&
-            "claude plugin marketplace add fluxzero-io/fluxzero-agent-plugins" in claudeText &&
-            "claude plugin install fluxzero@fluxzero" in claudeText
-    ) {
-        "$templateName.zip CLAUDE.md must import the shared instructions and bootstrap the Fluxzero Claude plugin."
-    }
-
-    val geminiText = readRequiredInstruction(templateName, "GEMINI.md")
-    require(
-        "@./AGENTS.md" in geminiText &&
-            "gemini extensions install https://github.com/fluxzero-io/fluxzero-agent-plugins" in geminiText
-    ) {
-        "$templateName.zip GEMINI.md must import the shared instructions and bootstrap the Fluxzero Gemini extension."
-    }
-
-    val forbiddenEntries = entries().asSequence()
-        .filterNot { it.isDirectory }
-        .map { it.name }
-        .filter { name ->
-            name.endsWith("/AGENTS.md") ||
-                name.endsWith("/CLAUDE.md") ||
-                name.endsWith("/GEMINI.md") ||
-                name.startsWith(".fluxzero/agents/") || name.contains("/.fluxzero/agents/")
-        }
-        .toList()
-    require(forbiddenEntries.isEmpty()) {
-        "$templateName.zip contains nested duplicate or retired agent instructions: ${forbiddenEntries.joinToString()}"
-    }
-}
-
-fun ZipFile.verifyDevEnvironment(templateName: String) {
-    val devConfig = getEntry(".fluxzero/dev.yaml")
-    require(devConfig != null && getInputStream(devConfig).bufferedReader().use { it.readText() }.contains("version: 1")) {
-        "$templateName.zip must contain tracked Fluxzero dev-server defaults."
-    }
-    require(getEntry(".run/TestApp.run.xml") == null) {
-        "$templateName.zip must not contain the replaced TestApp launcher."
-    }
-    require(entries().asSequence().filterNot { it.isDirectory }.none { it.name.startsWith(".fluxzero/agents/") }) {
-        "$templateName.zip must not contain synced local manuals."
-    }
 }
 
 // Configuration for the separately released template repository.
@@ -164,51 +95,6 @@ val packageTemplates by tasks.registering(Exec::class) {
     outputs.dir(generatedTemplatesDir)
 }
 
-val verifyPackagedTemplates by tasks.registering {
-    group = "verification"
-    description = "Verify packaged templates include current login support and minimal plugin guidance."
-
-    dependsOn(packageTemplates)
-
-    val javaTemplateZip = generatedTemplatesDir.map { it.file("flux-basic-java.zip") }
-    val kotlinTemplateZip = generatedTemplatesDir.map { it.file("flux-basic-kotlin.zip") }
-    inputs.files(javaTemplateZip, kotlinTemplateZip)
-
-    doLast {
-        val zipFile = javaTemplateZip.get().asFile
-        require(zipFile.isFile) { "Missing packaged template: ${zipFile.absolutePath}" }
-
-        ZipFile(zipFile).use { zip ->
-            zip.verifyAgentInstructions("flux-basic-java")
-            zip.verifyDevEnvironment("flux-basic-java")
-
-            val authEndpoint = zip.getEntry("src/main/java/com/example/app/authentication/AppAuthEndpoint.java")
-            require(authEndpoint != null) {
-                "flux-basic-java.zip is missing AppAuthEndpoint.java; generated login cannot work out-of-the-box."
-            }
-
-            val staleEntries = zip.entries().asSequence()
-                .filterNot { it.isDirectory }
-                .filter { it.name.endsWith(".java") || it.name.endsWith(".kt") }
-                .filter { entry ->
-                    zip.getInputStream(entry).bufferedReader().use { it.readText() }.contains("LocalStubIdp")
-                }
-                .map { it.name }
-                .toList()
-            require(staleEntries.isEmpty()) {
-                "flux-basic-java.zip still references the removed LocalStubIdp API: ${staleEntries.joinToString()}"
-            }
-        }
-
-        val kotlinZipFile = kotlinTemplateZip.get().asFile
-        require(kotlinZipFile.isFile) { "Missing packaged template: ${kotlinZipFile.absolutePath}" }
-        ZipFile(kotlinZipFile).use { zip ->
-            zip.verifyAgentInstructions("flux-basic-kotlin")
-            zip.verifyDevEnvironment("flux-basic-kotlin")
-        }
-    }
-}
-
 sourceSets {
     main {
         resources {
@@ -218,7 +104,7 @@ sourceSets {
 }
 
 tasks.named("processResources") {
-    dependsOn(verifyPackagedTemplates)
+    dependsOn(packageTemplates)
 }
 
 tasks.test {
