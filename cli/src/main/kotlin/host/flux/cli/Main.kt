@@ -54,7 +54,12 @@ fun main(args: Array<String>) {
             )
             .main(args)
     } catch (e: Exception) {
-        System.err.println("Error: ${e.message}")
+        System.err.println("Error: ${e.actionableMessage()}")
         kotlin.system.exitProcess(1)
     }
 }
+
+internal fun Throwable.actionableMessage(): String = generateSequence(this) { it.cause }
+    .mapNotNull { cause -> cause.message?.takeIf(String::isNotBlank) }
+    .firstOrNull()
+    ?: javaClass.simpleName

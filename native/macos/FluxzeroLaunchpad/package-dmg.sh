@@ -68,16 +68,39 @@ end tell
 OSA
 }
 
+detach_disk_image() {
+    local target="$1"
+    local attempts="${DMG_DETACH_ATTEMPTS:-5}"
+    local retry_seconds="${DMG_DETACH_RETRY_SECONDS:-1}"
+    local attempt
+
+    for ((attempt = 1; attempt <= attempts; attempt++)); do
+        if hdiutil detach "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        if ((attempt < attempts)); then
+            sleep "$retry_seconds"
+        fi
+    done
+
+    echo "Could not detach $target after $attempts attempts; forcing detach." >&2
+    hdiutil detach -force "$target" >/dev/null
+}
+
 detach_existing_volume() {
     local mount_point
     while IFS= read -r mount_point; do
         local volume_basename
         volume_basename="$(basename "$mount_point")"
         if [[ "$volume_basename" == "$VOLUME_NAME" || "$volume_basename" == "$VOLUME_NAME "* ]]; then
-            hdiutil detach "$mount_point" >/dev/null 2>&1 || true
+            detach_disk_image "$mount_point" >/dev/null 2>&1 || true
         fi
     done < <(find /Volumes -maxdepth 1 -mindepth 1 -type d -print 2>/dev/null)
 }
+
+if [[ "${FLUXZERO_DMG_FUNCTIONS_ONLY:-0}" == "1" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 "$SCRIPT_DIR/build.sh"
 
@@ -103,7 +126,7 @@ DEVICE=""
 
 cleanup() {
     if [[ -n "$DEVICE" ]]; then
-        hdiutil detach "$DEVICE" >/dev/null 2>&1 || true
+        detach_disk_image "$DEVICE" >/dev/null 2>&1 || true
     fi
     rm -rf "$TMP_DIR"
 }
@@ -146,7 +169,7 @@ fi
 
 rm -rf "$MOUNT_DIR/.fseventsd" "$MOUNT_DIR/.Trashes"
 sync
-hdiutil detach "$DEVICE" >/dev/null
+detach_disk_image "$DEVICE"
 DEVICE=""
 
 hdiutil convert "$RW_DMG" \
