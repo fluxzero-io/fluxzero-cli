@@ -25,3 +25,6 @@ jobs:
 
       - name: Test Homebrew formula generation
         run: scripts/test-render-homebrew-formula.sh
+
+      - name: Test macOS DMG detach recovery
+        run: scripts/test-package-dmg-detach.sh
