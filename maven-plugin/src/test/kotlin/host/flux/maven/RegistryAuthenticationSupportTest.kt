@@ -1,5 +1,6 @@
 package host.flux.maven
 
+import host.flux.publishing.JavaPackageRegistryCredential
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,19 +14,108 @@ import org.junit.Test
 
 class RegistryAuthenticationSupportTest {
     @Test
-    fun `requires at least one explicit image`() {
+    fun `keeps explicit images without resolving registry identity`() {
+        var identityRequests = 0
         assertEquals(
             listOf("registry.example.com/team/service"),
-            PackageImageSupport.resolve(listOf(" ", " registry.example.com/team/service "))
+            PackageImageSupport.resolve(
+                configuredImages = listOf(" ", " registry.example.com/team/service "),
+                packageName = "service",
+                credentials = emptyList(),
+                organisationId = {
+                    identityRequests++
+                    "unused"
+                }
+            )
         )
+        assertEquals(0, identityRequests)
+    }
 
+    @Test
+    fun `requires at least one explicit image`() {
         val missingTarget = assertFailsWith<MojoFailureException> {
-            PackageImageSupport.resolve(emptyList())
+            PackageImageSupport.resolve(emptyList(), "service", emptyList()) { "unused" }
         }
+        assertEquals("Configure at least one <image> under <images>.", missingTarget.message)
+    }
+
+    @Test
+    fun `resolves organisation placeholder using exact registry host authentication`() {
+        val fluxzero = JavaPackageRegistryCredential("registry.fluxzero.io", password = "fluxzero-token")
+        val github = JavaPackageRegistryCredential("ghcr.io", password = "github-token")
+        val resolvedFor = mutableListOf<String>()
+
+        val images = PackageImageSupport.resolve(
+            listOf(
+                "registry.fluxzero.io/\${organisationId}/\${packageName}",
+                "ghcr.io/fluxzero/\${packageName}"
+            ),
+            "service",
+            listOf(fluxzero, github)
+        ) {
+            resolvedFor += it.host
+            "owned"
+        }
+
         assertEquals(
-            "Configure at least one <image> under <images>.",
-            missingTarget.message
+            listOf("registry.fluxzero.io/owned/service", "ghcr.io/fluxzero/service"),
+            images
         )
+        assertEquals(listOf("registry.fluxzero.io"), resolvedFor)
+    }
+
+    @Test
+    fun `requires organisation placeholder to be a complete segment with matching authentication`() {
+        listOf(
+            "registry.fluxzero.io/prefix-\${organisationId}/service",
+            "registry.fluxzero.io/\${organisationId}/\${organisationId}/service",
+            "\${organisationId}/service"
+        ).forEach { image ->
+            val invalid = assertFailsWith<MojoFailureException> {
+                PackageImageSupport.resolve(
+                    listOf(image),
+                    "service",
+                    listOf(JavaPackageRegistryCredential("registry.fluxzero.io", password = "token"))
+                ) { "owned" }
+            }
+            assertTrue(invalid.message.orEmpty().contains("complete image path segment"))
+        }
+
+        val missingAuthentication = assertFailsWith<MojoFailureException> {
+            PackageImageSupport.resolve(
+                listOf("registry.fluxzero.io/\${organisationId}/service"),
+                "service",
+                emptyList()
+            ) { "owned" }
+        }
+        assertTrue(missingAuthentication.message.orEmpty().contains("has no authentication"))
+    }
+
+    @Test
+    fun `rejects invalid organisation id returned by registry identity`() {
+        val invalid = assertFailsWith<MojoFailureException> {
+            PackageImageSupport.resolve(
+                listOf("registry.fluxzero.io/\${organisationId}/service"),
+                "service",
+                listOf(JavaPackageRegistryCredential("registry.fluxzero.io", password = "token"))
+            ) { "not/a/path-segment" }
+        }
+
+        assertEquals("Registry identity returned an invalid organisationId.", invalid.message)
+    }
+
+    @Test
+    fun `requires package name placeholder to be a complete path segment`() {
+        listOf(
+            "registry.fluxzero.io/owned/prefix-\${packageName}",
+            "registry.fluxzero.io/owned/\${packageName}/\${packageName}",
+            "\${packageName}/owned/service"
+        ).forEach { image ->
+            val invalid = assertFailsWith<MojoFailureException> {
+                PackageImageSupport.resolve(listOf(image), "service", emptyList()) { "unused" }
+            }
+            assertTrue(invalid.message.orEmpty().contains("complete image path segment"))
+        }
     }
 
     @Test

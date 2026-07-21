@@ -121,7 +121,7 @@ come from CI or the local environment.
   <packageName>my-service</packageName>
   <applicationId>...</applicationId>
   <images>
-    <image>registry.fluxzero.io/958e1ee2f6c64facbc7765026a9a6e09/my-service</image>
+    <image>registry.fluxzero.io/${organisationId}/${packageName}</image>
   </images>
   <tags>
     <tag>${project.version}</tag>
@@ -159,7 +159,7 @@ Package and registry configuration is Maven configuration only:
 | `packageName` | Yes | — | Public package name. |
 | `applicationId` | No | — | Fluxzero application id stored as package metadata. |
 | `packageVersion` | No | Generated git/time-based tag | Primary package tag when `tags` is omitted. |
-| `images` | Yes | — | One or more explicit image repositories. |
+| `images` | Yes | — | One or more image repositories. `${packageName}` reuses `packageName`; `${organisationId}` resolves the registry organisation from matching authentication. Both must be complete path segments. |
 | `tags` | No | `packageVersion`, or its generated value | Tags applied to every configured image. |
 | `authentications` | No | Anonymous access | Optional host-bound authentication; unmatched target registries remain anonymous. |
 
@@ -170,8 +170,8 @@ for target registries that require it.
 <configuration>
   <packageName>my-service</packageName>
   <images>
-    <image>registry.fluxzero.io/${env.FLUXZERO_ORGANISATION_ID}/my-service</image>
-    <image>ghcr.io/${env.GITHUB_REPOSITORY}-${project.artifactId}</image>
+    <image>registry.fluxzero.io/${organisationId}/${packageName}</image>
+    <image>ghcr.io/${env.GITHUB_REPOSITORY}/${packageName}</image>
   </images>
   <tags>
     <tag>${project.version}</tag>
@@ -212,6 +212,15 @@ authentications that match no image are configuration errors. Authentications de
 username/password credential for Jib; they are not themselves necessarily long-lived credentials. Tags and images form
 a Cartesian product: every tag is published to every image. Jib performs one containerization per image and attaches the
 remaining tags to that same push.
+
+`${packageName}` and `${organisationId}` are reserved complete image-path segments. The plugin substitutes the configured
+package name directly. For an image that contains `${organisationId}`, the plugin first requests
+`/v2/` from that image's registry without credentials and reads the standard Docker Bearer token realm from the
+`WWW-Authenticate` challenge. A Fluxzero realm ending in `/api/registry/token` exposes the sibling
+`/api/registry/identity` endpoint. The plugin sends the configured registry token to that HTTPS endpoint as a Bearer
+token and substitutes the returned `organisationId`. It never sends that token during unauthenticated discovery. The
+placeholder therefore also works when multiple registries are configured; its image must have an authentication with an
+exactly matching host and port.
 
 `basic` sends the configured username and token to Jib as registry username/password credentials. Its username defaults
 to empty; configure it for registries that use the username as part of authentication:

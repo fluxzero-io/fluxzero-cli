@@ -45,7 +45,7 @@ class PublishPackageMojo : AbstractMojo() {
     private var session: MavenSession? = null
 
     /**
-     * Required image repositories.
+     * Required image repositories. Complete path segments may use organisationId and packageName placeholders.
      */
     @Parameter(required = true)
     private var images: List<String> = emptyList()
@@ -175,8 +175,8 @@ class PublishPackageMojo : AbstractMojo() {
         val resolvedJavaToolOptions = configuredValue("fluxzero.package.javaToolOptions", "JAVA_TOOL_OPTIONS", javaToolOptions)
             ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
 
-        val resolvedImages = resolveImages()
         val resolvedCredentials = resolveAuthentications()
+        val resolvedImages = resolveImages(resolvedPackageName, resolvedCredentials)
         val packageReferences = resolvedImages.flatMap { image -> resolvedTags.map { tag -> "$image:$tag" } }.joinToString(", ")
         log.info("Building Fluxzero Java package $packageReferences")
 
@@ -270,7 +270,21 @@ class PublishPackageMojo : AbstractMojo() {
         )
     }
 
-    private fun resolveImages(): List<String> = PackageImageSupport.resolve(images)
+    private fun resolveImages(
+        resolvedPackageName: String,
+        credentials: List<JavaPackageRegistryCredential>
+    ): List<String> {
+        val identities = mutableMapOf<String, String>()
+        return try {
+            PackageImageSupport.resolve(images, resolvedPackageName, credentials) { credential ->
+                identities.getOrPut(credential.host) {
+                    RegistryIdentityResolver().resolveOrganisationId(credential)
+                }
+            }
+        } catch (exception: RegistryIdentityException) {
+            throw MojoFailureException(exception.message)
+        }
+    }
 
     private fun resolveAuthentications(): List<JavaPackageRegistryCredential> = try {
         RegistryAuthenticationSupport.resolve(
@@ -291,13 +305,52 @@ class PublishPackageMojo : AbstractMojo() {
 }
 
 internal object PackageImageSupport {
-    fun resolve(configuredImages: List<String>): List<String> {
+    const val ORGANISATION_ID_PLACEHOLDER = "\${organisationId}"
+    const val PACKAGE_NAME_PLACEHOLDER = "\${packageName}"
+
+    fun resolve(
+        configuredImages: List<String>,
+        packageName: String,
+        credentials: List<JavaPackageRegistryCredential>,
+        organisationId: (JavaPackageRegistryCredential) -> String
+    ): List<String> {
         val images = configuredImages.map { it.trim() }.filter { it.isNotBlank() }
         if (images.isEmpty()) {
             throw MojoFailureException("Configure at least one <image> under <images>.")
         }
-        return images
+        return images.map { configuredImage ->
+            validatePlaceholder(configuredImage, PACKAGE_NAME_PLACEHOLDER)
+            validatePlaceholder(configuredImage, ORGANISATION_ID_PLACEHOLDER)
+            val withPackageName = configuredImage.replace(PACKAGE_NAME_PLACEHOLDER, packageName)
+            if (!withPackageName.contains(ORGANISATION_ID_PLACEHOLDER)) {
+                return@map withPackageName
+            }
+            val host = PackageNameSupport.registryAuthority(withPackageName)
+            val credential = credentials.singleOrNull { it.host == host }
+                ?: throw MojoFailureException(
+                    "Image '$configuredImage' uses $ORGANISATION_ID_PLACEHOLDER but has no authentication for registry host '$host'."
+                )
+            val resolvedOrganisationId = organisationId(credential)
+            if (!PackageNameSupport.isValidPackageName(resolvedOrganisationId)) {
+                throw MojoFailureException("Registry identity returned an invalid organisationId.")
+            }
+            withPackageName.replace(ORGANISATION_ID_PLACEHOLDER, resolvedOrganisationId)
+        }
     }
+
+    private fun validatePlaceholder(image: String, placeholder: String) {
+        if (!image.contains(placeholder)) {
+            return
+        }
+        val pathSegments = image.substringAfter('/', "").split('/')
+        if (pathSegments.count { it == placeholder } != 1 || image.countOccurrences(placeholder) != 1) {
+            throw MojoFailureException(
+                "$placeholder must occur exactly once as a complete image path segment: '$image'."
+            )
+        }
+    }
+
+    private fun String.countOccurrences(value: String): Int = windowed(value.length).count { it == value }
 }
 
 internal object MavenRuntimeClasspathOrder {
