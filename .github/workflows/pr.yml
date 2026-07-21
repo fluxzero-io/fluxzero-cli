@@ -23,6 +23,9 @@ jobs:
       - name: Test release versioning
         run: scripts/test-determine-release-version.sh
 
+      - name: Test Central publication decisions
+        run: scripts/test-central-publish-decision.sh
+
       - name: Test Homebrew formula generation
         run: scripts/test-render-homebrew-formula.sh
 

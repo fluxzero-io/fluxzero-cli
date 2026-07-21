@@ -85,7 +85,7 @@ jobs:
 
   publish-plugins:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build-macos, native-build-cli]
+    needs: [version, build-and-test, native-build-macos, native-build-cli, reserve-version]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -109,19 +109,31 @@ jobs:
           curl -fsS "$maven_pom" >/dev/null && existing=$((existing + 1)) || true
           curl -fsS "$gradle_pom" >/dev/null && existing=$((existing + 1)) || true
           curl -fsS "$marker_pom" >/dev/null && existing=$((existing + 1)) || true
-          if [[ "$existing" == "3" ]]; then
-            echo "Fluxzero plugins $version are already available from Maven Central."
-            echo "published=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "$existing" != "0" ]]; then
-            echo "Fluxzero plugin release $version is only partially present in Maven Central; refusing an unsafe retry." >&2
-            exit 1
-          fi
-          ./gradlew :maven-plugin:publishAndReleaseToMavenCentral \
-                    :gradle-plugin:publishAndReleaseToMavenCentral \
-                    -PappVersion="$version"
-          echo "published=true" >> "$GITHUB_OUTPUT"
+          decision="$(scripts/central-publish-decision.sh \
+            "$existing" \
+            "${{ needs.reserve-version.outputs.created }}" \
+            "${{ github.run_attempt }}")"
+          case "$decision" in
+            complete)
+              echo "Fluxzero plugins $version are already available from Maven Central."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            wait)
+              echo "Release $version was already reserved or this is a workflow rerun."
+              echo "Skipping a duplicate Central upload and waiting for the accepted deployment."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              ;;
+            publish)
+              ./gradlew :maven-plugin:publishAndReleaseToMavenCentral \
+                        :gradle-plugin:publishAndReleaseToMavenCentral \
+                        -PappVersion="$version"
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              ;;
+            conflict)
+              echo "Fluxzero plugin release $version was reserved by this run but is already partially present in Maven Central." >&2
+              exit 1
+              ;;
+          esac
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
@@ -141,6 +153,8 @@ jobs:
             fi
             if [[ "$attempt" == "60" ]]; then
               echo "Plugins $version did not become available from Maven Central within 20 minutes." >&2
+              echo "The version remains reserved. Rerunning this workflow will wait without uploading it again." >&2
+              echo "If the Central deployment failed, start a new Release workflow to reserve the next version." >&2
               exit 1
             fi
             sleep 20
@@ -170,20 +184,25 @@ jobs:
       targets-json: >-
         {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 
-  tag-release:
+  reserve-version:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, publish-plugins, native-build-macos, native-build-cli]
+    needs: [version, build-and-test, native-build-macos, native-build-cli]
     permissions:
       contents: write
+    outputs:
+      created: ${{ steps.reserve.outputs.created }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Create verified release tag
+      - name: Reserve release version
+        id: reserve
         shell: bash
         run: |
+          # The numeric tag is the durable release lock. Even if Central fails,
+          # a later commit must use a new coordinate instead of uploading twice.
           version="${{ needs.version.outputs.version }}"
           git fetch --tags --force
           if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
@@ -192,6 +211,8 @@ jobs:
               echo "Tag $version points to $tag_sha instead of $GITHUB_SHA." >&2
               exit 1
             fi
+            echo "Release version $version was already reserved by this run."
+            echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -200,9 +221,11 @@ jobs:
             -m "Fluxzero CLI $version" \
             -m "Release run: $GITHUB_RUN_ID"
           git push origin "refs/tags/$version"
+          echo "Reserved release version $version."
+          echo "created=true" >> "$GITHUB_OUTPUT"
 
   macos-launchpad-build:
-    needs: [version, native-build-macos, tag-release]
+    needs: [version, native-build-macos, reserve-version]
     uses: ./.github/workflows/macos-launchpad-build.yml
     with:
       version: ${{ needs.version.outputs.version }}
@@ -210,7 +233,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [version, build-and-test, native-build-macos, native-build-cli, tag-release]
+    needs: [version, build-and-test, publish-plugins, native-build-macos, native-build-cli, reserve-version]
     permissions:
       contents: write
 
