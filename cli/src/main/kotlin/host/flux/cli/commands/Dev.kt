@@ -16,6 +16,7 @@ import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
 import host.flux.dev.DevServerLauncher
+import java.nio.file.Files
 import java.nio.file.Path
 
 class Dev(
@@ -105,6 +106,12 @@ class Dev(
         if (selectedAction !in setOf("start", "attach", "status", "logs", "stop")) {
             throw UsageError("Unknown dev action '$selectedAction'. Expected start, attach, status, logs, or stop.")
         }
+        if (selectedAction == "start" && !isBuildProject(root)) {
+            throw UsageError(
+                "No Maven or Gradle project found in '$root'. " +
+                    "Run fz dev from the project root or pass --project-dir <path>."
+            )
+        }
         if (selectedAction != "start") {
             val controlArguments = buildList {
                 add(selectedAction)
@@ -163,4 +170,12 @@ class Dev(
             add(value)
         }
     }
+
+    private fun isBuildProject(directory: Path): Boolean = listOf(
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts"
+    ).any { Files.isRegularFile(directory.resolve(it)) }
 }

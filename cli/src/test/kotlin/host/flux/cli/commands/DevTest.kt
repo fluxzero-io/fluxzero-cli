@@ -5,6 +5,7 @@ import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,8 +15,13 @@ class DevTest {
     @TempDir
     lateinit var projectDirectory: Path
 
+    private fun mavenProject() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+    }
+
     @Test
     fun `forwards dev configuration to shared launcher`() {
+        mavenProject()
         var request: DevLaunchRequest? = null
         val launcher = DevLauncher { captured -> request = captured; 0 }
 
@@ -88,6 +94,7 @@ class DevTest {
 
     @Test
     fun `forwards backend only override`() {
+        mavenProject()
         var request: DevLaunchRequest? = null
         val launcher = DevLauncher { captured -> request = captured; 0 }
 
@@ -101,6 +108,7 @@ class DevTest {
 
     @Test
     fun `starts dev server detached when background is requested`() {
+        mavenProject()
         var request: DevLaunchRequest? = null
         val launcher = DevLauncher { captured -> request = captured; 0 }
 
@@ -111,6 +119,19 @@ class DevTest {
         assertEquals(0, result.statusCode)
         assertEquals(DevLaunchTarget.SERVER, request?.target)
         assertTrue(request?.detached == true)
+    }
+
+    @Test
+    fun `rejects start outside a Maven or Gradle project before launching`() {
+        var launched = false
+        val result = Dev { launched = true; 0 }.test(
+            listOf("--project-dir", projectDirectory.toString())
+        )
+
+        assertEquals(1, result.statusCode)
+        assertTrue(!launched)
+        assertTrue(result.output.contains("No Maven or Gradle project found in '$projectDirectory'"))
+        assertTrue(result.output.contains("--project-dir <path>"))
     }
 
     @Test
