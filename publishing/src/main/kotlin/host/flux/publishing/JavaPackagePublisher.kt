@@ -8,6 +8,7 @@ import com.google.cloud.tools.jib.api.RegistryImage
 import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
 import com.google.cloud.tools.jib.api.buildplan.ContainerBuildPlan
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
+import com.google.cloud.tools.jib.api.buildplan.Platform
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -88,25 +89,23 @@ class JavaPackagePublisher : PackagePublisher {
             BaseImageSource.REGISTRY -> Jib.from(spec.baseImage)
             BaseImageSource.DOCKER_DAEMON -> Jib.from(DockerDaemonImage.named(spec.baseImage))
         }
+            .setPlatforms(
+                spec.platforms.mapTo(linkedSetOf()) { platform ->
+                    Platform(platform.architecture, platform.os)
+                }
+            )
             .setCreationTime(JavaPackagePublishSpec.REPRODUCIBLE_CONTAINER_TIMESTAMP)
             .setWorkingDirectory(AbsoluteUnixPath.get("/app"))
             .setEntrypoint("java", "-cp", classpath(dependencies), spec.mainClass)
-            .addLabel("org.opencontainers.image.title", spec.packageName)
-            .addLabel("org.opencontainers.image.version", spec.packageVersion)
-            .addLabel("io.fluxzero.package.metadata-version", "1")
 
         builder.addEnvironmentVariable("JAVA_TOOL_OPTIONS", spec.javaToolOptions)
 
-        spec.applicationId?.takeIf { it.isNotBlank() }?.let {
-            builder.addLabel("io.fluxzero.application-id", it)
-        }
-        spec.labels.forEach { (name, value) ->
-            if (name.isNotBlank() && value.isNotBlank()) {
-                builder.addLabel(name, value)
-            }
+        spec.resolvedLabels().forEach { (name, value) ->
+            builder.addLabel(name, value)
         }
 
         addDependencyLayer(builder, "dependencies", dependencies)
+        addExtraDirectoryLayers(builder, spec.extraDirectories)
         addApplicationLayer(builder, spec.classesDirectory)
         return builder
     }
@@ -128,6 +127,34 @@ class JavaPackagePublisher : PackagePublisher {
             )
         }
         builder.addFileEntriesLayer(layerBuilder.build())
+    }
+
+    private fun addExtraDirectoryLayers(
+        builder: JibContainerBuilder,
+        extraDirectories: List<JavaPackageExtraDirectory>
+    ) {
+        extraDirectories.forEachIndexed { index, extraDirectory ->
+            val files = Files.walk(extraDirectory.source).use { paths ->
+                paths.asSequence()
+                    .filter { Files.isRegularFile(it) }
+                    .sortedBy { normalizedRelativePath(extraDirectory.source, it) }
+                    .toList()
+            }
+            if (files.isEmpty()) {
+                return@forEachIndexed
+            }
+
+            val targetRoot = AbsoluteUnixPath.get(extraDirectory.normalizedContainerPath)
+            val layerBuilder = FileEntriesLayer.builder().setName("extra-directory-${index + 1}")
+            files.forEach { file ->
+                layerBuilder.addEntry(
+                    file,
+                    targetRoot.resolve(normalizedRelativePath(extraDirectory.source, file)),
+                    JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP
+                )
+            }
+            builder.addFileEntriesLayer(layerBuilder.build())
+        }
     }
 
     private fun addApplicationLayer(
@@ -200,8 +227,12 @@ data class JavaPackagePublishSpec(
     val baseImage: String = DEFAULT_BASE_IMAGE,
     val baseImageSource: BaseImageSource = BaseImageSource.REGISTRY,
     val javaToolOptions: String = DEFAULT_JAVA_TOOL_OPTIONS,
+    val platforms: List<JavaPackagePlatform> = listOf(JavaPackagePlatform.DEFAULT),
     val dependencies: List<JavaPackageDependency> = emptyList(),
-    val labels: Map<String, String> = emptyMap(),
+    val extraDirectories: List<JavaPackageExtraDirectory> = emptyList(),
+    val includeDefaultLabels: Boolean = true,
+    val defaultLabels: Map<String, String> = emptyMap(),
+    val labels: Map<String, String?> = emptyMap(),
     val tags: List<String> = emptyList(),
     val toolName: String = "fluxzero-publishing",
     val publishAttempts: Int = DEFAULT_PUBLISH_ATTEMPTS,
@@ -226,6 +257,9 @@ data class JavaPackagePublishSpec(
         require(PackageNameSupport.isValidTag(packageVersion)) { "Invalid package version '$packageVersion'." }
         require(mainClass.isNotBlank()) { "Missing application main class." }
         require(baseImage.isNotBlank()) { "Missing Java runtime base image." }
+        require(platforms.isNotEmpty()) { "Configure at least one package platform." }
+        platforms.forEach { it.validate() }
+        require(platforms.distinct().size == platforms.size) { "Package platforms must be unique." }
         require(images.isNotEmpty()) { "Configure at least one package image." }
         require(images.distinct().size == images.size) { "Package images must be unique." }
         require(resolvedTags().distinct().size == resolvedTags().size) { "Package tags must be unique." }
@@ -238,6 +272,19 @@ data class JavaPackagePublishSpec(
             require(Files.isRegularFile(dependency.source)) {
                 "Dependency JAR does not exist: ${dependency.source.toAbsolutePath()}."
             }
+        }
+        extraDirectories.forEach { extraDirectory ->
+            require(Files.isDirectory(extraDirectory.source)) {
+                "Extra directory does not exist: ${extraDirectory.source.toAbsolutePath()}."
+            }
+        }
+        validateExtraDirectoryTargets()
+        defaultLabels.forEach { (key, value) ->
+            require(key.isNotBlank()) { "Default package label keys must not be blank." }
+            require(value.isNotBlank()) { "Default package label '$key' must not be blank." }
+        }
+        labels.keys.forEach { key ->
+            require(key.isNotBlank()) { "Package label keys must not be blank." }
         }
         credentials.forEach { it.validate() }
         val duplicateCredentialHosts = credentials
@@ -284,6 +331,61 @@ data class JavaPackagePublishSpec(
         tags.takeIf { it.isNotEmpty() } ?: listOf(packageVersion)
 
     internal fun orderedDependencies(): List<JavaPackageDependency> = dependencies
+
+    internal fun resolvedLabels(): Map<String, String> = buildMap {
+        if (includeDefaultLabels) {
+            put("org.opencontainers.image.title", packageName)
+            put("org.opencontainers.image.version", packageVersion)
+            put("io.fluxzero.package.metadata-version", "1")
+            applicationId?.takeIf { it.isNotBlank() }?.let { put("io.fluxzero.application-id", it) }
+            putAll(defaultLabels)
+        }
+        labels.forEach { (key, value) ->
+            if (value == null) {
+                remove(key)
+            } else {
+                put(key, value)
+            }
+        }
+    }
+
+    private fun validateExtraDirectoryTargets() {
+        val targets = extraDirectories.map { it.normalizedContainerPath }
+        val reservedTargets = listOf("/app/classes", "/app/libs")
+        targets.forEach { target ->
+            require(reservedTargets.none { reserved -> containerPathsOverlap(target, reserved) }) {
+                "Extra directory target '$target' overlaps a managed package path."
+            }
+        }
+        targets.forEachIndexed { index, target ->
+            require(targets.drop(index + 1).none { other -> containerPathsOverlap(target, other) }) {
+                "Extra directory targets must not overlap: '$target'."
+            }
+        }
+    }
+}
+
+data class JavaPackagePlatform(
+    val os: String,
+    val architecture: String
+) {
+    companion object {
+        val DEFAULT = JavaPackagePlatform(os = "linux", architecture = "amd64")
+    }
+
+    fun validate() {
+        require(os == "linux") { "Unsupported package platform OS '$os'. Only linux is supported." }
+        require(architecturePattern.matches(architecture)) {
+            "Invalid package platform architecture '$architecture'."
+        }
+    }
+}
+
+data class JavaPackageExtraDirectory(
+    val source: Path,
+    val containerPath: String
+) {
+    val normalizedContainerPath: String = normalizeContainerDirectory(containerPath)
 }
 
 internal data class JavaPackagePublishTarget(
@@ -333,3 +435,19 @@ data class PackagePublishResult(
     val packageReference: String,
     val digest: String
 )
+
+private val architecturePattern = Regex("[a-z0-9][a-z0-9_-]*")
+
+private fun normalizeContainerDirectory(path: String): String {
+    require(path.startsWith("/")) { "Extra directory target must be absolute: $path." }
+    require('\\' !in path) { "Extra directory target must use Unix separators: $path." }
+    val segments = path.split('/').filter { it.isNotEmpty() }
+    require(segments.isNotEmpty()) { "Extra directory target must not be the container root." }
+    require(segments.none { it == "." || it == ".." }) {
+        "Extra directory target must not contain '.' or '..': $path."
+    }
+    return "/${segments.joinToString("/")}"
+}
+
+private fun containerPathsOverlap(first: String, second: String): Boolean =
+    first == second || first.startsWith("$second/") || second.startsWith("$first/")

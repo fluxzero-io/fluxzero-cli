@@ -2,6 +2,8 @@ package host.flux.maven
 
 import host.flux.publishing.BaseImageSource
 import host.flux.publishing.JavaPackageDependency
+import host.flux.publishing.JavaPackageExtraDirectory
+import host.flux.publishing.JavaPackagePlatform
 import host.flux.publishing.JavaPackageRegistryCredential
 import host.flux.publishing.JavaPackagePublishSpec
 import host.flux.publishing.JavaPackagePublisher
@@ -105,6 +107,30 @@ class PublishPackageMojo : AbstractMojo() {
     private var javaToolOptions: String? = null
 
     /**
+     * Target operating-system and architecture pairs. Defaults to linux/amd64.
+     */
+    @Parameter
+    private var platforms: List<Platform> = emptyList()
+
+    /**
+     * Additional directories copied into deterministic image layers.
+     */
+    @Parameter
+    private var extraDirectories: List<ExtraDirectory> = emptyList()
+
+    /**
+     * Whether standard OCI, Maven, and Fluxzero labels are included before custom label overrides.
+     */
+    @Parameter(defaultValue = "true")
+    private var includeDefaultLabels: Boolean = true
+
+    /**
+     * Custom label additions, overrides, and removals.
+     */
+    @Parameter
+    private var labels: List<Label> = emptyList()
+
+    /**
      * Whether to skip building and publishing the package.
      */
     @Parameter(property = "fluxzero.package.skip", defaultValue = "false")
@@ -139,6 +165,7 @@ class PublishPackageMojo : AbstractMojo() {
             )
             return
         }
+        val gitInfo = PackageNameSupport.gitInfo(project.basedir.toPath())
         val resolvedTags = resolveTags()
         val resolvedVersion = resolvedTags.first()
         val resolvedApplicationId = applicationId?.takeIf { it.isNotBlank() }
@@ -169,6 +196,9 @@ class PublishPackageMojo : AbstractMojo() {
         }
         val resolvedJavaToolOptions = configuredValue("fluxzero.package.javaToolOptions", "JAVA_TOOL_OPTIONS", javaToolOptions)
             ?: JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS
+        val resolvedPlatforms = resolvePlatforms()
+        val resolvedExtraDirectories = resolveExtraDirectories()
+        val resolvedLabels = PackagePublishingConfigurationSupport.labels(includeDefaultLabels, labels)
 
         val resolvedCredentials = resolveAuthentications()
         val resolvedImages = resolveImages(resolvedPackageName, resolvedCredentials)
@@ -185,9 +215,13 @@ class PublishPackageMojo : AbstractMojo() {
                     baseImage = resolvedBaseImage,
                     baseImageSource = resolvedBaseImageSource,
                     javaToolOptions = resolvedJavaToolOptions,
+                    platforms = resolvedPlatforms,
                     classesDirectory = outputDirectory.toPath(),
                     dependencies = runtimeDependencyPaths().map { JavaPackageDependency(it) },
-                    labels = mavenLabels(),
+                    extraDirectories = resolvedExtraDirectories,
+                    includeDefaultLabels = resolvedLabels.includeDefaults,
+                    defaultLabels = MavenPackageLabels.defaults(project, gitInfo),
+                    labels = resolvedLabels.overrides,
                     images = resolvedImages,
                     tags = resolvedTags,
                     credentials = resolvedCredentials,
@@ -225,18 +259,19 @@ class PublishPackageMojo : AbstractMojo() {
         return JarFile(jarFile).use { jar -> PackageNameSupport.mainClassFromManifest(jar.manifest?.mainAttributes) }
     }
 
-    private fun mavenLabels(): Map<String, String> = buildMap {
-        put("io.fluxzero.maven.group-id", project.groupId)
-        put("io.fluxzero.maven.artifact-id", project.artifactId)
-        put("io.fluxzero.maven.version", project.version)
-        githubSourceRepository()?.let { put("org.opencontainers.image.source", it) }
-    }
+    private fun resolvePlatforms(): List<JavaPackagePlatform> =
+        try {
+            PackagePublishingConfigurationSupport.platforms(platforms)
+        } catch (exception: IllegalArgumentException) {
+            throw MojoFailureException(exception.message)
+        }
 
-    private fun githubSourceRepository(): String? {
-        val repository = System.getenv("GITHUB_REPOSITORY")?.takeIf { it.isNotBlank() } ?: return null
-        val serverUrl = System.getenv("GITHUB_SERVER_URL")?.takeIf { it.isNotBlank() } ?: "https://github.com"
-        return "${serverUrl.trimEnd('/')}/$repository"
-    }
+    private fun resolveExtraDirectories(): List<JavaPackageExtraDirectory> =
+        try {
+            PackagePublishingConfigurationSupport.extraDirectories(extraDirectories, project.basedir.toPath())
+        } catch (exception: IllegalArgumentException) {
+            throw MojoFailureException(exception.message)
+        }
 
     private fun resolveTags(): List<String> {
         val configuredTags = tags.map { it.trim() }.filter { it.isNotBlank() }

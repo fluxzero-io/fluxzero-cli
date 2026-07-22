@@ -248,6 +248,78 @@ class JavaPackagePublishSpecTest {
     }
 
     @Test
+    fun defaultsToLinuxAmd64AndAcceptsMultipleUniquePlatforms() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        assertEquals(listOf(JavaPackagePlatform("linux", "amd64")), publishSpec(classesDirectory).platforms)
+
+        publishSpec(
+            classesDirectory = classesDirectory,
+            platforms = listOf(
+                JavaPackagePlatform("linux", "amd64"),
+                JavaPackagePlatform("linux", "arm64")
+            )
+        ).validate()
+    }
+
+    @Test
+    fun rejectsMissingDuplicateOrUnsupportedPlatforms() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+
+        listOf(
+            emptyList(),
+            listOf(JavaPackagePlatform("linux", "amd64"), JavaPackagePlatform("linux", "amd64")),
+            listOf(JavaPackagePlatform("windows", "amd64")),
+            listOf(JavaPackagePlatform("linux", "ARM 64"))
+        ).forEach { platforms ->
+            assertThrows(IllegalArgumentException::class.java) {
+                publishSpec(classesDirectory, platforms = platforms).validate()
+            }
+        }
+    }
+
+    @Test
+    fun appliesCustomLabelsAfterDefaultsAndSupportsRemoval() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        val spec = publishSpec(
+            classesDirectory = classesDirectory,
+            defaultLabels = mapOf(
+                "org.opencontainers.image.revision" to "original-revision",
+                "org.opencontainers.image.source" to "https://example.com/source"
+            ),
+            labels = mapOf(
+                "org.opencontainers.image.revision" to "overridden-revision",
+                "org.opencontainers.image.source" to null,
+                "example.custom" to "custom-value",
+                "io.fluxzero.package.metadata-version" to null
+            )
+        )
+
+        assertEquals(
+            mapOf(
+                "org.opencontainers.image.title" to "service",
+                "org.opencontainers.image.version" to "1.0.0",
+                "org.opencontainers.image.revision" to "overridden-revision",
+                "example.custom" to "custom-value"
+            ),
+            spec.resolvedLabels()
+        )
+    }
+
+    @Test
+    fun canOmitEveryDefaultLabelBeforeApplyingCustomLabels() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        val spec = publishSpec(
+            classesDirectory = classesDirectory,
+            includeDefaultLabels = false,
+            defaultLabels = mapOf("org.opencontainers.image.source" to "https://example.com/source"),
+            labels = mapOf("example.custom" to "custom-value")
+        )
+
+        assertEquals(mapOf("example.custom" to "custom-value"), spec.resolvedLabels())
+    }
+
+    @Test
     fun hasDefaultJavaToolOptions() {
         assertEquals("-XX:MaxRAMPercentage=75.0", JavaPackagePublishSpec.DEFAULT_JAVA_TOOL_OPTIONS.substringBefore(" "))
     }
@@ -344,13 +416,73 @@ class JavaPackagePublishSpecTest {
         )
     }
 
+    @Test
+    fun copiesExtraDirectoriesIntoSeparateDeterministicLayers() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        Files.writeString(classesDirectory.resolve("Application.class"), "compiled-application")
+        val configDirectory = Files.createTempDirectory("fluxzero-publish-config")
+        Files.writeString(configDirectory.resolve("z.properties"), "z=true")
+        Files.createDirectories(configDirectory.resolve("nested"))
+        Files.writeString(configDirectory.resolve("nested/a.properties"), "a=true")
+
+        val plan = JavaPackagePublisher().buildPlan(
+            publishSpec(
+                classesDirectory = classesDirectory,
+                extraDirectories = listOf(JavaPackageExtraDirectory(configDirectory, "/app/config/"))
+            )
+        )
+
+        val layers = plan.layers.filterIsInstance<FileEntriesLayer>()
+        val extraEntries = layers.first { it.name == "extra-directory-1" }.entries
+        assertEquals(listOf("extra-directory-1", "application"), layers.map { it.name })
+        assertEquals(
+            listOf("/app/config/nested/a.properties", "/app/config/z.properties"),
+            extraEntries.map { it.extractionPath.toString() }
+        )
+        assertTrue(extraEntries.all { it.modificationTime == JavaPackagePublishSpec.REPRODUCIBLE_FILE_TIMESTAMP })
+    }
+
+    @Test
+    fun rejectsMissingOrOverlappingExtraDirectories() {
+        val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
+        val configDirectory = Files.createTempDirectory("fluxzero-publish-config")
+        val missingDirectory = configDirectory.resolve("missing")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory,
+                extraDirectories = listOf(JavaPackageExtraDirectory(missingDirectory, "/app/config"))
+            ).validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory,
+                extraDirectories = listOf(JavaPackageExtraDirectory(configDirectory, "/app/classes/config"))
+            ).validate()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            publishSpec(
+                classesDirectory,
+                extraDirectories = listOf(
+                    JavaPackageExtraDirectory(configDirectory, "/app/config"),
+                    JavaPackageExtraDirectory(configDirectory, "/app/config/nested")
+                )
+            ).validate()
+        }
+    }
+
     private fun publishSpec(
         classesDirectory: Path,
         images: List<String> = listOf("registry.fluxzero.io/team/service"),
         credentials: List<JavaPackageRegistryCredential> = listOf(credential()),
         tags: List<String> = emptyList(),
         baseImage: String = JavaPackagePublishSpec.DEFAULT_BASE_IMAGE,
+        platforms: List<JavaPackagePlatform> = listOf(JavaPackagePlatform.DEFAULT),
         dependencies: List<JavaPackageDependency> = emptyList(),
+        extraDirectories: List<JavaPackageExtraDirectory> = emptyList(),
+        includeDefaultLabels: Boolean = true,
+        defaultLabels: Map<String, String> = emptyMap(),
+        labels: Map<String, String?> = emptyMap(),
         publishAttempts: Int = JavaPackagePublishSpec.DEFAULT_PUBLISH_ATTEMPTS,
         publishRetryDelayMillis: Long = JavaPackagePublishSpec.DEFAULT_PUBLISH_RETRY_DELAY_MILLIS
     ): JavaPackagePublishSpec = JavaPackagePublishSpec(
@@ -362,7 +494,12 @@ class JavaPackagePublishSpecTest {
         credentials = credentials,
         tags = tags,
         baseImage = baseImage,
+        platforms = platforms,
         dependencies = dependencies,
+        extraDirectories = extraDirectories,
+        includeDefaultLabels = includeDefaultLabels,
+        defaultLabels = defaultLabels,
+        labels = labels,
         publishAttempts = publishAttempts,
         publishRetryDelayMillis = publishRetryDelayMillis
     )

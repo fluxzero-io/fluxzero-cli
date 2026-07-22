@@ -2,12 +2,16 @@ package host.flux.publishing
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.jar.Attributes
 import java.util.jar.Manifest
 
@@ -130,5 +134,52 @@ class PackageNameSupportTest {
 
         manifest.mainAttributes.putValue("Start-Class", "com.example.BootApplication")
         assertEquals("com.example.BootApplication", PackageNameSupport.mainClassFromManifest(manifest.mainAttributes))
+    }
+
+    @Test
+    fun normalizesVendorNeutralRepositoryUrls() {
+        assertEquals(
+            "https://code.example.org/team/service",
+            PackageNameSupport.normalizeRepositoryUrl("https://code.example.org/team/service.git")
+        )
+        assertEquals(
+            "ssh://code.example.org/team/service",
+            PackageNameSupport.normalizeRepositoryUrl("git@code.example.org:team/service.git")
+        )
+        assertEquals(
+            "https://code.example.org/team/service",
+            PackageNameSupport.normalizeRepositoryUrl(
+                "https://build-user:secret-token@code.example.org/team/service.git?credential=secret"
+            )
+        )
+        assertNull(PackageNameSupport.normalizeRepositoryUrl("../service"))
+        assertNull(PackageNameSupport.normalizeRepositoryUrl("file:///tmp/service"))
+    }
+
+    @Test
+    fun readsFullRevisionAndOriginFromGitWithoutCiEnvironmentVariables() {
+        val repository = Files.createTempDirectory("fluxzero-git-info")
+        git(repository, "init", "-q")
+        git(repository, "config", "user.name", "Fluxzero Test")
+        git(repository, "config", "user.email", "test@fluxzero.local")
+        Files.writeString(repository.resolve("README.md"), "test")
+        git(repository, "add", "README.md")
+        git(repository, "commit", "-q", "-m", "initial")
+        git(repository, "remote", "add", "origin", "git@code.example.org:team/service.git")
+
+        val gitInfo = PackageNameSupport.gitInfo(repository)
+
+        assertNotNull(gitInfo)
+        assertTrue(gitInfo!!.sha!!.matches(Regex("[0-9a-f]{40,64}")))
+        assertTrue(gitInfo.sha!!.startsWith(gitInfo.shortSha!!))
+        assertEquals("ssh://code.example.org/team/service", gitInfo.remoteUrl)
+    }
+
+    private fun git(repository: Path, vararg arguments: String) {
+        val process = ProcessBuilder(listOf("git", "-C", repository.toString()) + arguments)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        assertEquals(0, process.waitFor(), output)
     }
 }

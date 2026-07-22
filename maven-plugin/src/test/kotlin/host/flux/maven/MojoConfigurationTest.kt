@@ -51,6 +51,10 @@ class MojoConfigurationTest {
         assertNotNull("images parameter should exist for multi-registry publishing", fields.find { it.name == "images" })
         assertNotNull("tags parameter should exist for multi-tag publishing", fields.find { it.name == "tags" })
         assertNotNull("authentications parameter should exist for registry authentication", fields.find { it.name == "authentications" })
+        assertNotNull("platforms parameter should exist for multi-platform publishing", fields.find { it.name == "platforms" })
+        assertNotNull("extraDirectories parameter should exist for deterministic additional files", fields.find { it.name == "extraDirectories" })
+        assertNotNull("includeDefaultLabels parameter should control standard labels", fields.find { it.name == "includeDefaultLabels" })
+        assertNotNull("labels parameter should exist for default and custom labels", fields.find { it.name == "labels" })
     }
 
     @Test

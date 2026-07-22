@@ -16,7 +16,9 @@ object PackageNameSupport {
     data class GitInfo(
         val branch: String?,
         val shortSha: String?,
-        val dirty: Boolean
+        val dirty: Boolean,
+        val sha: String? = null,
+        val remoteUrl: String? = null
     )
 
     fun packageReference(host: String, packageName: String, version: String): String =
@@ -165,12 +167,42 @@ object PackageNameSupport {
 
     fun gitInfo(projectDirectory: Path): GitInfo? {
         val branch = git(projectDirectory, "rev-parse", "--abbrev-ref", "HEAD")
+        val sha = git(projectDirectory, "rev-parse", "HEAD")
         val shortSha = git(projectDirectory, "rev-parse", "--short=12", "HEAD")
-        if (branch == null && shortSha == null) {
+        val remoteUrl = git(projectDirectory, "config", "--get", "remote.origin.url")
+            ?.let(::normalizeRepositoryUrl)
+        if (branch == null && sha == null && shortSha == null && remoteUrl == null) {
             return null
         }
         val dirty = git(projectDirectory, "status", "--porcelain")?.isNotBlank() == true
-        return GitInfo(branch = branch, shortSha = shortSha, dirty = dirty)
+        return GitInfo(branch = branch, shortSha = shortSha, dirty = dirty, sha = sha, remoteUrl = remoteUrl)
+    }
+
+    fun normalizeRepositoryUrl(value: String?): String? {
+        val repository = value?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val uri = runCatching { URI.create(repository) }.getOrNull()
+        val scheme = uri?.scheme?.lowercase(Locale.ROOT)
+        if (scheme != null) {
+            if (scheme == "file" || uri.host == null) {
+                return null
+            }
+            return URI(
+                scheme,
+                null,
+                uri.host,
+                uri.port,
+                uri.path.removeSuffix(".git"),
+                null,
+                null
+            ).toString()
+        }
+        val scpLike = Regex("(?:(?<user>[^@\\s]+)@)?(?<host>[^:/\\s]+):(?<path>[^\\s]+)").matchEntire(repository)
+        if (scpLike != null) {
+            val host = scpLike.groups["host"]!!.value
+            val path = scpLike.groups["path"]!!.value.removeSuffix(".git").trimStart('/')
+            return "ssh://$host/$path"
+        }
+        return null
     }
 
     private fun git(projectDirectory: Path, vararg args: String): String? =

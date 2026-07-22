@@ -160,6 +160,10 @@ Package and registry configuration is Maven configuration only:
 | `packageVersion` | No | Generated git/time-based tag | Primary package tag when `tags` is omitted. |
 | `images` | For publishing modules | — | One or more image repositories. `${packageName}` reuses `packageName`; `${organisationId}` resolves the registry organisation from matching authentication. Both must be complete path segments. |
 | `tags` | No | `packageVersion`, or its generated value | Tags applied to every configured image. |
+| `platforms` | No | `linux/amd64` | Target operating-system and architecture pairs. Multiple platforms produce a manifest list. |
+| `extraDirectories` | No | — | Directories copied into separate deterministic image layers. Relative `from` paths resolve from the module directory. |
+| `includeDefaultLabels` | No | `true` | Include standard OCI, Maven, and Fluxzero labels before applying custom labels. |
+| `labels` | No | — | Custom label additions, overrides, and removals. Omitting a label's `value` removes that key. |
 | `authentications` | No | Anonymous access | Optional host-bound authentication; unmatched target registries remain anonymous. |
 
 To publish the same package to multiple repositories or tags, configure `images` and `tags`. Add authentication only
@@ -193,6 +197,64 @@ for target registries that require it.
   </authentications>
 </configuration>
 ```
+
+Configure multiple target platforms when the base image publishes matching platform manifests:
+
+```xml
+<platforms>
+  <platform>
+    <os>linux</os>
+    <architecture>amd64</architecture>
+  </platform>
+  <platform>
+    <os>linux</os>
+    <architecture>arm64</architecture>
+  </platform>
+</platforms>
+```
+
+Jib selects the matching base image for every configured platform and publishes one manifest list without Docker or
+QEMU. The plugin currently supports Linux images. An omitted `platforms` configuration keeps the stable `linux/amd64`
+default.
+
+Use extra directories for runtime files that are not Maven resources or dependencies:
+
+```xml
+<extraDirectories>
+  <extraDirectory>
+    <from>${project.basedir}/config</from>
+    <into>/app/config</into>
+  </extraDirectory>
+</extraDirectories>
+```
+
+Every extra directory receives its own reproducible layer. Files are ordered by relative path and use the same fixed
+modification time as application files. Targets must be absolute Unix paths and may not overlap each other or the
+managed `/app/classes` and `/app/libs` paths.
+
+Default labels are derived without assuming a CI vendor. The Maven plugin uses the package name and primary image tag,
+the full Git `HEAD`, Maven `scm.url` with the Git `origin` as fallback, and Maven project `url` and `description` when
+available. It also includes Maven coordinates and Fluxzero package metadata. `created` is deliberately omitted to keep
+images reproducible; licenses are not inferred because Maven license names are not guaranteed to be SPDX expressions.
+
+Custom labels are applied after defaults. A value adds or overwrites a label; a key without a value removes it. Set
+`includeDefaultLabels` to `false` to start with no default labels. No label key is protected from either mechanism.
+
+```xml
+<includeDefaultLabels>true</includeDefaultLabels>
+<labels>
+  <label>
+    <key>org.opencontainers.image.source</key>
+    <value>https://code.example.org/team/service</value>
+  </label>
+  <label>
+    <key>io.fluxzero.maven.version</key>
+  </label>
+</labels>
+```
+
+OCI labels are readable by anyone who can inspect the image. Never put credentials, tokens, or other secrets in label
+values.
 
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
@@ -267,15 +329,21 @@ Runtime dependencies are written to the container classpath explicitly. Applicat
 dependencies in Maven's runtime classpath order, comparable to `exec:java`; the dependency layer uses the same order.
 The dependency layer is placed below the application layer so source changes can reuse the stable dependency layer.
 
-The package contains these labels:
+With default labels enabled, the package contains these labels when their source values are available:
 
 - `org.opencontainers.image.title`
 - `org.opencontainers.image.version`
+- `org.opencontainers.image.revision`
+- `org.opencontainers.image.source`
+- `org.opencontainers.image.url`
+- `org.opencontainers.image.description`
 - `io.fluxzero.maven.group-id`
 - `io.fluxzero.maven.artifact-id`
 - `io.fluxzero.maven.version`
 - `io.fluxzero.package.metadata-version`
 - `io.fluxzero.application-id`, when configured
+
+Every label can be overwritten or removed through the package configuration above.
 
 ## Local OCI Registry Test Chain
 

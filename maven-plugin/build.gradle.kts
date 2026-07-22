@@ -27,6 +27,10 @@ val mavenPluginMojoDescriptions = mapOf(
 val mavenPluginParameterDescriptions = mapOf(
     "baseImage" to "Java runtime base image for publish-package. Property: fluxzero.package.baseImage.",
     "baseImageSource" to "Where publish-package reads the base image from: registry or docker-daemon. Property: fluxzero.package.baseImageSource.",
+    "platforms" to "Target operating-system and architecture pairs for publish-package. Defaults to linux/amd64.",
+    "extraDirectories" to "Additional directories copied into deterministic publish-package image layers.",
+    "includeDefaultLabels" to "Include standard OCI, Maven, and Fluxzero labels before custom overrides. Defaults to true.",
+    "labels" to "Custom OCI label additions, overrides, or removals for publish-package.",
     "enabled" to "Enable or disable sync-project-files. Property: fluxzero.projectFiles.enabled.",
     "forceUpdate" to "Force project files to be downloaded and rewritten. Property: fluxzero.projectFiles.forceUpdate.",
     "applicationId" to "Optional Fluxzero application id stored as OCI package metadata.",
