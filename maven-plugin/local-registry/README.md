@@ -28,9 +28,6 @@ export FLUXZERO_PACKAGE_VERSION="local-dev"
 mvn -B -f maven-plugin/examples/plain-java/pom.xml package fluxzero:publish-package
 ```
 
-If you are testing from an uncommitted checkout, add `-Dfluxzero.package.allowDirty=true`; the pushed tag will be
-`local-dev-dirty`.
-
 Pull from Zot directly to inspect or run the backend package:
 
 ```bash

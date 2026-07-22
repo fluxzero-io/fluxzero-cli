@@ -45,9 +45,9 @@ class PublishPackageMojo : AbstractMojo() {
     private var session: MavenSession? = null
 
     /**
-     * Required image repositories. Complete path segments may use organisationId and packageName placeholders.
+     * Image repositories, required for modules that configure packageName. Complete path segments may use placeholders.
      */
-    @Parameter(required = true)
+    @Parameter
     private var images: List<String> = emptyList()
 
     /**
@@ -73,12 +73,6 @@ class PublishPackageMojo : AbstractMojo() {
      */
     @Parameter
     private var packageVersion: String? = null
-
-    /**
-     * Allows publishing a package from a dirty git worktree. Disabled by default so published packages map to a committed source state.
-     */
-    @Parameter(property = "fluxzero.package.allowDirty", defaultValue = "false")
-    private var allowDirty: Boolean = false
 
     /**
      * Optional Fluxzero application id associated with this package. Stored as package metadata for future deployment flows.
@@ -139,12 +133,13 @@ class PublishPackageMojo : AbstractMojo() {
         }
 
         val resolvedPackageName = packageName?.takeIf { it.isNotBlank() }
-            ?: throw MojoFailureException(
-                "Missing package name. Configure <packageName> in the fluxzero-maven-plugin."
+        if (resolvedPackageName == null) {
+            log.info(
+                "Skipping Fluxzero package publish for ${project.groupId}:${project.artifactId}: no packageName configured"
             )
-        val gitInfo = PackageNameSupport.gitInfo(project.basedir.toPath())
-        ensureCleanGitWorktree(gitInfo)
-        val resolvedTags = resolveTags(gitInfo)
+            return
+        }
+        val resolvedTags = resolveTags()
         val resolvedVersion = resolvedTags.first()
         val resolvedApplicationId = applicationId?.takeIf { it.isNotBlank() }
         if (!PackageNameSupport.isValidPackageName(resolvedPackageName)) {
@@ -210,30 +205,15 @@ class PublishPackageMojo : AbstractMojo() {
         }
     }
 
-    private fun ensureCleanGitWorktree(gitInfo: PackageNameSupport.GitInfo?) {
-        try {
-            PackageNameSupport.ensureCleanGitWorktree(gitInfo, allowDirty)
-        } catch (e: IllegalStateException) {
-            throw MojoFailureException(e.message)
-        }
-    }
-
     private fun configured(propertyName: String, environmentVariable: String, configuredValue: String?): String? =
         MavenParameterSupport.firstConfigured(session?.userProperties, propertyName, environmentVariable, configuredValue)
 
     private fun configuredValue(propertyName: String, environmentVariable: String, configuredValue: String?): String? =
         MavenParameterSupport.firstConfiguredValue(session?.userProperties, propertyName, environmentVariable, configuredValue)
 
-    private fun markDirtyPackageVersion(packageVersion: String, gitInfo: PackageNameSupport.GitInfo?): String =
-        try {
-            PackageNameSupport.markDirtyPackageVersion(packageVersion, gitInfo, allowDirty)
-        } catch (e: IllegalStateException) {
-            throw MojoFailureException(e.message)
-        }
-
     private fun automaticPackageVersion(): String =
         try {
-            PackageNameSupport.automaticPackageVersion(project.basedir.toPath(), allowDirty = allowDirty)
+            PackageNameSupport.automaticPackageVersion(project.basedir.toPath(), allowDirty = true)
         } catch (e: IllegalStateException) {
             throw MojoFailureException(e.message)
         }
@@ -258,16 +238,12 @@ class PublishPackageMojo : AbstractMojo() {
         return "${serverUrl.trimEnd('/')}/$repository"
     }
 
-    private fun resolveTags(gitInfo: PackageNameSupport.GitInfo?): List<String> {
+    private fun resolveTags(): List<String> {
         val configuredTags = tags.map { it.trim() }.filter { it.isNotBlank() }
         if (configuredTags.isNotEmpty()) {
-            return configuredTags.map { markDirtyPackageVersion(it, gitInfo) }
+            return configuredTags
         }
-        return listOf(
-            packageVersion?.takeIf { it.isNotBlank() }
-                ?.let { markDirtyPackageVersion(it, gitInfo) }
-                ?: automaticPackageVersion()
-        )
+        return listOf(packageVersion?.takeIf { it.isNotBlank() } ?: automaticPackageVersion())
     }
 
     private fun resolveImages(

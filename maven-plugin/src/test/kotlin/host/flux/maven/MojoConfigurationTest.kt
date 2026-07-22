@@ -94,12 +94,12 @@ class MojoConfigurationTest {
     }
 
     @Test
-    fun testPublishPackageAllowDirtyParameterExists() {
+    fun testPublishPackageDoesNotExposeAllowDirtyParameter() {
         val mojoClass = PublishPackageMojo::class.java
         val fields = mojoClass.declaredFields
 
         val allowDirtyField = fields.find { it.name == "allowDirty" }
-        assertNotNull("allowDirty parameter should exist for intentional dirty publishes", allowDirtyField)
+        assertNull("publish-package should not inspect or reject a dirty git worktree", allowDirtyField)
     }
 
     @Test

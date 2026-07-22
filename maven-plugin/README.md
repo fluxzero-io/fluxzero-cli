@@ -145,7 +145,6 @@ General behavior can still be overridden from the command line or environment:
 
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| `allowDirty` | No | `false` | Permit publishing a dirty worktree; property `fluxzero.package.allowDirty`. |
 | `mainClass` | No | Built artifact `Start-Class` or `Main-Class` | Main class; property `fluxzero.package.mainClass`, environment fallback `FLUXZERO_MAIN_CLASS`. |
 | `baseImage` | No | Fluxzero Java distroless runtime | Runtime base image; property `fluxzero.package.baseImage`, with `FLUXZERO_BASE_IMAGE` as environment fallback. |
 | `baseImageSource` | No | `registry` | Base-image source; property `fluxzero.package.baseImageSource`, environment fallback `FLUXZERO_BASE_IMAGE_SOURCE`. |
@@ -156,10 +155,10 @@ Package and registry configuration is Maven configuration only:
 
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
-| `packageName` | Yes | — | Public package name. |
+| `packageName` | For publishing modules | Skip module | Public package name and multi-module publishing opt-in. |
 | `applicationId` | No | — | Fluxzero application id stored as package metadata. |
 | `packageVersion` | No | Generated git/time-based tag | Primary package tag when `tags` is omitted. |
-| `images` | Yes | — | One or more image repositories. `${packageName}` reuses `packageName`; `${organisationId}` resolves the registry organisation from matching authentication. Both must be complete path segments. |
+| `images` | For publishing modules | — | One or more image repositories. `${packageName}` reuses `packageName`; `${organisationId}` resolves the registry organisation from matching authentication. Both must be complete path segments. |
 | `tags` | No | `packageVersion`, or its generated value | Tags applied to every configured image. |
 | `authentications` | No | Anonymous access | Optional host-bound authentication; unmatched target registries remain anonymous. |
 
@@ -252,8 +251,8 @@ The `github-oidc` username also defaults to empty and can be overridden with an 
 `<audience>` is required: it identifies the Fluxzero OIDC verifier and is intentionally not derived from the target
 registry host. A directly available CI OIDC token is a `basic` token; use Maven interpolation to put it in `<token>`.
 
-The plugin rejects a dirty git worktree by default. Use `-Dfluxzero.package.allowDirty=true` for local experiments; dirty
-pushes get a `-dirty` tag suffix.
+The plugin publishes explicitly configured versions and tags exactly as provided, regardless of the Git worktree state.
+Automatically generated development tags retain a `-dirty` suffix when the checkout has uncommitted changes.
 
 Use `baseImage` for a different Java runtime image. If that image was built locally in the Docker daemon during the
 same build, also set `baseImageSource` to `docker-daemon`; otherwise the plugin reads the base image from a registry.
@@ -299,9 +298,6 @@ export FLUXZERO_PACKAGE_VERSION="local-dev"
 mvn -B -f maven-plugin/examples/plain-java/pom.xml package fluxzero:publish-package
 ```
 
-If the checkout has uncommitted changes, add `-Dfluxzero.package.allowDirty=true`; the pushed tag becomes
-`local-dev-dirty`.
-
 Inspect the backend package directly in Zot:
 
 ```bash
@@ -312,6 +308,17 @@ docker run --rm 127.0.0.1:5100/team-a/plain-java:local-dev codex
 Request metrics are written to `.local-registry/proxy-metrics.ndjson`.
 
 ## Multi-Module Projects
+
+`publish-package` treats `packageName` as a per-module opt-in. It skips `pom` projects and modules without a configured
+`packageName`, so the goal can run once for the complete reactor:
+
+```bash
+mvn fluxzero:publish-package
+```
+
+Configure `packageName`, the application entry point, and any module-specific metadata only in modules that produce an
+image. Shared `images`, `tags`, and `authentications` configuration can stay in the parent plugin configuration. Once a
+module opts in, missing build output or publishing configuration remains a build failure.
 
 By default, agent files are only synced in the root project to avoid duplication:
 
