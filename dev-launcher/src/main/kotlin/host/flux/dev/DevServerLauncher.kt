@@ -284,14 +284,16 @@ class DevServerLauncher(
     }
 
     private fun javaExecutable(): String {
-        val javaHome = environment["JAVA_HOME"]?.takeIf { it.isNotBlank() }
-        if (javaHome != null) {
-            val executable = Path.of(javaHome, "bin", if (isWindows()) "java.exe" else "java")
-            if (Files.isRegularFile(executable)) return executable.toString()
-        }
-        val currentRuntime = Path.of(System.getProperty("java.home"), "bin", if (isWindows()) "java.exe" else "java")
-        return if (Files.isRegularFile(currentRuntime)) currentRuntime.toString()
-        else if (isWindows()) "java.exe" else "java"
+        val executableName = if (isWindows()) "java.exe" else "java"
+        return sequenceOf(environment["JAVA_HOME"], System.getProperty("java.home"))
+            .mapNotNull { javaHome ->
+                javaHome?.takeIf(String::isNotBlank)?.let {
+                    runCatching { Path.of(it, "bin", executableName) }.getOrNull()
+                }
+            }
+            .firstOrNull(Files::isRegularFile)
+            ?.toString()
+            ?: executableName
     }
 
     private fun unsafeMemoryOption(): List<String> =

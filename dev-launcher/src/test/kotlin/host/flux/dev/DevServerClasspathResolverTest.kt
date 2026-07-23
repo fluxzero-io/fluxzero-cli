@@ -3,9 +3,11 @@ package host.flux.dev
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import kotlin.test.assertTrue
 
 class DevServerClasspathResolverTest {
     @TempDir
@@ -52,6 +54,36 @@ class DevServerClasspathResolverTest {
         assertEquals(classpath, resolver.resolve(projectDirectory, "1.2.3"))
         assertEquals(4, downloads.size, "a corrupt managed artifact should be downloaded and verified again")
         assertEquals("standalone dev server", Files.readString(Path.of(classpath)))
+    }
+
+    @Test
+    fun `stable release falls back to Maven when native download fails without a message`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.writeString(projectDirectory.resolve("dev-server.jar"), "resolved by Maven")
+        val messages = mutableListOf<String>()
+        val artifacts = DevServerArtifactCache(
+            cacheDirectory = projectDirectory.resolve("global-cache"),
+            downloader = { _: URI -> throw NullPointerException() },
+            retryWait = { },
+            messageSink = messages::add
+        )
+        val executor = CommandExecutor { command, _, _ ->
+            val output = command.first { it.startsWith("-Dmdep.outputFile=") }.substringAfter('=')
+            Files.writeString(Path.of(output), dependency.toString())
+            0
+        }
+        val resolver = DevServerClasspathResolver(executor, artifacts, messages::add)
+
+        val classpath = resolver.resolve(projectDirectory, "1.2.3")
+
+        assertEquals(dependency.toAbsolutePath().normalize().toString(), classpath)
+        assertEquals("1.2.3", resolver.resolvedVersion(projectDirectory))
+        assertTrue(messages.any {
+            it.contains("Direct Fluxzero dev server 1.2.3 download failed") &&
+                it.contains("NullPointerException") &&
+                it.contains("Retrying through Maven")
+        })
+        assertTrue(messages.contains("Resolving Fluxzero dev server 1.2.3..."))
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
