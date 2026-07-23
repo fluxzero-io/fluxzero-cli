@@ -551,6 +551,35 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `uses java from path when native runtime has no java home`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ ->
+            commands += command
+            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+            }
+            0
+        }
+        val javaHome = System.getProperty("java.home")
+        System.clearProperty("java.home")
+        try {
+            DevServerLauncher(executor, emptyMap()) { }.launch(
+                DevLaunchRequest(
+                    projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
+                    listOf("status", "--project-dir", projectDirectory.toString())
+                )
+            )
+        } finally {
+            if (javaHome != null) System.setProperty("java.home", javaHome)
+        }
+
+        assertEquals("java", commands.last().first())
+        assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
+    }
+
+    @Test
     fun `resolves standalone artifact with project Gradle wrapper`() {
         Files.writeString(projectDirectory.resolve("build.gradle.kts"), "plugins { java }")
         Files.writeString(projectDirectory.resolve("gradlew"), "wrapper")
