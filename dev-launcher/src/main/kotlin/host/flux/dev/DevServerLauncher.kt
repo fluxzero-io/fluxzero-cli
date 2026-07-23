@@ -36,7 +36,11 @@ class DevServerLauncher(
             ?: environment["FLUXZERO_DEV_SERVER_VERSION"]?.takeIf { it.isNotBlank() }
         val pinnedVersion = classpathResolver.resolvedVersion(projectDirectory)
         val version = when {
-            pinnedVersion != null && (request.target != DevLaunchTarget.SERVER || activeSession?.active == true) ->
+            pinnedVersion != null && request.target == DevLaunchTarget.SERVER && activeSession?.active == true ->
+                pinnedVersion
+            pinnedVersion != null && request.target in setOf(
+                DevLaunchTarget.CONTROL, DevLaunchTarget.MCP_STDIO
+            ) ->
                 pinnedVersion
             requestedVersion != null -> requestedVersion
             else -> versionResolver.latestCompatible()
@@ -52,7 +56,8 @@ class DevServerLauncher(
                 val likelyActive = request.target == DevLaunchTarget.SERVER && activeSession?.active == true
                 var classpath = classpathResolver.resolve(
                     projectDirectory, version,
-                    reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive
+                    reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive,
+                    projectPin = request.target != DevLaunchTarget.CONFIG
                 )
                 var command = command(classpath, request)
                 if (request.target == DevLaunchTarget.SERVER) {

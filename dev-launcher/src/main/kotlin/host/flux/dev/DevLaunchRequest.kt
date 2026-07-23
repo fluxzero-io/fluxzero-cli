@@ -5,7 +5,8 @@ import java.nio.file.Path
 enum class DevLaunchTarget(val mainClass: String) {
     SERVER("io.fluxzero.devserver.DevServerMain"),
     MCP_STDIO("io.fluxzero.devserver.DevMcpStdioMain"),
-    CONTROL("io.fluxzero.devserver.DevServerControlMain")
+    CONTROL("io.fluxzero.devserver.DevServerControlMain"),
+    CONFIG("io.fluxzero.devserver.DevProjectConfigMain")
 }
 
 data class DevLaunchRequest(

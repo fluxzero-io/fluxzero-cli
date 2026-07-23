@@ -23,9 +23,12 @@ class Dev(
     private val launcher: DevLauncher = DevServerLauncher()
 ) : CliktCommand() {
     override fun help(context: Context): String = "Start the local Fluxzero development environment"
+    override fun helpEpilog(context: Context): String =
+        "Shared project defaults belong in .fluxzero/dev.yaml. " +
+            "Run `fz dev config` to print the version-aligned configuration reference."
 
     private val action by argument(
-        help = "Action: start (default), attach, status, logs, or stop."
+        help = "Action: start (default), config, attach, status, logs, or stop."
     ).optional()
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
@@ -103,14 +106,23 @@ class Dev(
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
         val selectedAction = action ?: "start"
-        if (selectedAction !in setOf("start", "attach", "status", "logs", "stop")) {
-            throw UsageError("Unknown dev action '$selectedAction'. Expected start, attach, status, logs, or stop.")
+        if (selectedAction !in setOf("start", "config", "attach", "status", "logs", "stop")) {
+            throw UsageError(
+                "Unknown dev action '$selectedAction'. Expected start, config, attach, status, logs, or stop."
+            )
         }
         if (selectedAction == "start" && !isBuildProject(root)) {
             throw UsageError(
                 "No Maven or Gradle project found in '$root'. " +
                     "Run fz dev from the project root or pass --project-dir <path>."
             )
+        }
+        if (selectedAction == "config") {
+            val exitCode = launcher.launch(
+                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.CONFIG)
+            )
+            if (exitCode != 0) throw ProgramResult(exitCode)
+            return
         }
         if (selectedAction != "start") {
             val controlArguments = buildList {
