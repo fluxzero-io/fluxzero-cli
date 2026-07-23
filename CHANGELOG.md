@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Dev project configuration**: `fz dev config` prints the version-aligned `.fluxzero/dev.yaml` reference directly
+  from the current compatible dev server, and `fz dev --help` points humans and coding agents to the command.
+
 ### Changed
 
 - **Templates**: Project starters now come from the dedicated `fluxzero-templates` repository. The CLI only packages

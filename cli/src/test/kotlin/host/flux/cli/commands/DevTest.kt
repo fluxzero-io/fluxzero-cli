@@ -161,4 +161,28 @@ class DevTest {
         assertEquals(DevLaunchTarget.CONTROL, request?.target)
         assertTrue(request!!.arguments.contains("attach"))
     }
+
+    @Test
+    fun `prints version aligned project configuration through config target`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("config", "--project-dir", projectDirectory.toString(), "--dev-server-version", "1.2.3")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.CONFIG, request?.target)
+        assertEquals("1.2.3", request?.devServerVersion)
+        assertTrue(request?.arguments?.isEmpty() == true)
+    }
+
+    @Test
+    fun `help points agents to project configuration reference`() {
+        val result = Dev { 0 }.test("--help")
+
+        assertEquals(0, result.statusCode)
+        assertTrue(result.output.contains("fz dev config"))
+        assertTrue(result.output.contains(".fluxzero/dev.yaml"))
+    }
 }

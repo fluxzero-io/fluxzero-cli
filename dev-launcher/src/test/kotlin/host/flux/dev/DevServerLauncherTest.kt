@@ -104,6 +104,37 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `configuration reference resolves latest compatible release instead of project pin`() {
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val pinnedDependency = Files.createFile(projectDirectory.resolve("dev-server-pinned.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), pinnedDependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
+        val resolver = DevServerVersionResolver({
+            "<metadata><versioning><versions><version>1.6.2</version></versions></versioning></metadata>"
+        }, projectDirectory.resolve("metadata-cache")) { }
+        val bytes = "latest-dev-server".encodeToByteArray()
+        val artifacts = DevServerArtifactCache(projectDirectory.resolve("artifact-cache"), { uri ->
+            if (uri.toString().endsWith(".sha256")) sha256(bytes).encodeToByteArray() else bytes
+        }) { }
+        val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
+
+        DevServerLauncher(
+            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
+        ) { }.launch(
+            DevLaunchRequest(projectDirectory, target = DevLaunchTarget.CONFIG)
+        )
+
+        assertEquals("1.2.3", Files.readString(launcherDirectory.resolve("version")))
+        assertEquals(
+            "1.6.2",
+            Files.readString(projectDirectory.resolve(".fluxzero/dev/config-launcher/version"))
+        )
+        assertTrue(commands.single().contains(DevLaunchTarget.CONFIG.mainClass))
+    }
+
+    @Test
     fun `refreshes snapshot classpath instead of reusing the cache`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))

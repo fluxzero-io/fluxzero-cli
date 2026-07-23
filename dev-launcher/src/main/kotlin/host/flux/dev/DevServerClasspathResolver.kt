@@ -12,8 +12,15 @@ class DevServerClasspathResolver(
     constructor(executor: CommandExecutor, messageSink: (String) -> Unit) :
         this(executor, DevServerArtifactCache(messageSink = messageSink), messageSink)
 
-    fun resolve(projectDirectory: Path, version: String, reuseSnapshotCache: Boolean = false): String {
-        val launcherDirectory = projectDirectory.resolve(".fluxzero/dev/launcher")
+    fun resolve(
+        projectDirectory: Path,
+        version: String,
+        reuseSnapshotCache: Boolean = false,
+        projectPin: Boolean = true
+    ): String {
+        val launcherDirectory = projectDirectory.resolve(
+            if (projectPin) ".fluxzero/dev/launcher" else ".fluxzero/dev/config-launcher"
+        )
         val classpathFile = launcherDirectory.resolve("classpath.txt")
         val versionFile = launcherDirectory.resolve("version")
         if ((!version.endsWith("SNAPSHOT") || reuseSnapshotCache)

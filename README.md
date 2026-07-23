@@ -177,9 +177,13 @@ fz dev logs --follow --errors
 fz dev logs --follow --app orders
 fz dev stop
 fz dev stop --force
+fz dev config
 ```
 
 `logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
+`fz dev config` prints the complete, valid `.fluxzero/dev.yaml` reference owned by the current compatible dev-server
+version. This gives humans and coding agents the exact supported field names, nesting, and frontend routing options
+without requiring a repository checkout or separate documentation lookup.
 
 Only one dev session may be active per project. `status`, `logs`, `stop`, MCP discovery, and the next `dev` launch
 reconcile stale session state when the supervisor was killed unexpectedly. Because that also means the embedded test
