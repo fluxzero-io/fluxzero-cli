@@ -22,23 +22,57 @@ class DevServerClasspathResolver(
         }
 
         if (StableVersion.parse(version) != null) {
-            val artifact = stableArtifacts.resolve(version).toAbsolutePath().normalize().toString()
-            writeAtomically(classpathFile, artifact)
-            writeAtomically(versionFile, version)
-            return artifact
+            try {
+                val artifact = stableArtifacts.resolve(version).toAbsolutePath().normalize().toString()
+                writeAtomically(classpathFile, artifact)
+                writeAtomically(versionFile, version)
+                return artifact
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw e
+            } catch (directFailure: Exception) {
+                val buildTool = buildTool(projectDirectory)
+                messageSink(
+                    "Direct Fluxzero dev server $version download failed (${failureDetail(directFailure)}). " +
+                        "Retrying through ${buildTool.displayName}..."
+                )
+                return try {
+                    resolveWithBuildTool(
+                        projectDirectory, version, launcherDirectory, classpathFile, versionFile, buildTool
+                    )
+                } catch (e: DevLaunchInterruptedException) {
+                    throw e
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw e
+                } catch (fallbackFailure: Exception) {
+                    throw IllegalStateException(
+                        "Could not resolve Fluxzero dev server $version. " +
+                            "Direct download failed: ${failureDetail(directFailure)}. " +
+                            "${buildTool.displayName} fallback failed: ${failureDetail(fallbackFailure)}.",
+                        fallbackFailure
+                    )
+                }
+            }
         }
 
-        val maven = Files.isRegularFile(projectDirectory.resolve("pom.xml"))
-        val gradle = Files.isRegularFile(projectDirectory.resolve("build.gradle")) ||
-            Files.isRegularFile(projectDirectory.resolve("build.gradle.kts")) ||
-            Files.isRegularFile(projectDirectory.resolve("settings.gradle")) ||
-            Files.isRegularFile(projectDirectory.resolve("settings.gradle.kts"))
-        require(maven || gradle) { "No Maven or Gradle build found in $projectDirectory." }
+        return resolveWithBuildTool(
+            projectDirectory, version, launcherDirectory, classpathFile, versionFile, buildTool(projectDirectory)
+        )
+    }
 
+    private fun resolveWithBuildTool(
+        projectDirectory: Path,
+        version: String,
+        launcherDirectory: Path,
+        classpathFile: Path,
+        versionFile: Path,
+        buildTool: BuildTool
+    ): String {
         Files.createDirectories(launcherDirectory)
         Files.deleteIfExists(classpathFile)
         messageSink("Resolving Fluxzero dev server $version...")
-        val command = if (maven) {
+        val command = if (buildTool == BuildTool.MAVEN) {
             val launcherPom = launcherDirectory.resolve("pom.xml")
             writeAtomically(launcherPom, launcherPom(version))
             mavenCommand(projectDirectory) + listOf(
@@ -64,10 +98,10 @@ class DevServerClasspathResolver(
             throw DevLaunchInterruptedException(exitCode)
         }
         check(exitCode == 0) {
-            "Could not resolve Fluxzero dev server $version (${if (maven) "Maven" else "Gradle"} exit code $exitCode)."
+            "Could not resolve Fluxzero dev server $version (${buildTool.displayName} exit code $exitCode)."
         }
         check(Files.isRegularFile(classpathFile) && Files.readString(classpathFile).isNotBlank()) {
-            "${if (maven) "Maven" else "Gradle"} did not produce a runtime classpath for Fluxzero dev server $version."
+            "${buildTool.displayName} did not produce a runtime classpath for Fluxzero dev server $version."
         }
         writeAtomically(versionFile, version)
         messageSink("")
@@ -104,6 +138,21 @@ class DevServerClasspathResolver(
                 (StableVersion.parse(version) == null || stableArtifacts.isUsablePinnedArtifact(version, Path.of(it)))
         }
     }
+
+    private fun buildTool(projectDirectory: Path): BuildTool = when {
+        Files.isRegularFile(projectDirectory.resolve("pom.xml")) -> BuildTool.MAVEN
+        Files.isRegularFile(projectDirectory.resolve("build.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("build.gradle.kts")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle")) ||
+            Files.isRegularFile(projectDirectory.resolve("settings.gradle.kts")) -> BuildTool.GRADLE
+        else -> error("No Maven or Gradle build found in $projectDirectory.")
+    }
+
+    private fun failureDetail(failure: Throwable): String =
+        generateSequence(failure) { it.cause }
+            .mapNotNull { cause -> cause.message?.takeIf(String::isNotBlank) }
+            .firstOrNull()
+            ?: failure.javaClass.simpleName
 
     private fun writeAtomically(target: Path, content: String) {
         Files.createDirectories(target.parent)
@@ -174,6 +223,11 @@ class DevServerClasspathResolver(
         .replace("'", "&apos;")
 
     private fun groovy(value: String): String = value.replace("\\", "\\\\").replace("'", "\\'")
+
+    private enum class BuildTool(val displayName: String) {
+        MAVEN("Maven"),
+        GRADLE("Gradle")
+    }
 }
 
 internal class DevLaunchInterruptedException(val exitCode: Int) : RuntimeException(null, null, false, false)
