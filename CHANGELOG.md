@@ -14,11 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Templates**: Project starters now come from the dedicated `fluxzero-templates` repository. The CLI only packages
-  `flux-basic-java` and `flux-basic-kotlin`; complete sample applications are no longer offered as scaffolds.
-- **Agent guidance**: Generated starters now contain only a minimal `AGENTS.md` that routes coding agents to the
-  separately installed Fluxzero Codex plugin and MCP manuals. The existing Gradle and Maven project-file sync
-  functionality remains available for projects that deliberately use local manuals.
+- **Templates**: The `flux-basic-java` and `flux-basic-kotlin` starters now live in this repository and are tested and
+  released atomically with the CLI and build plugins. Release packaging injects the matching Maven and Gradle plugin
+  version instead of depending on a separately released template archive.
+- **Agent guidance**: Generated starters now contain compact agent bootstrap files, anchored by `AGENTS.md`, that route
+  coding agents to the separately installed Fluxzero plugin and MCP manuals. The existing Gradle and Maven project-file
+  sync functionality remains available for projects that deliberately use local manuals.
 
 ### Fixed
 
@@ -44,7 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Templates**: Templates are now downloaded from GitHub release artifacts (`templates.zip`) instead of source archives, ensuring consistent template packaging. The `EXAMPLES_BRANCH` configuration has been replaced with `EXAMPLES_RELEASE_TAG` (default: `latest`).
 - **Gradle Plugin Publishing**: Removed publishing to Gradle Plugin Portal. The Gradle plugin is now only published to Maven Central as `io.fluxzero.tools:fluxzero-gradle-plugin`.
 - **Gradle Plugin ID**: Changed plugin ID from `io.fluxzero.tools.gradle` to `io.fluxzero.tools.gradle.plugin`. The main artifact coordinates remain `io.fluxzero.tools:fluxzero-gradle-plugin`.
 - **Gradle Plugin**: Embedded `project-files` module and its dependencies (kotlinx-serialization, kotlin-logging, slf4j) into the plugin JAR using shadow. The plugin is now self-contained with no transitive dependencies on internal modules.

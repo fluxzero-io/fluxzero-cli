@@ -1,0 +1,7 @@
+{
+  "@class" : "CreateUser",
+  "userId": "viewer",
+  "details": {
+    "name": "The viewer"
+  }
+}

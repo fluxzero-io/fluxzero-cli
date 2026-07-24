@@ -27,7 +27,8 @@ fluxzero-cli is a Kotlin-based command-line tool for interacting with Flux and F
 - Self-contained binary (no JVM required), but larger file size (~42MB vs ~7.5MB JAR)
 
 ### Template Management
-- `./gradlew zipTemplates` - Archives template folders from `templates/` directory as ZIP files for distribution
+- `./gradlew :templates:packageTemplates` - Packages the embedded Java and Kotlin template sources as CLI resources
+- `./gradlew :templates:test` - Verifies template packaging, version injection, and refactoring behavior
 - Templates are packaged into the JAR resources during build
 
 ## Architecture
@@ -51,11 +52,12 @@ fluxzero-cli is a Kotlin-based command-line tool for interacting with Flux and F
 
 ### Template System
 
-Templates are stored in `templates/` directory and packaged as ZIP files during build:
+Templates are stored in `templates/src/main/template-sources/` and packaged as ZIP files during build:
 - Each template is a complete working project
-- `customise.yaml` files define template customization rules (package name replacement, file modifications)
+- `refactor.yaml` files define template customization rules (package name replacement, file modifications)
 - Templates support regex-based find/replace operations for customization
 - Template selection is interactive during `init` command
+- Release builds inject the same version into the embedded Maven and Gradle plugin configuration
 
 ### Build System
 
@@ -63,7 +65,7 @@ Uses Gradle with Kotlin DSL:
 - Kotlin 2.1.20 with JVM target 21
 - Shadow plugin for fat JAR creation
 - GraalVM Native Build Tools plugin for native image compilation
-- Custom `zipTemplates` task for template packaging
+- Custom `:templates:packageTemplates` task for deterministic, cross-platform template packaging
 - Dependencies: Clikt (commands), JLine (prompts), MockK (testing)
 
 ### CI/CD Workflows
@@ -94,9 +96,9 @@ src/main/kotlin/host/flux/cli/
 ├── prompt/                  - User interaction
 └── template/               - Template processing
 
-templates/                   - Project templates
-├── flux-kotlin-single/     - Single module Kotlin template
-└── [other templates]
+templates/src/main/template-sources/
+├── flux-basic-java/         - Java starter with Maven and Gradle support
+└── flux-basic-kotlin/       - Kotlin starter with Maven and Gradle support
 
 config/detekt/              - Code quality configuration
 ```

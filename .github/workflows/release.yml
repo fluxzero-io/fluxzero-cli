@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  repository_dispatch:
-    types: [ templates-updated ]
   push:
     branches:
       - main
@@ -54,25 +52,42 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test JAR functionality
+        env:
+          CLI_JAR: cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
+          API_JAR: api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar
         run: |
           echo "Testing CLI JAR with basic commands..."
-          java -jar cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar version
-          java -jar cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar templates list
+          java -jar "$CLI_JAR" version
+          java -jar "$CLI_JAR" templates list
           echo "CLI JAR functionality test successful!"
           
           echo "Testing API JAR startup..."
           # Test that API JAR can start and respond to health check
+          # Positional parameters expand in the nested bash process.
+          # shellcheck disable=SC2016
           timeout 30s bash -c '
-            java -jar api/build/libs/flux-api-${{ needs.version.outputs.version }}.jar &
+            java -jar "$1" &
             API_PID=$!
             until curl -fsS http://localhost:8080/api/health; do sleep 0.5; done
             echo "API health check successful!"
             kill $API_PID 2>/dev/null || true
-          ' || {
+          ' _ "$API_JAR" || {
             echo "API JAR test failed!"
             exit 1
           }
           echo "API JAR functionality test successful!"
+
+      - name: Publish candidate plugins locally
+        run: >-
+          ./gradlew :maven-plugin:publishToMavenLocal :gradle-plugin:publishToMavenLocal
+          -PappVersion="${{ needs.version.outputs.version }}"
+          -Dmaven.repo.local="$RUNNER_TEMP/fluxzero-plugin-repository"
+
+      - name: Verify embedded templates with candidate plugins
+        run: >-
+          scripts/verify-embedded-templates.sh
+          "cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar"
+          "$RUNNER_TEMP/fluxzero-plugin-repository"
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v6
@@ -261,8 +276,7 @@ jobs:
       - name: Verify JAR functionality
         run: |
           echo "Testing JAR with 'templates list' command..."
-          java -jar build/libs/fluxzero-cli.jar templates list
-          if [ $? -ne 0 ]; then
+          if ! java -jar build/libs/fluxzero-cli.jar templates list; then
             echo "JAR verification failed!"
             exit 1
           fi
@@ -293,8 +307,10 @@ jobs:
           
           # Test bash install script with Linux binary
           echo "Testing bash install script..."
-          export TEST_HOME=$(mktemp -d)
-          export HOME=$TEST_HOME
+          TEST_HOME=$(mktemp -d)
+          export TEST_HOME
+          HOME=$TEST_HOME
+          export HOME
           
           # Use Linux native binary for testing
           LINUX_BINARY="$(pwd)/build/native-releases/flux-linux-amd64"
@@ -311,12 +327,11 @@ jobs:
           fi
           
           # Test the installed CLI
-          $TEST_HOME/.fluxzero/bin/fz version
-          if [ $? -ne 0 ]; then
+          if ! "$TEST_HOME/.fluxzero/bin/fz" version; then
             echo "Installed native binary verification failed!"
             exit 1
           fi
-          $TEST_HOME/.fluxzero/bin/fluxzero version
+          "$TEST_HOME/.fluxzero/bin/fluxzero" version
           
           # Check if fz was created in /usr/local/bin
           if [ ! -x "/usr/local/bin/fz" ]; then
@@ -329,15 +344,13 @@ jobs:
           fi
           
           # Test the fz command directly
-          fz version
-          if [ $? -ne 0 ]; then
+          if ! fz version; then
             echo "fz command verification failed!"
             exit 1
           fi
           
           # Also test templates list command via fz
-          fz templates list
-          if [ $? -ne 0 ]; then
+          if ! fz templates list; then
             echo "fz templates list command failed!"
             exit 1
           fi
@@ -359,7 +372,7 @@ jobs:
           
           # Cleanup
           sudo rm -f /usr/local/bin/fz /usr/local/bin/fluxzero
-          rm -rf $TEST_HOME
+          rm -rf "$TEST_HOME"
 
       - name: Test uninstall scripts
         run: |
@@ -367,8 +380,10 @@ jobs:
           
           # Test bash uninstall script with installed CLI
           echo "Testing bash uninstall script..."
-          export TEST_HOME=$(mktemp -d)
-          export HOME=$TEST_HOME
+          TEST_HOME=$(mktemp -d)
+          export TEST_HOME
+          HOME=$TEST_HOME
+          export HOME
           
           # Install first using Linux binary
           LINUX_BINARY="$(pwd)/build/native-releases/flux-linux-amd64"
@@ -403,8 +418,10 @@ jobs:
           
           # Test legacy installation cleanup
           echo "Testing legacy installation cleanup..."
-          export TEST_HOME2=$(mktemp -d)
-          export HOME=$TEST_HOME2
+          TEST_HOME2=$(mktemp -d)
+          export TEST_HOME2
+          HOME=$TEST_HOME2
+          export HOME
           
           # Create a fake legacy installation
           mkdir -p "$TEST_HOME2/.flux"
@@ -434,7 +451,7 @@ jobs:
           echo "Uninstall scripts verification successful!"
           
           # Cleanup
-          rm -rf $TEST_HOME $TEST_HOME2
+          rm -rf "$TEST_HOME" "$TEST_HOME2"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

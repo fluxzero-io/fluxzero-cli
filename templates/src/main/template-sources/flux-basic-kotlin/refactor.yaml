@@ -1,0 +1,142 @@
+operations:
+  # Replace package names in Kotlin files
+  - type: replace
+    files: ["**/*.kt"]
+    find: "package com\\.example\\.app"
+    replace: "package ${package}"
+    regex: true
+
+  # Replace package names in Java package-info files
+  - type: replace
+    files: ["**/*.java"]
+    find: "package com\\.example\\.app"
+    replace: "package ${package}"
+    regex: true
+
+  # Update Kotlin type registry root in App.kt
+  - type: replace
+    files: [ "src/main/kotlin/com/example/app/App.kt" ]
+    find: '@RegisterType(root = "com.example.app")'
+    replace: '@RegisterType(root = "${package}")'
+
+  # Update intellij run files
+  - type: replace
+    files: [ ".run/*.xml" ]
+    find: "com.example.app"
+    replace: "${package}"
+
+  # Replace imports in Kotlin files
+  - type: replace
+    files: ["**/*.kt"]
+    find: "import com\\.example\\.app\\."
+    replace: "import ${package}."
+    regex: true
+
+  # Replace imports in Java files
+  - type: replace
+    files: ["**/*.java"]
+    find: "import com\\.example\\.app\\."
+    replace: "import ${package}."
+    regex: true
+
+  # Update Maven pom.xml
+  - type: replace
+    files: ["pom.xml"]
+    find: "<groupId>com.example</groupId>"
+    replace: "<groupId>${groupId}</groupId>"
+
+  - type: replace
+    files: ["pom.xml"]
+    find: "<artifactId>flux-basic-kotlin</artifactId>"
+    replace: "<artifactId>${artifactId}</artifactId>"
+
+  - type: replace
+    files: ["pom.xml"]
+    find: "<name>Flux Basic Kotlin</name>"
+    replace: "<name>${projectName}</name>"
+
+  - type: replace
+    files: ["pom.xml"]
+    find: "<description>An empty Fluxzero application with Kotlin</description>"
+    replace: "<description>${description}</description>"
+
+  # Update Gradle build.gradle.kts
+  - type: replace
+    files: ["build.gradle.kts"]
+    find: 'group = "com.example.flux"'
+    replace: 'group = "${groupId}"'
+
+  # Update Gradle settings.gradle.kts
+  - type: replace
+    files: ["settings.gradle.kts"]
+    find: 'rootProject.name = "flux-basic-kotlin"'
+    replace: 'rootProject.name = "${artifactId}"'
+
+  # Keep package publishing and deployment aligned with the generated artifact id
+  - type: replace
+    files:
+      - "build.gradle.kts"
+      - ".github/workflows/deploy-to-fluxzero-cloud.yml.maven"
+      - ".github/workflows/deploy-to-fluxzero-cloud.yml.gradle"
+    find: "flux-basic-kotlin"
+    replace: "${artifactId}"
+
+  # Update package references in all resource files
+  - type: replace
+    files: ["src/main/resources/**/*", "src/test/resources/**/*"]
+    find: "com\\.example\\.app\\."
+    replace: "${package}."
+    regex: true
+
+  # Update README package references
+  - type: replace
+    files: ["README.md"]
+    find: "com\\.example\\.app"
+    replace: "${package}"
+    regex: true
+
+  - type: replace
+    files: ["README.md"]
+    find: "src/main/kotlin/com/example/app/"
+    replace: "src/main/kotlin/${packagePath}/"
+
+  - type: replace
+    files: ["README.md"]
+    find: "src/test/kotlin/com/example/app/"
+    replace: "src/test/kotlin/${packagePath}/"
+
+  # Keep only the workflow for the selected build system
+  - type: rename
+    from: ".github/workflows/deploy-to-fluxzero-cloud.yml.maven"
+    to: ".github/workflows/deploy-to-fluxzero-cloud.yml"
+
+  - type: rename
+    from: ".github/workflows/deploy-to-fluxzero-cloud.yml.gradle"
+    to: ".github/workflows/deploy-to-fluxzero-cloud.yml"
+
+  # rename docker files
+  - type: rename
+    from: "Dockerfile.gradle"
+    to: "Dockerfile"
+
+  - type: rename
+    from: "Dockerfile.maven"
+    to: "Dockerfile"
+
+  # Rename package directories
+  - type: rename
+    from: "src/main/kotlin/com/example/app"
+    to: "src/main/kotlin/${packagePath}"
+
+  - type: rename
+    from: "src/main/java/com/example/app"
+    to: "src/main/java/${packagePath}"
+
+  - type: rename
+    from: "src/test/kotlin/com/example/app"
+    to: "src/test/kotlin/${packagePath}"
+
+  # Make wrapper scripts executable
+  - type: chmod
+    files: ["gradlew", "mvnw"]
+    mode: "755"

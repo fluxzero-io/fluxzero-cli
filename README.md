@@ -399,9 +399,11 @@ FluxZero CLI installs to:
 
 ## Templates
 
-Templates are sourced from [fluxzero-templates](https://github.com/fluxzero-io/fluxzero-templates) at build time and packaged for use by the CLI. Local builds automatically use a sibling `../fluxzero-templates` checkout when present, so template changes can be tested without waiting for a published templates release. Override this with `-PtemplatesSourceDir=/path/to/fluxzero-templates` or `TEMPLATES_SOURCE_DIR=/path/to/fluxzero-templates`.
-
-When no local source directory is available, the build downloads the `templates.zip` release asset and caches it under `templates/build/templates-snapshot`. Use `REFRESH_TEMPLATES=true` or `-PrefreshTemplates=true` to force a fresh download.
+Template sources live in `templates/src/main/template-sources` and are versioned, tested, and released atomically with
+the CLI and its Maven and Gradle plugins. The `:templates:packageTemplates` task creates the embedded ZIP resources and
+injects the current release version into each generated project's plugin configuration. Development builds use the
+configured released fallback plugin version by default; pass `-PtemplatePluginVersion=<version>` when validating a
+different locally published version.
 
 **Template features:**
 - Package name replacement
@@ -520,11 +522,8 @@ operations:
     directory: "logs"
 ```
 
-Advanced:
-- Override repo URL: `./gradlew -PtemplatesRepoUrl=https://github.com/your-org/your-examples.git build`
-- Override release tag: `./gradlew -PtemplatesReleaseTag=v1.2.3 build`
-- Pin an explicit ZIP: `./gradlew -PtemplatesZipUrl=https://example.com/templates.zip build`
-- Force refresh the cache: `./gradlew -PrefreshTemplates=true build`
+Build the embedded template resources directly with `./gradlew :templates:packageTemplates`. They are written to
+`templates/build/generated/resources/templates` and are included automatically in CLI JARs and native executables.
 
 ## Build Plugins
 
@@ -732,7 +731,8 @@ Microsoft's contributor license agreement.
 
 ## License
 
-This project is licensed under the EUPL-1.2 - see the LICENSE file for details.
+The CLI and build plugins are licensed under the EUPL-1.2; see `LICENSE`. The embedded starter-template sources under
+`templates/src/main/template-sources` retain their Apache-2.0 license; see `templates/LICENSE`.
 
 ## Contributing
 
