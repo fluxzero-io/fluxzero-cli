@@ -57,6 +57,7 @@ generate_and_build() {
 
   local project_dir="$WORKSPACE/$project_name"
   local workflow="$project_dir/.github/workflows/deploy-to-fluxzero-cloud.yml"
+  [[ -f "$project_dir/.gitignore" ]] || { echo "Generated .gitignore not found" >&2; exit 1; }
   [[ -f "$workflow" ]] || { echo "Generated workflow not found: $workflow" >&2; exit 1; }
   [[ ! -e "$workflow.maven" ]] || { echo "Maven workflow source was not renamed" >&2; exit 1; }
   [[ ! -e "$workflow.gradle" ]] || { echo "Gradle workflow source was not renamed" >&2; exit 1; }
