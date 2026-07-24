@@ -59,6 +59,47 @@ class FluxzeroPluginFunctionalTest {
         assertTrue(result.output.contains("fluxzeroDev"))
         assertTrue(result.output.contains("fluxzeroDevMetadata"))
         assertTrue(result.output.contains("fluxzeroDevTest"))
+        assertTrue(result.output.contains("fluxzeroPublishPackage"))
+    }
+
+    @Test
+    fun `package publishing DSL configures the Gradle publish task`() {
+        buildFile.writeText("""
+            plugins {
+                java
+                id("io.fluxzero.tools.gradle.plugin")
+            }
+
+            group = "com.example"
+            version = "1.0.0"
+
+            fluxzero {
+                projectFiles {
+                    enabled.set(false)
+                }
+                packagePublishing {
+                    packageName.set("sample")
+                    images.add("registry.fluxzero.io/\${'$'}{organisationId}/\${'$'}{packageName}")
+                    tags.add("sha-example")
+                    authentications {
+                        create("fluxzero") {
+                            host.set("registry.fluxzero.io")
+                            githubOidc {
+                                audience.set("https://cloud.fluxzero.io")
+                            }
+                        }
+                    }
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(testProjectDir)
+            .withArguments("help", "--task", "fluxzeroPublishPackage")
+            .withPluginClasspath()
+            .build()
+
+        assertTrue(result.output.contains("Builds and publishes a layered Java OCI package."), result.output)
     }
 
     @Test

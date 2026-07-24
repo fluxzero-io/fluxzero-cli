@@ -1,19 +1,21 @@
 package host.flux.gradle
 
 import groovy.json.JsonOutput
+import host.flux.publishing.PackageNameSupport
+import java.io.File
+import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPlugin
-import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.api.tasks.testing.Test
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.create
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
-import java.io.File
 
 /**
  * Gradle plugin for Fluxzero projects.
@@ -57,6 +59,75 @@ class FluxzeroPlugin : Plugin<Project> {
         // Register project files sync feature
         registerProjectFilesFeature(project, extension)
         registerDevFeature(project, extension)
+        registerPackagePublishingFeature(project, extension)
+    }
+
+    private fun registerPackagePublishingFeature(project: Project, extension: FluxzeroExtension) {
+        val publishing = extension.packagePublishing
+        publishing.packageName.convention(project.name)
+        publishing.packageVersion.convention(project.provider {
+            PackageNameSupport.defaultPackageVersion(project.version.toString())
+        })
+        publishing.images.convention(emptyList())
+        publishing.tags.convention(emptyList())
+        publishing.labels.convention(emptyMap())
+
+        val publishTask = project.tasks.register<PublishPackageTask>("fluxzeroPublishPackage") {
+            group = "fluxzero"
+            description = "Builds and publishes a layered Java OCI package."
+            packageName.set(publishing.packageName)
+            packageVersion.set(publishing.packageVersion)
+            applicationId.set(publishing.applicationId)
+            mainClass.set(publishing.mainClass)
+            images.set(publishing.images)
+            tags.set(publishing.tags)
+            baseImage.set(publishing.baseImage)
+            baseImageSource.set(publishing.baseImageSource)
+            javaToolOptions.set(publishing.javaToolOptions)
+            labels.set(publishing.labels)
+            defaultLabels.set(project.provider { gradlePackageLabels(project) })
+            publishAttempts.set(publishing.publishAttempts)
+            publishRetryDelayMillis.set(publishing.publishRetryDelayMillis)
+            authentications = publishing.authentications
+        }
+
+        project.plugins.withType<JavaPlugin> {
+            val sourceSets = project.extensions.getByType(SourceSetContainer::class.java)
+            val main = sourceSets.getByName("main")
+            publishTask.configure { task ->
+                task.dependsOn(project.tasks.named(main.classesTaskName))
+                task.classesDirectories.from(main.output)
+                task.runtimeClasspath.from(main.runtimeClasspath)
+            }
+            val jarTask = project.tasks.named("jar", AbstractArchiveTask::class.java)
+            publishTask.configure { task ->
+                task.applicationArtifact.convention(jarTask.flatMap { it.archiveFile })
+                task.dependsOn(jarTask)
+            }
+            project.pluginManager.withPlugin("org.springframework.boot") {
+                val bootJarTask = project.tasks.named("bootJar", AbstractArchiveTask::class.java)
+                publishTask.configure { task ->
+                    task.applicationArtifact.set(bootJarTask.flatMap { it.archiveFile })
+                    task.dependsOn(bootJarTask)
+                }
+            }
+        }
+    }
+
+    private fun gradlePackageLabels(project: Project): Map<String, String> = buildMap {
+        put("io.fluxzero.gradle.group", project.group.toString())
+        put("io.fluxzero.gradle.project-name", project.name)
+        put("io.fluxzero.gradle.version", project.version.toString())
+        val gitInfo = PackageNameSupport.gitInfo(project.rootProject.projectDir.toPath())
+        gitInfo?.sha?.let { put("org.opencontainers.image.revision", it) }
+        val githubRepository = System.getenv("GITHUB_REPOSITORY")?.takeIf(String::isNotBlank)
+        if (githubRepository != null) {
+            val serverUrl = System.getenv("GITHUB_SERVER_URL")?.takeIf(String::isNotBlank)
+                ?: "https://github.com"
+            put("org.opencontainers.image.source", "${serverUrl.trimEnd('/')}/$githubRepository")
+        } else {
+            gitInfo?.remoteUrl?.let { put("org.opencontainers.image.source", it) }
+        }
     }
 
     private fun registerDevFeature(project: Project, extension: FluxzeroExtension) {
