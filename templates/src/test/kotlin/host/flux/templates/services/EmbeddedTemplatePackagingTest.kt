@@ -31,6 +31,7 @@ class EmbeddedTemplatePackagingTest {
                 assertContains(gradleBuild, "version \"$pluginVersion\"")
                 assertFalse(pom.contains("@fluxzeroPluginVersion@"))
                 assertFalse(gradleBuild.contains("@fluxzeroPluginVersion@"))
+                assertTrue(Files.exists(target.resolve(".gitignore")))
                 assertTrue(Files.exists(target.resolve(".github/workflows/deploy-to-fluxzero-cloud.yml.maven")))
                 assertTrue(Files.exists(target.resolve(".github/workflows/deploy-to-fluxzero-cloud.yml.gradle")))
             } finally {
