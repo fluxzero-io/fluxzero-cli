@@ -32,10 +32,15 @@ class Init(
 
     val dir by option(
         "--dir",
-        help = "The directory in which to create your application; defaults to the current working directory"
+        help = "Parent directory for the named project, or the exact target with --in-place; defaults to the current working directory"
     )
         .path(mustExist = true, canBeFile = false, canBeDir = true, mustBeWritable = true)
         .default(Paths.get(""))
+
+    val inPlace by option(
+        "--in-place",
+        help = "Generate directly in --dir (or the current directory) instead of creating a named child directory"
+    ).flag(default = false)
 
     val name by option("--name", help = "Project name (will be normalized to lowercase, alphanumeric, hyphens, underscores)")
 
@@ -88,6 +93,7 @@ class Init(
             template = finalTemplate,
             name = finalName,
             outputDir = dir.toString().ifEmpty { null },
+            inPlace = inPlace,
             initGit = initGit,
             packageName = finalPackage,
             groupId = groupId,

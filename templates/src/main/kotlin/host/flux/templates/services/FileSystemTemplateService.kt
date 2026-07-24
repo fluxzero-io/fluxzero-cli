@@ -5,7 +5,6 @@ import java.io.FileNotFoundException
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipInputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
@@ -73,6 +72,10 @@ class FileSystemTemplateService(private val templatePath: Path) : TemplateServic
             stream.forEach { sourcePath ->
                 val relativePath = source.relativize(sourcePath)
                 val targetPath = target.resolve(relativePath)
+
+                require(!Files.isSymbolicLink(sourcePath)) {
+                    "Template directories must not contain symbolic links: $relativePath"
+                }
                 
                 if (Files.isDirectory(sourcePath)) {
                     Files.createDirectories(targetPath)
@@ -92,21 +95,6 @@ class FileSystemTemplateService(private val templatePath: Path) : TemplateServic
     }
 
     private fun extractZip(zipStream: InputStream, targetDir: Path) {
-        ZipInputStream(zipStream).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val outPath = targetDir.resolve(entry.name).normalize()
-
-                if (entry.isDirectory) {
-                    Files.createDirectories(outPath)
-                } else {
-                    Files.createDirectories(outPath.parent)
-                    Files.newOutputStream(outPath).use { out -> zip.copyTo(out) }
-                }
-
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
-        }
+        ZipTemplateExtractor.extract(zipStream, targetDir)
     }
 }

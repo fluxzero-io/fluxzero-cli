@@ -344,7 +344,8 @@ fz init [OPTIONS]
 | `--template` | Name of the template to use | `--template flux-basic-kotlin` |
 | `--template-path` | Path to custom template directory or ZIP file | `--template-path ./my-templates` |
 | `--name` | Project name (1-50 chars: 0-9, a-z, -, _) | `--name my-app` |
-| `--dir` | Directory to create project in | `--dir ./projects` |
+| `--dir` | Parent directory for the named project, or the exact target with `--in-place` | `--dir ./projects` |
+| `--in-place` | Generate directly in `--dir` (or the current directory); the target must be empty except for managed `.fluxzero/dev` state | `--in-place` |
 | `--package` | Java package name | `--package com.example.myapp` |
 | `--group-id` | Maven/Gradle group ID | `--group-id com.example` |
 | `--artifact-id` | Maven/Gradle artifact ID | `--artifact-id my-app` |
@@ -361,6 +362,9 @@ fz init
 
 # With built-in template
 fz init --template flux-basic-kotlin --name my-app --package com.example.myapp --build gradle
+
+# Into the current empty workspace while pre-init Fluxzero dev state is present
+fz init --in-place --template flux-basic-java --name my-app --package com.example.myapp --build maven
 
 # Using custom template directory
 fz init --template-path ./my-templates --template custom-template --name my-project

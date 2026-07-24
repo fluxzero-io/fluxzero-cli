@@ -45,8 +45,8 @@ data class RenameOperation(
         val finalFrom = expandVariables(from, variables)
         val finalTo = expandVariables(to, variables)
         
-        val sourcePath = templateRoot.resolve(finalFrom)
-        val targetPath = templateRoot.resolve(finalTo)
+        val sourcePath = FileOperationHelper.resolveWithinRoot(templateRoot, finalFrom)
+        val targetPath = FileOperationHelper.resolveWithinRoot(templateRoot, finalTo)
         
         FileOperationHelper.moveFile(sourcePath, targetPath, messages)
         return messages
@@ -59,7 +59,7 @@ data class CreateDirectoryOperation(
     override fun execute(templateRoot: Path, variables: TemplateVariables): OperationMessages {
         val messages = OperationMessages()
         val finalDirectory = expandVariables(directory, variables)
-        val targetPath = templateRoot.resolve(finalDirectory)
+        val targetPath = FileOperationHelper.resolveWithinRoot(templateRoot, finalDirectory)
         FileOperationHelper.createDirectory(targetPath, messages)
         return messages
     }
@@ -71,7 +71,7 @@ data class CleanupEmptyDirectoriesOperation(
     override fun execute(templateRoot: Path, variables: TemplateVariables): OperationMessages {
         val messages = OperationMessages()
         paths.forEach { path ->
-            val targetPath = templateRoot.resolve(path)
+            val targetPath = FileOperationHelper.resolveWithinRoot(templateRoot, path)
             FileOperationHelper.cleanupEmptyDirectories(targetPath, messages)
         }
         return messages

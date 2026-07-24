@@ -66,7 +66,7 @@ class InteractiveDevProjectInitializer(
             outputDir = directory.toString(),
             packageName = packageName,
             buildSystem = buildSystem,
-            useOutputDirectory = useCurrentDirectory
+            inPlace = useCurrentDirectory
         ))
         if (!result.success || result.outputPath == null) {
             throw IllegalStateException(result.message)

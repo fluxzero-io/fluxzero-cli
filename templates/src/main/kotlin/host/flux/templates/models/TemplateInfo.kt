@@ -21,7 +21,7 @@ data class ScaffoldProject(
     val applicationId: String? = null,
     val description: String? = null,
     val buildSystem: BuildSystem? = null,
-    val useOutputDirectory: Boolean = false
+    val inPlace: Boolean = false
 )
 
 data class ScaffoldResult(

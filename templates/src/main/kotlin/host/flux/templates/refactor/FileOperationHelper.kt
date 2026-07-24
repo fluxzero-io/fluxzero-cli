@@ -10,6 +10,26 @@ import kotlin.streams.toList
 
 
 object FileOperationHelper {
+
+    fun resolveWithinRoot(templateRoot: Path, relativePath: String): Path {
+        require(relativePath.isNotBlank()) { "Template operation path must not be blank" }
+
+        val root = templateRoot.toAbsolutePath().normalize()
+        val resolved = root.resolve(relativePath).normalize()
+        require(resolved != root && resolved.startsWith(root)) {
+            "Template operation path escapes the template root: $relativePath"
+        }
+
+        var current: Path? = resolved
+        while (current != null && current.startsWith(root)) {
+            require(!Files.isSymbolicLink(current)) {
+                "Template operation path crosses a symbolic link: $relativePath"
+            }
+            if (current == root) break
+            current = current.parent
+        }
+        return resolved
+    }
     
     fun findMatchingFiles(templateRoot: Path, patterns: List<String>): List<Path> {
         val allFiles = mutableListOf<Path>()
