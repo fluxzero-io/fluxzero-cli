@@ -12,6 +12,7 @@ instruction files from GitHub releases.
 - **Smart Caching**: Only downloads when version changes
 - **Local Dev Environment**: Starts the same runtime, proxy, IDP, reload, test, frontend, diagnostics, and MCP stack as `fz dev`
 - **Gradle-Correct Builds**: Gradle owns compilation, annotation processors, resources, and runtime/test classpaths
+- **Layered Package Publishing**: Publishes application outputs above ordered dependency layers without requiring Docker
 
 ## Quick Start
 
@@ -106,6 +107,84 @@ directly when troubleshooting Gradle discovery:
 ```bash
 ./gradlew fluxzeroDevMetadata
 ```
+
+## Package publishing
+
+`fluxzeroPublishPackage` builds a Java OCI image from Gradle's main source-set outputs and runtime classpath, then pushes
+it directly through the registry protocol. Dependencies form the stable lower layer and application classes/resources
+form the top layer. A Spring Boot `Start-Class` or regular JAR `Main-Class` is detected automatically; configure
+`mainClass` only when the build artifact does not identify one.
+
+```kotlin
+fluxzero {
+    packagePublishing {
+        packageName.set("my-service")
+        images.add("registry.fluxzero.io/\${organisationId}/\${packageName}")
+        tags.add(providers.environmentVariable("GITHUB_SHA").map { "sha-$it" })
+        authentications {
+            create("fluxzero") {
+                host.set("registry.fluxzero.io")
+                githubOidc {
+                    audience.set("https://cloud.fluxzero.io")
+                }
+            }
+        }
+    }
+}
+```
+
+Run the build and publisher as separate CI steps when tests should complete before requesting short-lived credentials:
+
+```bash
+./gradlew --no-daemon build
+./gradlew --no-daemon fluxzeroPublishPackage
+```
+
+GitHub OIDC authentication requires `id-token: write` on the job. The plugin requests the OIDC token only when the
+publish task runs. For an image containing `${organisationId}`, it discovers the Fluxzero identity endpoint from the
+registry's standard Bearer challenge, resolves the organisation from that token, and substitutes the result. The token
+is not sent to the unauthenticated registry discovery request.
+
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `packageName` | No | Gradle project name | Public package name and value for `${packageName}`. |
+| `packageVersion` | No | Gradle project version | Primary image tag when `tags` is empty. |
+| `applicationId` | No | — | Fluxzero application id stored as OCI metadata. |
+| `mainClass` | No | Built artifact `Start-Class` or `Main-Class` | Java application entrypoint. |
+| `images` | Yes | — | Image repositories; supports complete `${organisationId}` and `${packageName}` path segments. |
+| `tags` | No | `packageVersion` | Tags applied to every configured image. |
+| `baseImage` | No | Fluxzero Java distroless runtime | Runtime base image. |
+| `baseImageSource` | No | `registry` | `registry` or `docker-daemon`. |
+| `javaToolOptions` | No | Fluxzero JVM defaults | Value stored as `JAVA_TOOL_OPTIONS`. |
+| `labels` | No | Empty | Additional or overriding OCI labels. |
+| `publishAttempts` | No | `3` | Attempts for transient registry blob-upload failures. |
+| `publishRetryDelayMillis` | No | `2000` | Base delay between retry attempts. |
+| `authentications` | No | Anonymous access | Host-bound credentials; unmatched image registries remain anonymous. |
+
+Each named authentication requires an exact lowercase `host` (including the port when non-default) and exactly one
+mechanism:
+
+```kotlin
+authentications {
+    create("privateRegistry") {
+        host.set("registry.example.com")
+        basic {
+            username.set(providers.environmentVariable("REGISTRY_USERNAME"))
+            token.set(providers.environmentVariable("REGISTRY_TOKEN"))
+        }
+    }
+}
+```
+
+| Name | Required | Default | Description |
+|------|----------|---------|-------------|
+| `authentication.host` | Yes | — | Exact registry host and optional port, without a scheme or path. |
+| `authentication.basic` | No | — | Username/token credential; mutually exclusive with `githubOidc`. |
+| `authentication.githubOidc` | No | — | GitHub Actions OIDC credential; mutually exclusive with `basic`. |
+| `basic.username` | No | Empty | Registry username. |
+| `basic.token` | Yes | — | Registry password or token. |
+| `githubOidc.username` | No | Empty | Registry username associated with the OIDC token. |
+| `githubOidc.audience` | Yes | — | Audience requested from GitHub Actions. |
 
 ## Configuration
 
@@ -336,6 +415,14 @@ fluxzero {
 ```
 
 ## Task Reference
+
+### `fluxzeroPublishPackage`
+
+Builds and publishes a layered Java OCI package from Gradle's main source-set output and ordered runtime JARs.
+
+```bash
+./gradlew fluxzeroPublishPackage
+```
 
 ### `syncProjectFiles`
 

@@ -17,8 +17,10 @@ val shade by configurations.creating {
 dependencies {
     shade(project(":project-files"))
     shade(project(":dev-launcher"))
+    shade(project(":publishing"))
     compileOnly(project(":project-files"))
     compileOnly(project(":dev-launcher"))
+    compileOnly(project(":publishing"))
 
     implementation(gradleApi())
     implementation(gradleKotlinDsl())
@@ -32,6 +34,7 @@ dependencies {
     // Functional testing
     testImplementation(gradleTestKit())
     testImplementation(project(":project-files"))
+    testImplementation(project(":publishing"))
 }
 
 group = "io.fluxzero.tools"

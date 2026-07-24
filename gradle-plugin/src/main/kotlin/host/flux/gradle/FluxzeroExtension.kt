@@ -31,6 +31,9 @@ abstract class FluxzeroExtension @Inject constructor(objects: ObjectFactory) {
     /** Configuration for the local Fluxzero development environment. */
     val dev: DevExtension = objects.newInstance(DevExtension::class.java)
 
+    /** Configuration for layered Java package publishing. */
+    val packagePublishing: PackagePublishingExtension = objects.newInstance(PackagePublishingExtension::class.java)
+
     /**
      * Configures the project files sync feature.
      */
@@ -40,5 +43,9 @@ abstract class FluxzeroExtension @Inject constructor(objects: ObjectFactory) {
 
     fun dev(action: Action<DevExtension>) {
         action.execute(dev)
+    }
+
+    fun packagePublishing(action: Action<PackagePublishingExtension>) {
+        action.execute(packagePublishing)
     }
 }

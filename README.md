@@ -528,7 +528,8 @@ Advanced:
 
 ## Build Plugins
 
-Fluxzero provides Gradle and Maven plugins that automatically sync AI agent instruction files (AGENTS.md, CLAUDE.md, etc.) from GitHub releases matching your Fluxzero SDK version.
+Fluxzero provides Gradle and Maven plugins that run the local development environment, publish layered Java OCI
+packages, and optionally synchronize AI agent instruction files.
 
 ### Gradle Plugin
 
@@ -542,6 +543,18 @@ plugins {
 fluxzero {
     projectFiles {
         enabled.set(true)
+    }
+    packagePublishing {
+        packageName.set("my-service")
+        images.add("registry.fluxzero.io/\${organisationId}/\${packageName}")
+        authentications {
+            create("fluxzero") {
+                host.set("registry.fluxzero.io")
+                githubOidc {
+                    audience.set("https://cloud.fluxzero.io")
+                }
+            }
+        }
     }
 }
 
@@ -580,6 +593,7 @@ pluginManagement {
 ./gradlew build -Pfluxzero.projectFiles.enabled=false
 ./gradlew build -Pfluxzero.projectFiles.overrideLanguage=kotlin
 ./gradlew syncProjectFiles -Pfluxzero.projectFiles.forceUpdate=true
+./gradlew build fluxzeroPublishPackage
 ```
 
 ### Maven Plugin
