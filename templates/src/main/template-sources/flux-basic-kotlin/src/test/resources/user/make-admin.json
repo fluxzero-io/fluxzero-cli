@@ -1,0 +1,5 @@
+{
+  "@class" : "SetRole",
+  "userId": "viewer",
+  "role": "ADMIN"
+}

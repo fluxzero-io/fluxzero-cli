@@ -1,0 +1,13 @@
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+
+{
+  "name": "my user", "email": "a@b.com"
+}
+
+###
+
+GET {{baseUrl}}/api/users
+Accept: application/json
+
+###

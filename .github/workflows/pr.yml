@@ -7,6 +7,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      CANDIDATE_VERSION: 0.0.0-pr-${{ github.run_id }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -18,7 +20,19 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       - name: Build and test
-        run: ./gradlew build
+        run: ./gradlew build :cli:shadowJar -PappVersion="$CANDIDATE_VERSION"
+
+      - name: Publish candidate plugins locally
+        run: >-
+          ./gradlew :maven-plugin:publishToMavenLocal :gradle-plugin:publishToMavenLocal
+          -PappVersion="$CANDIDATE_VERSION"
+          -Dmaven.repo.local="$RUNNER_TEMP/fluxzero-plugin-repository"
+
+      - name: Verify embedded templates with candidate plugins
+        run: >-
+          scripts/verify-embedded-templates.sh
+          "cli/build/libs/fluxzero-cli-$CANDIDATE_VERSION.jar"
+          "$RUNNER_TEMP/fluxzero-plugin-repository"
 
       - name: Test release versioning
         run: scripts/test-determine-release-version.sh

@@ -1,0 +1,3 @@
+version: 1
+environment: local
+fastCompiler: true

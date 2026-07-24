@@ -1,0 +1,59 @@
+name: Deploy to Fluxzero Cloud
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster-name:
+        description: "Cluster name"
+        required: true
+        default: "Test"
+      application-name:
+        description: "Application name"
+        required: true
+        default: "flux-basic-kotlin"
+
+env:
+  FLUXZERO_PACKAGE_NAME: flux-basic-kotlin
+  FLUXZERO_PACKAGE_VERSION: sha-${{ github.sha }}
+
+jobs:
+  deploy:
+    name: Build, publish and deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build and test with Maven
+        run: ./mvnw -B -ntp -T1C package
+
+      - name: Publish layered image with the Fluxzero Maven plugin
+        run: ./mvnw -B -ntp -Dfluxzero.package.tag="${FLUXZERO_PACKAGE_VERSION}" fluxzero:publish-package
+
+      - name: Authenticate for deployment
+        id: fluxzero-auth
+        uses: fluxzero-io/fluxzero-jwt-action@v2
+        with:
+          mode: oidc
+          image-name: ${{ env.FLUXZERO_PACKAGE_NAME }}
+
+      - name: Deploy to Fluxzero Cloud
+        uses: fluxzero-io/fluxzero-deploy-action@v1
+        with:
+          cluster-name: ${{ github.event.inputs.cluster-name }}
+          application-name: ${{ github.event.inputs.application-name }}
+          image-name: ${{ env.FLUXZERO_PACKAGE_NAME }}
+          version: ${{ env.FLUXZERO_PACKAGE_VERSION }}
+          token: ${{ steps.fluxzero-auth.outputs.deploy-token }}
