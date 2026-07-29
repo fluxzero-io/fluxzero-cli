@@ -78,13 +78,25 @@ jobs:
           VERSION: ${{ inputs.version }}
         working-directory: build/package-managers/homebrew-tap
         run: |
+          wait_for_checks() {
+            local pr_url="$1"
+            local check_count=0
+
+            for _ in {1..12}; do
+              check_count="$(gh pr view "$pr_url" --json statusCheckRollup --jq '.statusCheckRollup | length')"
+              if (( check_count > 0 )); then
+                gh pr checks "$pr_url" --watch --fail-fast --interval 5
+                return
+              fi
+              sleep 5
+            done
+
+            echo "::error title=Homebrew checks missing::No platform checks were registered for $pr_url within 60 seconds."
+            return 1
+          }
+
           branch="release/fluxzero-$VERSION"
           pr_url="$(gh pr list --repo fluxzero-io/homebrew-tap --head "$branch" --state open --json url --jq '.[0].url')"
-          if [[ -n "$pr_url" ]]; then
-            gh pr merge "$pr_url" --auto --squash --delete-branch
-            echo "Homebrew update already pending: $pr_url"
-            exit 0
-          fi
 
           git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
           git checkout -B "$branch"
@@ -92,6 +104,12 @@ jobs:
           git diff --check
           git add Formula/fluxzero.rb
           if git diff --cached --quiet; then
+            if [[ -n "$pr_url" ]]; then
+              gh pr merge "$pr_url" --auto --squash --delete-branch
+              wait_for_checks "$pr_url"
+              echo "Homebrew update already pending: $pr_url"
+              exit 0
+            fi
             echo "Homebrew already publishes Fluxzero $VERSION."
             exit 0
           fi
@@ -101,13 +119,16 @@ jobs:
           git commit -m "chore(fluxzero): update to $VERSION"
           git push --force-with-lease origin "$branch"
 
-          pr_url="$(gh pr create \
-            --repo fluxzero-io/homebrew-tap \
-            --base main \
-            --head "$branch" \
-            --title "chore(fluxzero): update to $VERSION" \
-            --body "Updates the Fluxzero formula from immutable CLI release $VERSION artifacts. Platform installation tests must pass before merge.")"
+          if [[ -z "$pr_url" ]]; then
+            pr_url="$(gh pr create \
+              --repo fluxzero-io/homebrew-tap \
+              --base main \
+              --head "$branch" \
+              --title "chore(fluxzero): update to $VERSION" \
+              --body "Updates the Fluxzero formula from immutable CLI release $VERSION artifacts. Platform installation tests must pass before merge.")"
+          fi
           gh pr merge "$pr_url" --auto --squash --delete-branch
+          wait_for_checks "$pr_url"
           echo "Homebrew update: $pr_url"
 
   winget:
