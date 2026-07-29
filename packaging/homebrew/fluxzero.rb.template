@@ -1,7 +1,6 @@
 class Fluxzero < Formula
   desc "Develop, test, and manage Fluxzero applications"
   homepage "https://fluxzero.io"
-  version "@VERSION@"
   license "EUPL-1.2"
 
   on_macos do
