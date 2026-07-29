@@ -157,9 +157,12 @@ is not sent to the unauthenticated registry discovery request.
 | `baseImageSource` | No | `registry` | `registry` or `docker-daemon`. |
 | `javaToolOptions` | No | Fluxzero JVM defaults | Value stored as `JAVA_TOOL_OPTIONS`. |
 | `labels` | No | Empty | Additional or overriding OCI labels. |
-| `publishAttempts` | No | `3` | Attempts for transient registry blob-upload failures. |
+| `publishAttempts` | No | `10` | Attempts for transient registry failures. |
 | `publishRetryDelayMillis` | No | `2000` | Base delay between retry attempts. |
 | `authentications` | No | Anonymous access | Host-bound credentials; unmatched image registries remain anonymous. |
+
+Registry HTTP operations time out after 60 seconds by default. Set the JVM system property
+`jib.httpTimeout` to a different number of milliseconds to override this for the build.
 
 Each named authentication requires an exact lowercase `host` (including the port when non-default) and exactly one
 mechanism:

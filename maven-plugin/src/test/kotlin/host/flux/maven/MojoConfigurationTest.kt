@@ -113,8 +113,8 @@ class MojoConfigurationTest {
 
         val publishAttemptsField = fields.find { it.name == "publishAttempts" }
         val publishRetryDelayMillisField = fields.find { it.name == "publishRetryDelayMillis" }
-        assertNotNull("publishAttempts parameter should exist for registry blob-upload retries", publishAttemptsField)
-        assertNotNull("publishRetryDelayMillis parameter should exist for registry blob-upload retries", publishRetryDelayMillisField)
+        assertNotNull("publishAttempts parameter should exist for transient registry retries", publishAttemptsField)
+        assertNotNull("publishRetryDelayMillis parameter should exist for transient registry retries", publishRetryDelayMillisField)
     }
 
     @Test

@@ -9,6 +9,9 @@ import com.google.cloud.tools.jib.api.buildplan.AbsoluteUnixPath
 import com.google.cloud.tools.jib.api.buildplan.ContainerBuildPlan
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
 import com.google.cloud.tools.jib.api.buildplan.Platform
+import java.io.EOFException
+import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -23,6 +26,7 @@ fun interface PackagePublisher {
 class JavaPackagePublisher : PackagePublisher {
     override fun publish(spec: JavaPackagePublishSpec): List<PackagePublishResult> {
         spec.validate()
+        JibHttpTimeout.configureDefault()
 
         return spec.publishTargets().flatMap { publishTarget ->
             publishWithRetries(spec, publishTarget)
@@ -52,7 +56,7 @@ class JavaPackagePublisher : PackagePublisher {
                     PackagePublishResult(packageReference.reference, container.digest.toString())
                 }
             } catch (exception: Exception) {
-                val willRetry = attempt < spec.publishAttempts && exception.isRetriableRegistryBlobUploadFailure()
+                val willRetry = attempt < spec.publishAttempts && exception.isRetriableRegistryPublishFailure()
                 if (!willRetry) {
                     throw exception
                 }
@@ -185,9 +189,26 @@ class JavaPackagePublisher : PackagePublisher {
         (listOf("/app/classes") + dependencies.map { it.containerPath }).joinToString(":")
 }
 
-internal fun Throwable.isRetriableRegistryBlobUploadFailure(): Boolean =
+internal object JibHttpTimeout {
+    const val PROPERTY = "jib.httpTimeout"
+    const val DEFAULT_MILLIS = 60_000
+
+    fun configureDefault() {
+        val properties = System.getProperties()
+        synchronized(properties) {
+            if (!properties.containsKey(PROPERTY)) {
+                properties.setProperty(PROPERTY, DEFAULT_MILLIS.toString())
+            }
+        }
+    }
+}
+
+internal fun Throwable.isRetriableRegistryPublishFailure(): Boolean =
     generateSequence(this) { it.cause }.any { throwable ->
-        throwable.message.isRetriableRegistryBlobUploadMessage()
+        throwable is SocketTimeoutException ||
+            throwable is SocketException ||
+            throwable is EOFException ||
+            throwable.message.isRetriableRegistryBlobUploadMessage()
     }
 
 private fun String?.isRetriableRegistryBlobUploadMessage(): Boolean {
@@ -242,7 +263,7 @@ data class JavaPackagePublishSpec(
         val REPRODUCIBLE_CONTAINER_TIMESTAMP: Instant = Instant.EPOCH
         val REPRODUCIBLE_FILE_TIMESTAMP: Instant = Instant.EPOCH
 
-        const val DEFAULT_PUBLISH_ATTEMPTS = 3
+        const val DEFAULT_PUBLISH_ATTEMPTS = 10
         const val DEFAULT_PUBLISH_RETRY_DELAY_MILLIS = 2000L
 
         const val DEFAULT_BASE_IMAGE =

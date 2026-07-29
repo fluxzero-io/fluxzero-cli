@@ -2,6 +2,9 @@ package host.flux.publishing
 
 import com.google.cloud.tools.jib.api.buildplan.FileEntriesLayer
 import com.google.cloud.tools.jib.http.Authorization
+import java.io.EOFException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
@@ -14,6 +17,27 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class JavaPackagePublishSpecTest {
+    @Test
+    fun defaultsJibHttpTimeoutWithoutOverridingExplicitConfiguration() {
+        val previous = System.getProperty(JibHttpTimeout.PROPERTY)
+        try {
+            System.clearProperty(JibHttpTimeout.PROPERTY)
+
+            JibHttpTimeout.configureDefault()
+            assertEquals("60000", System.getProperty(JibHttpTimeout.PROPERTY))
+
+            System.setProperty(JibHttpTimeout.PROPERTY, "90000")
+            JibHttpTimeout.configureDefault()
+            assertEquals("90000", System.getProperty(JibHttpTimeout.PROPERTY))
+        } finally {
+            if (previous == null) {
+                System.clearProperty(JibHttpTimeout.PROPERTY)
+            } else {
+                System.setProperty(JibHttpTimeout.PROPERTY, previous)
+            }
+        }
+    }
+
     @Test
     fun defaultsBasicUsernameToEmpty() {
         val credential = credential(password = "registry-token")
@@ -215,6 +239,7 @@ class JavaPackagePublishSpecTest {
     fun rejectsInvalidPublishRetrySettings() {
         val classesDirectory = Files.createTempDirectory("fluxzero-publish-classes")
 
+        assertEquals(10, publishSpec(classesDirectory).publishAttempts)
         assertThrows(IllegalArgumentException::class.java) {
             publishSpec(classesDirectory, publishAttempts = 0).validate()
         }
@@ -337,14 +362,25 @@ class JavaPackagePublishSpecTest {
             )
         )
 
-        assertTrue(exception.isRetriableRegistryBlobUploadFailure())
+        assertTrue(exception.isRetriableRegistryPublishFailure())
+    }
+
+    @Test
+    fun detectsRetriableRegistryTransportFailures() {
+        listOf(
+            SocketTimeoutException("Read timed out"),
+            RuntimeException("containerization failed", ConnectException("Connection reset")),
+            EOFException("Unexpected end of stream")
+        ).forEach { exception ->
+            assertTrue(exception.isRetriableRegistryPublishFailure(), exception.toString())
+        }
     }
 
     @Test
     fun doesNotRetryUnrelatedRegistryFailures() {
         val exception = RuntimeException("authentication failed for ghcr.io/org/repo")
 
-        assertFalse(exception.isRetriableRegistryBlobUploadFailure())
+        assertFalse(exception.isRetriableRegistryPublishFailure())
     }
 
     @Test

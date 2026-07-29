@@ -39,7 +39,7 @@ val mavenPluginParameterDescriptions = mapOf(
     "packageName" to "Public package name and multi-module publishing opt-in; modules without it are skipped.",
     "packageVersion" to "Package version for publish-package. Defaults to a generated git/time-based tag.",
     "tags" to "Tags for publish-package.",
-    "publishAttempts" to "Maximum publish attempts per image for transient registry blob-upload failures. Property: fluxzero.package.publishAttempts.",
+    "publishAttempts" to "Maximum publish attempts per image for transient registry failures. Property: fluxzero.package.publishAttempts.",
     "publishRetryDelayMillis" to "Base delay between publish attempts in milliseconds. Property: fluxzero.package.publishRetryDelayMillis.",
     "mainClass" to "Application main class for publish-package. Property: fluxzero.package.mainClass.",
     "javaToolOptions" to "Value written to JAVA_TOOL_OPTIONS for publish-package. Property: fluxzero.package.javaToolOptions.",

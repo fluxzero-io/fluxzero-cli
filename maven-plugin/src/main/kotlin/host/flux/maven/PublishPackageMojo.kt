@@ -137,9 +137,9 @@ class PublishPackageMojo : AbstractMojo() {
     private var skipPackagePublish: Boolean = false
 
     /**
-     * Maximum publish attempts per image for transient registry blob-upload failures.
+     * Maximum publish attempts per image for transient registry failures.
      */
-    @Parameter(property = "fluxzero.package.publishAttempts", defaultValue = "3")
+    @Parameter(property = "fluxzero.package.publishAttempts", defaultValue = "10")
     private var publishAttempts: Int = JavaPackagePublishSpec.DEFAULT_PUBLISH_ATTEMPTS
 
     /**
