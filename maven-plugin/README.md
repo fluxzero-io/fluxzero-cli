@@ -52,7 +52,8 @@ and returning to the live view, and press Enter to confirm. Type `d`/`detach` an
 running. `Ctrl-C` stops the environment and all applications; an unexpected terminal disconnect only detaches the view. Set
 `-Dfluxzero.dev.background=true` to skip the attached view.
 A detached environment is controlled with `fz dev attach`, `fz dev status`, `fz dev logs --follow`, and `fz dev stop`;
-only one session can run per project.
+only one session can run per project. Run `fz dev list` from any directory for a global overview of all known project
+environments and their running, unresponsive, or stale state.
 
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|

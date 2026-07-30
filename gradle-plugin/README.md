@@ -44,11 +44,15 @@ Skip the attached view entirely with background mode:
 
 ```bash
 ./gradlew fluxzeroDev -Pfluxzero.dev.background=true
+fz dev list
 fz dev status
 fz dev attach
 fz dev logs --follow
 fz dev stop
 ```
+
+`fz dev list` is global and may be run from any directory. It reports every known project environment, its applications
+and browser URL, and whether the environment is running, unresponsive, or stale.
 
 The same launch settings are available as native task options, for example
 `./gradlew fluxzeroDev --background --applications=api,worker --no-tests`. Run

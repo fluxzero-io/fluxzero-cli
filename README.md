@@ -169,6 +169,8 @@ Use background mode to start and return immediately after readiness without open
 
 ```bash
 fz dev --background
+fz dev list
+fz dev list --json
 fz dev attach
 fz dev status
 fz dev status --json
@@ -179,6 +181,10 @@ fz dev stop
 fz dev stop --force
 fz dev config
 ```
+
+`fz dev list` is global: run it from any directory to see every known Fluxzero development environment, including its
+project, applications, browser URL, and whether it is running, unresponsive, or stale. Project-specific control
+commands still use the current project or `--project-dir`.
 
 `logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
 `fz dev config` prints the complete, valid `.fluxzero/dev.yaml` reference owned by the current compatible dev-server
