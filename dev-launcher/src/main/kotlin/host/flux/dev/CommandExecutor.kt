@@ -27,6 +27,9 @@ fun interface CommandExecutor {
     fun releaseDetached(workingDirectory: Path) {
     }
 
+    fun releaseAllDetached() {
+    }
+
     fun <T> supervise(onShutdown: () -> Unit, action: () -> T): T = action()
 
     fun <T> supervise(onShutdownStarted: () -> Unit, onShutdownComplete: () -> Unit, action: () -> T): T =
@@ -107,11 +110,17 @@ class InheritedIoCommandExecutor : CommandExecutor {
     override fun releaseDetached(workingDirectory: Path) {
         if (!isMac() || java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) return
         val domain = "gui/${userId()}"
-        ProcessBuilder("/bin/launchctl", "bootout", "$domain/${launchdLabel(workingDirectory)}")
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-            .redirectError(ProcessBuilder.Redirect.DISCARD).start().run {
-                if (!waitFor(1, TimeUnit.SECONDS)) destroyForcibly()
-            }
+        bootout(domain, launchdLabel(workingDirectory))
+        runCatching { java.nio.file.Files.deleteIfExists(launchdPlist(workingDirectory)) }
+    }
+
+    override fun releaseAllDetached() {
+        if (!isMac() || java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) return
+        val domain = "gui/${userId()}"
+        val listed = ProcessBuilder("/bin/launchctl", "list").redirectErrorStream(true).start()
+        val output = listed.inputStream.bufferedReader().readText()
+        if (!listed.waitFor(2, TimeUnit.SECONDS) || listed.exitValue() != 0) return
+        fluxzeroLaunchdLabels(output).forEach { bootout(domain, it) }
     }
 
     private fun startWithLaunchd(command: List<String>, workingDirectory: Path, outputFile: Path): Long {
@@ -119,7 +128,7 @@ class InheritedIoCommandExecutor : CommandExecutor {
         val domain = "gui/$uid"
         val label = launchdLabel(workingDirectory)
         releaseDetached(workingDirectory)
-        val plist = workingDirectory.resolve(".fluxzero/dev/launchd.plist")
+        val plist = launchdPlist(workingDirectory)
         val arguments = listOf("/bin/zsh", "-lc", "exec \"\$@\"", "fluxzero-dev") + command
         val argumentXml = arguments.joinToString("\n") { "      <string>${xml(it)}</string>" }
         java.nio.file.Files.writeString(
@@ -137,8 +146,9 @@ class InheritedIoCommandExecutor : CommandExecutor {
               <key>WorkingDirectory</key><string>${xml(workingDirectory.toString())}</string>
               <key>StandardOutPath</key><string>${xml(outputFile.toString())}</string>
               <key>StandardErrorPath</key><string>${xml(outputFile.toString())}</string>
-              <key>RunAtLoad</key><true/>
+              <key>RunAtLoad</key><false/>
               <key>KeepAlive</key><false/>
+              <key>LaunchOnlyOnce</key><true/>
               <key>ProcessType</key><string>Interactive</string>
               <key>ExitTimeOut</key><integer>1</integer>
             </dict>
@@ -150,6 +160,12 @@ class InheritedIoCommandExecutor : CommandExecutor {
         val detail = bootstrap.inputStream.bufferedReader().readText()
         check(bootstrap.waitFor(5, TimeUnit.SECONDS) && bootstrap.exitValue() == 0) {
             "Could not register detached Fluxzero dev process: ${detail.trim()}"
+        }
+        val kickstart = ProcessBuilder("/bin/launchctl", "kickstart", "$domain/$label")
+            .redirectErrorStream(true).start()
+        val kickstartDetail = kickstart.inputStream.bufferedReader().readText()
+        check(kickstart.waitFor(5, TimeUnit.SECONDS) && kickstart.exitValue() == 0) {
+            "Could not start detached Fluxzero dev process: ${kickstartDetail.trim()}"
         }
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
         while (System.nanoTime() < deadline) {
@@ -179,6 +195,17 @@ class InheritedIoCommandExecutor : CommandExecutor {
             .digest(workingDirectory.toAbsolutePath().normalize().toString().toByteArray())
             .take(10).joinToString("") { "%02x".format(it) }
         return "io.fluxzero.dev.$digest"
+    }
+
+    private fun launchdPlist(workingDirectory: Path): Path =
+        workingDirectory.resolve(".fluxzero/dev/launchd.plist")
+
+    private fun bootout(domain: String, label: String) {
+        ProcessBuilder("/bin/launchctl", "bootout", "$domain/$label")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD).start().run {
+                if (!waitFor(1, TimeUnit.SECONDS)) destroyForcibly()
+            }
     }
 
     private fun xml(value: String): String = value
@@ -320,3 +347,10 @@ class InheritedIoCommandExecutor : CommandExecutor {
 
     private fun isMac() = System.getProperty("os.name").lowercase().contains("mac")
 }
+
+internal fun fluxzeroLaunchdLabels(output: String): List<String> = output.lineSequence()
+    .map(String::trim)
+    .filter(String::isNotEmpty)
+    .map { it.split(Regex("\\s+")).last() }
+    .filter { it.startsWith("io.fluxzero.dev.") }
+    .toList()

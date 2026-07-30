@@ -217,4 +217,20 @@ class ScaffoldServiceTest {
         assertTrue(result.success)
         assertTrue(Files.isExecutable(tempDir.resolve("my-project/mvnw")))
     }
+
+    @Test
+    fun `can scaffold directly into selected empty directory`() {
+        val request = ScaffoldProject(
+            template = "test-template",
+            name = "my-project",
+            outputDir = tempDir.toString(),
+            useOutputDirectory = true
+        )
+
+        val result = scaffoldService.scaffoldProject(request)
+
+        assertTrue(result.success)
+        assertEquals(tempDir.toAbsolutePath().toString(), result.outputPath)
+        verify { mockTemplateService.extractTemplate("test-template", tempDir) }
+    }
 }

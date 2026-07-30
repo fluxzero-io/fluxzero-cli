@@ -20,7 +20,8 @@ data class ScaffoldProject(
     val artifactId: String? = null,
     val applicationId: String? = null,
     val description: String? = null,
-    val buildSystem: BuildSystem? = null
+    val buildSystem: BuildSystem? = null,
+    val useOutputDirectory: Boolean = false
 )
 
 data class ScaffoldResult(

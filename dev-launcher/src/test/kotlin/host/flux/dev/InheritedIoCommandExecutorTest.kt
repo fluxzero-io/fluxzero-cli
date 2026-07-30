@@ -17,6 +17,21 @@ import kotlin.test.assertTrue
 @EnabledOnOs(OS.LINUX, OS.MAC)
 class InheritedIoCommandExecutorTest {
     @Test
+    fun `global launchd cleanup only selects Fluxzero dev jobs`() {
+        val output = """
+            PID Status Label
+            123 0 io.fluxzero.dev.abc123
+            - 0 com.apple.unrelated
+            456 0 io.fluxzero.dev.def456
+        """.trimIndent()
+
+        assertEquals(
+            listOf("io.fluxzero.dev.abc123", "io.fluxzero.dev.def456"),
+            fluxzeroLaunchdLabels(output)
+        )
+    }
+
+    @Test
     fun `cleanup command can run after supervised shutdown was requested`() {
         val directory = Files.createTempDirectory("fluxzero-cleanup-command")
         val marker = directory.resolve("cleanup-ran")
