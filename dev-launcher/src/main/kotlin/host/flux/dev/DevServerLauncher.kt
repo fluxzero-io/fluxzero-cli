@@ -35,7 +35,8 @@ class DevServerLauncher(
         val activeSession = activeSession(projectDirectory)
         val requestedVersion = request.devServerVersion?.takeIf { it.isNotBlank() }
             ?: environment["FLUXZERO_DEV_SERVER_VERSION"]?.takeIf { it.isNotBlank() }
-        val pinnedVersion = classpathResolver.resolvedVersion(projectDirectory)
+        val projectPin = usesProjectPin(request)
+        val pinnedVersion = if (projectPin) classpathResolver.resolvedVersion(projectDirectory) else null
         val version = when {
             pinnedVersion != null && request.target == DevLaunchTarget.SERVER && activeSession?.active == true ->
                 pinnedVersion
@@ -58,7 +59,7 @@ class DevServerLauncher(
                 var classpath = classpathResolver.resolve(
                     projectDirectory, version,
                     reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive,
-                    projectPin = request.target != DevLaunchTarget.CONFIG
+                    projectPin = projectPin
                 )
                 var command = command(classpath, request)
                 if (request.target == DevLaunchTarget.SERVER) {
@@ -108,6 +109,14 @@ class DevServerLauncher(
         classpath,
         request.target.mainClass
     ) + request.arguments
+
+    private fun usesProjectPin(request: DevLaunchRequest): Boolean = when {
+        request.target == DevLaunchTarget.CONFIG -> false
+        request.target != DevLaunchTarget.CONTROL -> true
+        request.arguments.firstOrNull() == "list" -> false
+        request.arguments.firstOrNull() == "stop" && "--all" in request.arguments -> false
+        else -> true
+    }
 
     private fun launchServer(
         command: List<String>, projectDirectory: Path, detached: Boolean, shutdown: ShutdownOutcome, active: Boolean
