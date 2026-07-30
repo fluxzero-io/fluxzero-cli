@@ -227,8 +227,7 @@ Start options:
 | `--startup-timeout-ms <ms>` | Override application/frontend readiness timeout. |
 | `--graceful-shutdown-timeout-ms <ms>` | Override rolling app shutdown timeout. |
 | `--debounce-ms <ms>` | Override source-change debounce. |
-| `--idle-timeout <duration>` | Stop a ready inactive environment; defaults to `8h`, use `disabled` to opt out. |
-| `--failed-startup-timeout <duration>` | Stop an unready inactive environment; defaults to `10m`. |
+| `--idle-timeout <duration>` | Stop an inactive environment; defaults to `24h`, use `disabled` to opt out. |
 | `--background`, `--detach`, `-d` | Start without an attached live view and return after startup succeeds or fails. |
 
 Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
@@ -246,8 +245,7 @@ frontend:
   backendPaths:
     - /api
 lifecycle:
-  idleTimeout: 8h
-  failedStartupTimeout: 10m
+  idleTimeout: 24h
 applicationConfig:
   rebound-encrypted:
     application: rebound

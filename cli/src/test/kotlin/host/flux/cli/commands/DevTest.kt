@@ -37,7 +37,6 @@ class DevTest {
                 "--idp", "external",
                 "--fast-compiler",
                 "--idle-timeout", "4h",
-                "--failed-startup-timeout", "20m",
                 "--no-tests",
                 "--frontend-command", "npm run dev",
                 "--frontend-directory", "frontend",
@@ -54,7 +53,6 @@ class DevTest {
         assertTrue(request!!.arguments.containsAll(listOf("--app", "app", "--app", "audittrail")))
         assertTrue(request!!.arguments.containsAll(listOf("--environment", "local")))
         assertTrue(request!!.arguments.containsAll(listOf("--idle-timeout", "4h")))
-        assertTrue(request!!.arguments.containsAll(listOf("--failed-startup-timeout", "20m")))
         assertTrue(request!!.arguments.containsAll(listOf("--port", "4200")))
         assertTrue(request!!.arguments.containsAll(listOf("--idp", "external")))
         assertTrue(request!!.arguments.containsAll(listOf("--frontend-command", "npm run dev", "--backend-path", "/graphql")))

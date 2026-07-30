@@ -108,11 +108,7 @@ class Dev(
         .flag(default = false)
     private val idleTimeout by option(
         "--idle-timeout",
-        help = "Stop a ready environment after inactivity, for example 8h or disabled."
-    )
-    private val failedStartupTimeout by option(
-        "--failed-startup-timeout",
-        help = "Stop an environment that remains unready and inactive, for example 10m or disabled."
+        help = "Stop an environment after inactivity, for example 24h or disabled."
     )
 
     override fun run() {
@@ -176,7 +172,6 @@ class Dev(
             addOption("--graceful-shutdown-timeout-ms", shutdownTimeout?.toString())
             addOption("--debounce-ms", debounce?.toString())
             addOption("--idle-timeout", idleTimeout)
-            addOption("--failed-startup-timeout", failedStartupTimeout)
             addOption("--frontend-command", frontendCommand)
             addOption("--frontend-directory", frontendDirectory)
             addOption("--frontend-setup-command", frontendSetupCommand)
