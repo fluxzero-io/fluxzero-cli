@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference
 private const val PREFLIGHT_MAIN_CLASS = "io.fluxzero.devserver.DevServerPreflightMain"
 private const val USE_DYNAMIC_PORT_EXIT_CODE = 75
 private const val CANCEL_STARTUP_EXIT_CODE = 76
+private const val ATTACHED_OWNER_DISCONNECTED_EXIT_CODE = 77
 
 fun interface DevLauncher {
     fun launch(request: DevLaunchRequest): Int
@@ -76,7 +77,13 @@ class DevServerLauncher(
                     }
                     val exitCode = executor.execute(command, projectDirectory, OutputMode.INHERIT)
                     if (request.target == DevLaunchTarget.CONTROL && request.arguments.firstOrNull() == "stop") {
-                        executor.releaseDetached(projectDirectory)
+                        if ("--all" in request.arguments) executor.releaseAllDetached()
+                        else executor.releaseDetached(projectDirectory)
+                    }
+                    if (request.target == DevLaunchTarget.CONTROL && request.arguments.firstOrNull() == "attach"
+                        && exitCode == ATTACHED_OWNER_DISCONNECTED_EXIT_CODE) {
+                        stopDetached(projectDirectory, command, OutputMode.DISCARD, cleanup = true, force = true)
+                        return@supervise 0
                     }
                     if (request.target == DevLaunchTarget.CONTROL && request.arguments.firstOrNull() == "attach"
                         && exitCode in setOf(130, 143)) {
@@ -181,6 +188,10 @@ class DevServerLauncher(
         }
         val exitCode = executor.execute(controlCommand(command, *arguments.toTypedArray()), projectDirectory,
                                         OutputMode.INHERIT)
+        if (exitCode == ATTACHED_OWNER_DISCONNECTED_EXIT_CODE) {
+            stopDetached(projectDirectory, command, OutputMode.DISCARD, cleanup = true, force = true)
+            return 0
+        }
         if (exitCode in setOf(130, 143)) {
             shutdown.report()
             return 0

@@ -582,6 +582,64 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `lost attached terminal stops environment instead of detaching implicitly`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        Files.writeString(projectDirectory.resolve(".fluxzero/dev/session.json"),
+                          """{"status":"running","pid":${ProcessHandle.current().pid()}}""")
+        val commands = mutableListOf<List<String>>()
+        var released = false
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += command
+                return when {
+                    command.contains("probe") -> 0
+                    command.contains("attach") -> 77
+                    command.contains("stop") -> 0
+                    else -> error("unexpected command: $command")
+                }
+            }
+
+            override fun releaseDetached(workingDirectory: Path) {
+                released = true
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
+        )
+
+        assertEquals(0, exitCode)
+        assertTrue(commands.any { it.contains("stop") && it.contains("--force") })
+        assertTrue(released)
+    }
+
+    @Test
+    fun `global stop releases all detached operating system registrations`() {
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        var releasedAll = false
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode) = 0
+            override fun releaseAllDetached() {
+                releasedAll = true
+            }
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.CONTROL, listOf("stop", "--all"))
+        )
+
+        assertEquals(0, exitCode)
+        assertTrue(releasedAll)
+    }
+
+    @Test
     fun `uses java from path when native runtime has no java home`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))

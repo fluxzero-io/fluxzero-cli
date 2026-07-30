@@ -147,8 +147,10 @@ fz dev
 
 The default command starts the environment independently from the terminal and attaches a live semantic event view.
 Type `q` or `quit` and press Enter to open a menu, use the arrow keys to select an action, and press Enter to confirm.
-Type `d` or `detach` and press Enter to leave it running. `Ctrl-C` stops the environment and all applications; an
-unexpected terminal disconnect only detaches the view. Common overrides include:
+Type `d` or `detach` and press Enter to leave it running. `Ctrl-C` and an unexpected terminal disconnect stop the
+environment and all applications; background ownership is therefore always an explicit choice. When no Maven or
+Gradle project exists in the selected folder, interactive use offers to create a project in that folder or a new
+subfolder before startup. Common overrides include:
 
 ```bash
 fz dev --fast-compiler
@@ -179,12 +181,14 @@ fz dev logs --follow --errors
 fz dev logs --follow --app orders
 fz dev stop
 fz dev stop --force
+fz dev stop --all
 fz dev config
 ```
 
 `fz dev list` is global: run it from any directory to see every known Fluxzero development environment, including its
 project, applications, browser URL, and whether it is running, unresponsive, or stale. Project-specific control
 commands still use the current project or `--project-dir`.
+`fz dev stop --all` stops every registered environment and removes stale or legacy macOS launchd registrations.
 
 `logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
 `fz dev config` prints the complete, valid `.fluxzero/dev.yaml` reference owned by the current compatible dev-server
@@ -194,7 +198,8 @@ without requiring a repository checkout or separate documentation lookup.
 Only one dev session may be active per project. `status`, `logs`, `stop`, MCP discovery, and the next `dev` launch
 reconcile stale session state when the supervisor was killed unexpectedly. Because that also means the embedded test
 runtime lost its in-memory data, startup commands run again in the next session. Detaching keeps that state alive when a
-terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop`.
+terminal closes, but also keeps the environment's processes and memory in use until `fz dev stop` or its configured
+idle timeout.
 
 Start options:
 
@@ -222,6 +227,8 @@ Start options:
 | `--startup-timeout-ms <ms>` | Override application/frontend readiness timeout. |
 | `--graceful-shutdown-timeout-ms <ms>` | Override rolling app shutdown timeout. |
 | `--debounce-ms <ms>` | Override source-change debounce. |
+| `--idle-timeout <duration>` | Stop a ready inactive environment; defaults to `8h`, use `disabled` to opt out. |
+| `--failed-startup-timeout <duration>` | Stop an unready inactive environment; defaults to `10m`. |
 | `--background`, `--detach`, `-d` | Start without an attached live view and return after startup succeeds or fails. |
 
 Shared project defaults belong in the tracked `.fluxzero/dev.yaml`; session state, logs, tokens, and build snapshots
@@ -238,6 +245,9 @@ frontend:
   command: "cd frontend && npm start -- --host 127.0.0.1 --port {port}"
   backendPaths:
     - /api
+lifecycle:
+  idleTimeout: 8h
+  failedStartupTimeout: 10m
 applicationConfig:
   rebound-encrypted:
     application: rebound

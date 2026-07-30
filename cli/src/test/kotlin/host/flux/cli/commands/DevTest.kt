@@ -36,6 +36,8 @@ class DevTest {
                 "--port", "4200",
                 "--idp", "external",
                 "--fast-compiler",
+                "--idle-timeout", "4h",
+                "--failed-startup-timeout", "20m",
                 "--no-tests",
                 "--frontend-command", "npm run dev",
                 "--frontend-directory", "frontend",
@@ -51,6 +53,8 @@ class DevTest {
         assertTrue(request!!.arguments.containsAll(listOf("--main-class", "com.example.App", "--fast-compiler")))
         assertTrue(request!!.arguments.containsAll(listOf("--app", "app", "--app", "audittrail")))
         assertTrue(request!!.arguments.containsAll(listOf("--environment", "local")))
+        assertTrue(request!!.arguments.containsAll(listOf("--idle-timeout", "4h")))
+        assertTrue(request!!.arguments.containsAll(listOf("--failed-startup-timeout", "20m")))
         assertTrue(request!!.arguments.containsAll(listOf("--port", "4200")))
         assertTrue(request!!.arguments.containsAll(listOf("--idp", "external")))
         assertTrue(request!!.arguments.containsAll(listOf("--frontend-command", "npm run dev", "--backend-path", "/graphql")))
@@ -124,14 +128,31 @@ class DevTest {
     @Test
     fun `rejects start outside a Maven or Gradle project before launching`() {
         var launched = false
-        val result = Dev { launched = true; 0 }.test(
+        val result = Dev({ launched = true; 0 }, DevProjectInitializer { null }).test(
             listOf("--project-dir", projectDirectory.toString())
         )
 
         assertEquals(1, result.statusCode)
         assertTrue(!launched)
-        assertTrue(result.output.contains("No Maven or Gradle project found in '$projectDirectory'"))
-        assertTrue(result.output.contains("--project-dir <path>"))
+        assertTrue(result.output.contains("No project was created"))
+        assertTrue(result.output.contains("fz init"))
+    }
+
+    @Test
+    fun `starts generated project returned by interactive initializer`() {
+        val generated = Files.createDirectory(projectDirectory.resolve("generated"))
+        Files.writeString(generated.resolve("pom.xml"), "<project/>")
+        var initialized: Path? = null
+        var request: DevLaunchRequest? = null
+        val result = Dev(
+            DevLauncher { captured -> request = captured; 0 },
+            DevProjectInitializer { directory -> initialized = directory; generated }
+        ).test(listOf("--project-dir", projectDirectory.toString()))
+
+        assertEquals(0, result.statusCode)
+        assertEquals(projectDirectory, initialized)
+        assertEquals(generated.toAbsolutePath(), request?.projectDirectory)
+        assertTrue(request!!.arguments.containsAll(listOf("--project-dir", generated.toAbsolutePath().toString())))
     }
 
     @Test
@@ -160,6 +181,20 @@ class DevTest {
         assertEquals(0, result.statusCode)
         assertEquals(DevLaunchTarget.CONTROL, request?.target)
         assertTrue(request!!.arguments.containsAll(listOf("list", "--json")))
+    }
+
+    @Test
+    fun `forwards global stop action outside a build project`() {
+        var request: DevLaunchRequest? = null
+        val launcher = DevLauncher { captured -> request = captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf("stop", "--project-dir", projectDirectory.toString(), "--all", "--force")
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(DevLaunchTarget.CONTROL, request?.target)
+        assertTrue(request!!.arguments.containsAll(listOf("stop", "--all", "--force")))
     }
 
     @Test
@@ -193,7 +228,7 @@ class DevTest {
 
     @Test
     fun `help points agents to project configuration reference`() {
-        val result = Dev { 0 }.test("--help")
+        val result = Dev(DevLauncher { 0 }).test("--help")
 
         assertEquals(0, result.statusCode)
         assertTrue(result.output.contains("fz dev config"))

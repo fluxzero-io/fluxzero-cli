@@ -20,7 +20,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class Dev(
-    private val launcher: DevLauncher = DevServerLauncher()
+    private val launcher: DevLauncher = DevServerLauncher(),
+    private val projectInitializer: DevProjectInitializer = InteractiveDevProjectInitializer()
 ) : CliktCommand() {
     override fun help(context: Context): String = "Start the local Fluxzero development environment"
     override fun helpEpilog(context: Context): String =
@@ -103,19 +104,35 @@ class Dev(
     private val json by option("--json", help = "Print machine-readable status or environment-list JSON.")
         .flag(default = false)
     private val force by option("--force", help = "Force termination for the stop action.").flag(default = false)
+    private val all by option("--all", help = "Apply the stop action to all registered dev environments.")
+        .flag(default = false)
+    private val idleTimeout by option(
+        "--idle-timeout",
+        help = "Stop a ready environment after inactivity, for example 8h or disabled."
+    )
+    private val failedStartupTimeout by option(
+        "--failed-startup-timeout",
+        help = "Stop an environment that remains unready and inactive, for example 10m or disabled."
+    )
 
     override fun run() {
-        val root = projectDirectory.toAbsolutePath().normalize()
+        var root = projectDirectory.toAbsolutePath().normalize()
         val selectedAction = action ?: "start"
         if (selectedAction !in setOf("start", "config", "list", "attach", "status", "logs", "stop")) {
             throw UsageError(
                 "Unknown dev action '$selectedAction'. Expected start, config, list, attach, status, logs, or stop."
             )
         }
+        if (all && selectedAction != "stop") {
+            throw UsageError("--all is only supported by fz dev stop")
+        }
         if (selectedAction == "start" && !isBuildProject(root)) {
-            throw UsageError(
-                "No Maven or Gradle project found in '$root'. " +
-                    "Run fz dev from the project root or pass --project-dir <path>."
+            root = try {
+                projectInitializer.initialize(root)
+            } catch (e: Exception) {
+                throw UsageError(e.message ?: "Could not initialize a Fluxzero project")
+            } ?: throw UsageError(
+                "No project was created. Run fz init or fz dev from a Maven or Gradle project root."
             )
         }
         if (selectedAction == "config") {
@@ -133,6 +150,7 @@ class Dev(
                 addFlag("--follow", follow)
                 addFlag("--errors", errors)
                 addFlag("--force", force)
+                addFlag("--all", all)
                 applications.singleOrNull()?.let { addOption("--app", it) }
             }
             val exitCode = launcher.launch(
@@ -157,6 +175,8 @@ class Dev(
             addOption("--startup-timeout-ms", startupTimeout?.toString())
             addOption("--graceful-shutdown-timeout-ms", shutdownTimeout?.toString())
             addOption("--debounce-ms", debounce?.toString())
+            addOption("--idle-timeout", idleTimeout)
+            addOption("--failed-startup-timeout", failedStartupTimeout)
             addOption("--frontend-command", frontendCommand)
             addOption("--frontend-directory", frontendDirectory)
             addOption("--frontend-setup-command", frontendSetupCommand)

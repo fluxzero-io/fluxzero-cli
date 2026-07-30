@@ -37,7 +37,7 @@ class ScaffoldService(
             
             // Determine output directory
             val baseDir = request.outputDir?.let { Paths.get(it) } ?: Paths.get("")
-            val outputDir = baseDir.resolve(normalizedName)
+            val outputDir = if (request.useOutputDirectory) baseDir else baseDir.resolve(normalizedName)
             
             // Check if directory already exists
             if (Files.exists(outputDir) && Files.list(outputDir).use { it.findFirst().isPresent }) {
