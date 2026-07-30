@@ -135,6 +135,45 @@ class DevServerLauncherTest {
     }
 
     @Test
+    fun `global control actions resolve latest compatible release instead of project pin`() {
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val pinnedDependency = Files.createFile(projectDirectory.resolve("dev-server-pinned.jar"))
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), pinnedDependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.0")
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
+        val resolver = DevServerVersionResolver({
+            "<metadata><versioning><versions><version>1.2.3</version></versions></versioning></metadata>"
+        }, projectDirectory.resolve("metadata-cache")) { }
+        val bytes = "latest-dev-server".encodeToByteArray()
+        val artifacts = DevServerArtifactCache(projectDirectory.resolve("artifact-cache"), { uri ->
+            if (uri.toString().endsWith(".sha256")) sha256(bytes).encodeToByteArray() else bytes
+        }) { }
+        val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
+        val launcher = DevServerLauncher(
+            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
+        ) { }
+
+        launcher.launch(DevLaunchRequest(
+            projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("list")
+        ))
+        launcher.launch(DevLaunchRequest(
+            projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("stop", "--all")
+        ))
+
+        assertEquals("1.2.0", Files.readString(launcherDirectory.resolve("version")))
+        assertEquals(
+            "1.2.3",
+            Files.readString(projectDirectory.resolve(".fluxzero/dev/config-launcher/version"))
+        )
+        assertEquals(2, commands.size)
+        assertTrue(commands.all { it.contains(DevLaunchTarget.CONTROL.mainClass) })
+        assertTrue(commands.none { it.contains(pinnedDependency.toString()) })
+        assertTrue(commands[0].contains("list"))
+        assertTrue(commands[1].containsAll(listOf("stop", "--all")))
+    }
+
+    @Test
     fun `refreshes snapshot classpath instead of reusing the cache`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
