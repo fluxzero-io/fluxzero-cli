@@ -129,17 +129,10 @@ class Init(
     }
 
     private fun promptForBuildSystem(): BuildSystem {
-        while (true) {
-            echo("Please select a build system:")
-            echo("1) Maven")
-            echo("2) Gradle")
-            val input = actualPrompt.readLine("Enter choice [1-2]: ")?.trim()
-            when (input) {
-                "1" -> return BuildSystem.MAVEN
-                "2" -> return BuildSystem.GRADLE
-                null -> throw RuntimeException("Cannot read input in non-interactive mode. Please specify --build parameter.")
-                else -> echo("Invalid choice, try again.")
-            }
+        return when (actualPrompt.select("Please select a build system:", listOf("Maven", "Gradle"))) {
+            0 -> BuildSystem.MAVEN
+            1 -> BuildSystem.GRADLE
+            else -> throw RuntimeException("Cannot read input in non-interactive mode. Please specify --build parameter.")
         }
     }
 
@@ -147,19 +140,9 @@ class Init(
         val templates = scaffoldService.listAvailableTemplates()
 
         fun promptForTemplate(): String {
-            while (true) {
-                echo("Please select a template:")
-                templates.forEachIndexed { i, t -> echo("${i + 1}) ${t.name}") }
-                val input = actualPrompt.readLine("Enter choice [1-${templates.size}]: ")?.trim()
-                if (input == null) {
-                    throw RuntimeException("Cannot read input in non-interactive mode. Please specify --template parameter.")
-                }
-                val choice = input.toIntOrNull()
-                if (choice != null && choice in 1..templates.size) {
-                    return templates[choice - 1].name
-                }
-                echo("Invalid choice, try again.")
-            }
+            val choice = actualPrompt.select("Please select a template:", templates.map { it.name })
+            return templates.getOrNull(choice)?.name
+                ?: throw RuntimeException("Cannot read input in non-interactive mode. Please specify --template parameter.")
         }
 
         val finalTemplate = if (template == null)

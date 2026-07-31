@@ -21,16 +21,22 @@ class DevProjectInitializerTest {
     @Test
     fun `offers the three explicit choices and supports cancellation`() {
         val output = mutableListOf<String>()
+        val prompt = QueuePrompt("3")
         val initializer = InteractiveDevProjectInitializer(
-            prompt = QueuePrompt("3"),
+            prompt = prompt,
             scaffoldService = mockk(relaxed = true),
             output = output::add
         )
 
         assertNull(initializer.initialize(directory))
-        assertTrue(output.contains("1) Create a new project in the current folder"))
-        assertTrue(output.contains("2) Create a new project in a subfolder"))
-        assertTrue(output.contains("3) Cancel"))
+        assertEquals(
+            listOf(
+                "Create a new project in the current folder",
+                "Create a new project in a subfolder",
+                "Cancel"
+            ),
+            prompt.selections.single().second
+        )
     }
 
     @Test
@@ -72,6 +78,13 @@ class DevProjectInitializerTest {
 
     private class QueuePrompt(vararg answers: String) : Prompt {
         private val answers = ArrayDeque(answers.toList())
+        val selections = mutableListOf<Pair<String, List<String>>>()
+
         override fun readLine(prompt: String): String = answers.removeFirst()
+
+        override fun select(question: String, options: List<String>, defaultIndex: Int): Int {
+            selections += question to options
+            return answers.removeFirst().toInt() - 1
+        }
     }
 }
