@@ -11,6 +11,9 @@ import java.net.UnknownHostException
 import java.net.http.HttpTimeoutException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.assertEquals
@@ -285,6 +288,92 @@ class DefaultProjectFilesServiceTest {
         val syncVersionFile = tempDir.resolve(".fluxzero/agents/.sync-version")
         assert(Files.exists(syncVersionFile)) { "Expected .sync-version file to exist" }
         assertEquals("1.75.1:kotlin", Files.readString(syncVersionFile))
+    }
+
+    @Test
+    fun `failed replacement keeps the previously synced generation`() {
+        Files.createDirectories(agentsDir)
+        Files.writeString(agentsDir.resolve("AGENTS.md"), "previous instructions")
+        Files.writeString(agentsDir.resolve(".sync-version"), "1.74.0:kotlin")
+        every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } returns byteArrayOf()
+
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = "1.75.1"
+        )
+
+        assertIs<SyncResult.Failed>(result)
+        assertEquals("previous instructions", Files.readString(agentsDir.resolve("AGENTS.md")))
+        assertEquals("1.74.0:kotlin", Files.readString(agentsDir.resolve(".sync-version")))
+        assertNoTransactionDirectories()
+    }
+
+    @Test
+    fun `concurrent syncs publish one complete generation`() {
+        val downloadStarted = CountDownLatch(1)
+        val allowDownload = CountDownLatch(1)
+        every { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") } answers {
+            downloadStarted.countDown()
+            assertTrue(allowDownload.await(5, TimeUnit.SECONDS))
+            buildProjectFilesZip("kotlin")
+        }
+        val executor = Executors.newFixedThreadPool(2)
+
+        try {
+            val first = executor.submit<SyncResult> {
+                service.syncProjectFiles(tempDir, language = Language.KOTLIN, version = "1.75.1")
+            }
+            assertTrue(downloadStarted.await(5, TimeUnit.SECONDS))
+            val second = executor.submit<SyncResult> {
+                DefaultProjectFilesService(gitHubClient).syncProjectFiles(
+                    tempDir, language = Language.KOTLIN, version = "1.75.1"
+                )
+            }
+
+            allowDownload.countDown()
+            val results = listOf(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS))
+
+            assertEquals(1, results.count { it is SyncResult.Updated })
+            assertEquals(1, results.count { it is SyncResult.UpToDate })
+            verify(exactly = 1) { gitHubClient.downloadProjectFiles(Language.KOTLIN, "1.75.1") }
+            assertEquals("# Agents\n", Files.readString(agentsDir.resolve("AGENTS.md")))
+            assertEquals("1.75.1:kotlin", Files.readString(agentsDir.resolve(".sync-version")))
+            assertNoTransactionDirectories()
+        } finally {
+            allowDownload.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `recovers an interrupted replacement before checking sync state`() {
+        val backupDir = fluxzeroDir.resolve(".agents-backup")
+        Files.createDirectories(backupDir)
+        Files.writeString(backupDir.resolve("AGENTS.md"), "previous instructions")
+        Files.writeString(backupDir.resolve(".sync-version"), "1.75.1:kotlin")
+        val abandonedStage = Files.createDirectory(fluxzeroDir.resolve(".agents-stage-abandoned"))
+        Files.writeString(abandonedStage.resolve("partial.md"), "partial")
+
+        val result = service.syncProjectFiles(
+            projectDir = tempDir,
+            language = Language.KOTLIN,
+            version = "1.75.1"
+        )
+
+        assertIs<SyncResult.UpToDate>(result)
+        verify(exactly = 0) { gitHubClient.downloadProjectFiles(any(), any()) }
+        assertEquals("previous instructions", Files.readString(agentsDir.resolve("AGENTS.md")))
+        assertNoTransactionDirectories()
+    }
+
+    private fun assertNoTransactionDirectories() {
+        Files.list(fluxzeroDir).use { entries ->
+            assertFalse(entries.anyMatch {
+                val name = it.fileName.toString()
+                name.startsWith(".agents-stage-") || name == ".agents-backup"
+            })
+        }
     }
 
     /**

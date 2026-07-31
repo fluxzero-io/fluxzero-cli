@@ -3,9 +3,11 @@ package host.flux.projectfiles
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.util.zip.ZipInputStream
 
 private val logger = KotlinLogging.logger {}
@@ -24,6 +26,9 @@ object ProjectFilesExtractor {
      * Subdirectory owned by the project files sync.
      */
     const val AGENT_FILES_DIR = "agents"
+
+    private const val STAGING_DIRECTORY_PREFIX = ".agents-stage-"
+    private const val BACKUP_DIRECTORY = ".agents-backup"
 
     /**
      * Prefixes to strip from ZIP entries (language-specific folders).
@@ -69,9 +74,51 @@ object ProjectFilesExtractor {
      * @return List of files that were extracted (relative to .fluxzero/agents/)
      */
     fun extract(zipStream: InputStream, projectDir: Path): List<String> {
-        val extractedFiles = mutableListOf<String>()
         val targetDir = agentFilesDir(projectDir)
         logger.debug { "Extracting project files to $targetDir" }
+        return extractTo(zipStream, targetDir)
+    }
+
+    /**
+     * Builds a complete replacement beside the current agent directory and promotes it only after extraction succeeds.
+     * A retained backup makes an interrupted directory replacement recoverable by the next sync.
+     */
+    internal fun replaceAgentFiles(zipData: ByteArray, projectDir: Path, syncState: String): List<String> {
+        val fluxzeroDir = projectDir.toAbsolutePath().normalize().resolve(PROJECT_FILES_DIR)
+        val targetDir = fluxzeroDir.resolve(AGENT_FILES_DIR)
+        val backupDir = fluxzeroDir.resolve(BACKUP_DIRECTORY)
+        var stagingDir: Path? = null
+
+        try {
+            Files.createDirectories(fluxzeroDir)
+            recoverInterruptedReplacement(projectDir)
+            stagingDir = Files.createTempDirectory(fluxzeroDir, STAGING_DIRECTORY_PREFIX)
+
+            val extractedFiles = extractTo(ByteArrayInputStream(zipData), stagingDir)
+            if (extractedFiles.isEmpty()) {
+                throw ProjectFilesSyncException("Project files archive did not contain any files")
+            }
+            Files.writeString(
+                stagingDir.resolve(".sync-version"),
+                syncState,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE
+            )
+
+            promote(stagingDir, targetDir, backupDir)
+            stagingDir = null
+            return extractedFiles
+        } catch (e: ProjectFilesSyncException) {
+            throw e
+        } catch (e: Exception) {
+            throw ProjectFilesSyncException("Could not replace project files in $targetDir", e)
+        } finally {
+            stagingDir?.let { deleteQuietly(it) }
+        }
+    }
+
+    private fun extractTo(zipStream: InputStream, targetDir: Path): List<String> {
+        val extractedFiles = mutableListOf<String>()
 
         // Ensure target directory exists
         Files.createDirectories(targetDir)
@@ -117,6 +164,61 @@ object ProjectFilesExtractor {
 
         logger.info { "Extracted ${extractedFiles.size} files to $targetDir" }
         return extractedFiles
+    }
+
+    internal fun recoverInterruptedReplacement(projectDir: Path) {
+        try {
+            val fluxzeroDir = projectDir.toAbsolutePath().normalize().resolve(PROJECT_FILES_DIR)
+            val targetDir = fluxzeroDir.resolve(AGENT_FILES_DIR)
+            val backupDir = fluxzeroDir.resolve(BACKUP_DIRECTORY)
+            Files.createDirectories(fluxzeroDir)
+
+            if (!Files.exists(backupDir)) {
+                // Nothing to restore.
+            } else if (Files.exists(targetDir)) {
+                deleteRecursively(backupDir)
+            } else {
+                moveDirectory(backupDir, targetDir)
+                logger.info { "Recovered project files from an interrupted sync" }
+            }
+
+            Files.list(fluxzeroDir).use { entries ->
+                entries.filter { it.fileName.toString().startsWith(STAGING_DIRECTORY_PREFIX) }
+                    .forEach { deleteQuietly(it) }
+            }
+        } catch (e: ProjectFilesSyncException) {
+            throw e
+        } catch (e: Exception) {
+            throw ProjectFilesSyncException("Could not recover an interrupted project files sync for $projectDir", e)
+        }
+    }
+
+    private fun promote(stagingDir: Path, targetDir: Path, backupDir: Path) {
+        if (Files.exists(backupDir)) {
+            deleteRecursively(backupDir)
+        }
+        if (Files.exists(targetDir)) {
+            moveDirectory(targetDir, backupDir)
+        }
+
+        try {
+            moveDirectory(stagingDir, targetDir)
+        } catch (e: Exception) {
+            if (!Files.exists(targetDir) && Files.exists(backupDir)) {
+                moveDirectory(backupDir, targetDir)
+            }
+            throw e
+        }
+
+        deleteQuietly(backupDir)
+    }
+
+    private fun moveDirectory(source: Path, target: Path) {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(source, target)
+        }
     }
 
     /**
@@ -180,5 +282,13 @@ object ProjectFilesExtractor {
             }
         }
         Files.deleteIfExists(path)
+    }
+
+    private fun deleteQuietly(path: Path) {
+        try {
+            deleteRecursively(path)
+        } catch (e: Exception) {
+            logger.warn(e) { "Could not clean temporary project files directory $path" }
+        }
     }
 }

@@ -101,39 +101,37 @@ class DefaultProjectFilesService(
             val projectLanguage = language ?: LanguageDetector.detect(projectDir)
             logger.info { "Using language: $projectLanguage, version: $sdkVersion" }
 
-            // Check if already up-to-date
-            if (!forceUpdate) {
-                val syncVersionFile = ProjectFilesExtractor.syncVersionFile(projectDir)
-                if (Files.exists(syncVersionFile)) {
-                    val savedState = Files.readString(syncVersionFile).trim()
-                    val currentState = "$sdkVersion:${projectLanguage.name.lowercase()}"
-                    if (savedState == currentState) {
-                        logger.info { "Project files already up-to-date for $projectLanguage version $sdkVersion" }
-                        return SyncResult.UpToDate(version = sdkVersion)
+            ProjectFilesSyncCoordinator.withProjectLock(projectDir) {
+                val currentState = "$sdkVersion:${projectLanguage.name.lowercase()}"
+                ProjectFilesExtractor.recoverInterruptedReplacement(projectDir)
+
+                // Recheck under the project lock because another build may have completed the same sync while waiting.
+                if (!forceUpdate) {
+                    val syncVersionFile = ProjectFilesExtractor.syncVersionFile(projectDir)
+                    if (Files.exists(syncVersionFile)) {
+                        val savedState = try {
+                            Files.readString(syncVersionFile).trim()
+                        } catch (e: IOException) {
+                            throw ProjectFilesSyncException("Could not read project files state from $syncVersionFile", e)
+                        }
+                        if (savedState == currentState) {
+                            logger.info { "Project files already up-to-date for $projectLanguage version $sdkVersion" }
+                            return@withProjectLock SyncResult.UpToDate(version = sdkVersion)
+                        }
                     }
                 }
+
+                logger.info { "Downloading project files for $projectLanguage version $sdkVersion" }
+                val zipData = gitHubClient.downloadProjectFiles(projectLanguage, sdkVersion)
+                val extractedFiles = ProjectFilesExtractor.replaceAgentFiles(zipData, projectDir, currentState)
+
+                logger.info { "Successfully synced ${extractedFiles.size} project files" }
+                SyncResult.Updated(
+                    version = sdkVersion,
+                    filesWritten = extractedFiles,
+                    language = projectLanguage
+                )
             }
-
-            // Download project files
-            logger.info { "Downloading project files for $projectLanguage version $sdkVersion" }
-            val zipData = gitHubClient.downloadProjectFiles(projectLanguage, sdkVersion)
-
-            // Clean existing files
-            ProjectFilesExtractor.cleanExistingFiles(projectDir)
-
-            // Extract new files
-            val extractedFiles = ProjectFilesExtractor.extract(zipData, projectDir)
-
-            // Record synced version for up-to-date checking
-            val syncVersionFile = ProjectFilesExtractor.syncVersionFile(projectDir)
-            Files.writeString(syncVersionFile, "$sdkVersion:${projectLanguage.name.lowercase()}")
-
-            logger.info { "Successfully synced ${extractedFiles.size} project files" }
-            SyncResult.Updated(
-                version = sdkVersion,
-                filesWritten = extractedFiles,
-                language = projectLanguage
-            )
         } catch (e: GitHubApiException) {
             logger.warn(e) { "GitHub API error during project files sync - continuing without sync" }
             SyncResult.Skipped(
