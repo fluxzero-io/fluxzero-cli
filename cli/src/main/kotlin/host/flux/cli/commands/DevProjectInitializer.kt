@@ -23,17 +23,18 @@ class InteractiveDevProjectInitializer(
     override fun initialize(directory: Path): Path? {
         output("No Maven or Gradle project was found in '$directory'.")
         output("")
-        output("What would you like to do?")
-        output("")
-        output("1) Create a new project in the current folder")
-        output("2) Create a new project in a subfolder")
-        output("3) Cancel")
-        val choice = read("Choice [1-3]: ")?.trim()
+        val choice = select(
+            "What would you like to do?",
+            listOf(
+                "Create a new project in the current folder",
+                "Create a new project in a subfolder",
+                "Cancel"
+            )
+        ) ?: return null
         return when (choice) {
-            "1" -> initialize(directory, useCurrentDirectory = true)
-            "2" -> initialize(directory, useCurrentDirectory = false)
-            "3", "", null -> null
-            else -> throw IllegalArgumentException("Choose 1, 2, or 3")
+            0 -> initialize(directory, useCurrentDirectory = true)
+            1 -> initialize(directory, useCurrentDirectory = false)
+            else -> null
         }
     }
 
@@ -45,11 +46,8 @@ class InteractiveDevProjectInitializer(
         }
         val templates = scaffoldService.listAvailableTemplates()
         output("")
-        output("Select a template:")
-        templates.forEachIndexed { index, template -> output("${index + 1}) ${template.name}") }
-        val templateIndex = read("Choice [1-${templates.size}]: ")?.trim()?.toIntOrNull()
+        val templateIndex = select("Select a template:", templates.map { it.name })
             ?: throw IllegalArgumentException("A template must be selected")
-        require(templateIndex in 1..templates.size) { "Choose a template between 1 and ${templates.size}" }
         val defaultName = directory.fileName?.toString()?.lowercase() ?: "fluxzero-app"
         val name = read("Project name [$defaultName]: ")?.trim().orEmpty().ifEmpty { defaultName }
         val packageName = read("Package name [com.example.app]: ")?.trim().orEmpty()
@@ -57,16 +55,13 @@ class InteractiveDevProjectInitializer(
         require(Regex("^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9]*)*$").matches(packageName)) {
             "Package name must contain lowercase letters, numbers, and dots"
         }
-        output("Select a build system:")
-        output("1) Maven")
-        output("2) Gradle")
-        val buildSystem = when (read("Choice [1-2]: ")?.trim()) {
-            "1" -> BuildSystem.MAVEN
-            "2" -> BuildSystem.GRADLE
-            else -> throw IllegalArgumentException("Choose Maven or Gradle")
+        val buildSystem = when (select("Select a build system:", listOf("Maven", "Gradle"))) {
+            0 -> BuildSystem.MAVEN
+            1 -> BuildSystem.GRADLE
+            else -> throw IllegalArgumentException("A build system must be selected")
         }
         val result = scaffoldService.scaffoldProject(ScaffoldProject(
-            template = templates[templateIndex - 1].name,
+            template = templates[templateIndex].name,
             name = name,
             outputDir = directory.toString(),
             packageName = packageName,
@@ -82,6 +77,12 @@ class InteractiveDevProjectInitializer(
 
     private fun read(message: String): String? = try {
         actualPrompt.readLine(message)
+    } catch (_: org.jline.reader.EndOfFileException) {
+        null
+    }
+
+    private fun select(question: String, options: List<String>): Int? = try {
+        actualPrompt.select(question, options)
     } catch (_: org.jline.reader.EndOfFileException) {
         null
     }
