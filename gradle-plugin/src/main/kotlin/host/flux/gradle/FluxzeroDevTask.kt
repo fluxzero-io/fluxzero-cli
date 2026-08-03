@@ -22,6 +22,7 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @get:Input @get:Optional abstract val mainClass: Property<String>
     @get:Input @get:Optional abstract val applicationName: Property<String>
     @get:Input abstract val applications: ListProperty<String>
+    @get:Input @get:Optional abstract val profile: Property<String>
     @get:Input abstract val environment: Property<String>
     @get:Input @get:Optional abstract val port: Property<Int>
     @get:Input @get:Optional abstract val idp: Property<String>
@@ -54,7 +55,10 @@ abstract class FluxzeroDevTask : DefaultTask() {
     @Option(option = "applications", description = "Comma-separated application, module, test-app, or flavor selectors.")
     fun applicationsOption(value: String) = applications.set(commaSeparated(value))
 
-    @Option(option = "environment", description = "Application environment/profile; defaults to local.")
+    @Option(option = "profile", description = "Named development profile from .fluxzero/dev.yaml.")
+    fun profileOption(value: String) = profile.set(value)
+
+    @Option(option = "environment", description = "Application environment exposed as ENVIRONMENT; defaults to local.")
     fun environmentOption(value: String) = environment.set(value)
 
     @Option(option = "port", description = "Public gateway port; dynamically allocated by default.")
@@ -120,6 +124,7 @@ abstract class FluxzeroDevTask : DefaultTask() {
             option("--main-class", mainClass.orNull)
             option("--application-name", applicationName.orNull)
             applications.get().forEach { option("--app", it) }
+            option("--profile", profile.orNull)
             option("--environment", environment.orNull)
             option("--port", port.orNull?.toString())
             option("--idp", idp.orNull)

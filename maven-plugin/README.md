@@ -61,7 +61,8 @@ environments and their running, unresponsive, or stale state.
 | `devMainClass` | No | Auto-detected | Main-class override; property `fluxzero.dev.mainClass`, with `FLUXZERO_MAIN_CLASS` as environment fallback. |
 | `devApplicationName` | No | Maven artifact id | Application name; property `fluxzero.dev.applicationName`. |
 | `applications` | No | All discovered applications | Applications or named configurations to start; property `fluxzero.dev.applications`. |
-| `environment` | No | `local` | Application environment/profile; property `fluxzero.dev.environment`. |
+| `profile` | No | Configured default or sole profile | Named development profile from `.fluxzero/dev.yaml`; property `fluxzero.dev.profile`. |
+| `environment` | No | `local` | Application environment exposed as `ENVIRONMENT`; property `fluxzero.dev.environment`. |
 | `port` | No | Dynamic | Preferred public gateway port; property `fluxzero.dev.port`. |
 | `idp` | No | `managed` | IDP mode; property `fluxzero.dev.idp`. |
 | `devNamespace` | No | Project default | Fluxzero namespace; property `fluxzero.dev.namespace`. |

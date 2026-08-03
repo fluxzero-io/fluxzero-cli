@@ -208,6 +208,7 @@ Start options:
 | `--app <selector>` | Start one module, main class, test app, or named app configuration; repeatable. |
 | `--main-class <class>` | Override main-class detection. |
 | `--application-name <name>` | Override the Fluxzero runtime application name. |
+| `--profile <name>` | Select a named development profile from `.fluxzero/dev.yaml`. |
 | `--environment <name>` | Set `ENVIRONMENT`; defaults to `local`. |
 | `--namespace <name>` | Set the Fluxzero namespace. |
 | `--port <port>` | Prefer a public browser/gateway port; dynamic by default. |
@@ -260,6 +261,27 @@ commands:
     payload:
       name: Local Admin
 ```
+
+For multiple complete local setups, define named profiles and select one explicitly or configure a default. Legacy
+top-level settings remain supported and cannot be mixed with `profiles`:
+
+```yaml
+version: 1
+defaultProfile: encrypted
+profiles:
+  encrypted:
+    environment: local
+    apps: [rebound-encrypted]
+    frontend:
+      directory: frontend
+      command: "npm run dev -- --port {port}"
+  reporting:
+    environment: local
+    apps: [rebound, reporting]
+```
+
+Run the non-default setup with `fz dev --profile reporting`. A single profile is selected automatically when no
+`defaultProfile` is configured.
 
 `apps` may contain direct selectors or keys from `applicationConfig`. Secret values never belong in this file: only
 tracked `op://` references are allowed, and `op run` injects their values directly into the selected child process.

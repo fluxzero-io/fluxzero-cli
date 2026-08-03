@@ -193,6 +193,7 @@ class FluxzeroPlugin : Plugin<Project> {
             mainClass.set(project.stringGradleProperty("fluxzero.dev.mainClass").orElse(extension.dev.mainClass))
             applicationName.set(project.stringGradleProperty("fluxzero.dev.applicationName").orElse(extension.dev.applicationName))
             applications.set(project.listGradleProperty("fluxzero.dev.applications").orElse(extension.dev.applications))
+            profile.set(project.stringGradleProperty("fluxzero.dev.profile").orElse(extension.dev.profile))
             environment.set(project.stringGradleProperty("fluxzero.dev.environment").orElse(extension.dev.environment))
             port.set(project.intGradleProperty("fluxzero.dev.port").orElse(extension.dev.port))
             idp.set(project.stringGradleProperty("fluxzero.dev.idp").orElse(extension.dev.idp))

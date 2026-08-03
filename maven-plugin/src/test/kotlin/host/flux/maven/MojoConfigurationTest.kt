@@ -22,6 +22,7 @@ class MojoConfigurationTest {
         assertNotNull(fields.find { it.name == "devServerVersion" })
         assertNotNull(fields.find { it.name == "devMainClass" })
         assertNotNull(fields.find { it.name == "applications" })
+        assertNotNull(fields.find { it.name == "profile" })
         assertNotNull(fields.find { it.name == "environment" })
         assertNotNull(fields.find { it.name == "port" })
         assertNotNull(fields.find { it.name == "idp" })

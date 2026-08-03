@@ -69,6 +69,7 @@ configuration is preferable:
 fluxzero {
     dev {
         applications.set(listOf("app", "audittrail"))
+        profile.set("full-stack")
         environment.set("local")
         port.set(4200)
         idp.set("external")
@@ -86,6 +87,7 @@ fluxzero {
 | `mainClass` | `fluxzero.dev.mainClass` | auto-detected |
 | `applicationName` | `fluxzero.dev.applicationName` | project name |
 | `applications` | `fluxzero.dev.applications` (comma-separated) | all discovered apps |
+| `profile` | `fluxzero.dev.profile` | `.fluxzero/dev.yaml` default or sole profile |
 | `environment` | `fluxzero.dev.environment` | `local` |
 | `port` | `fluxzero.dev.port` | dynamic |
 | `idp` | `fluxzero.dev.idp` | `managed` |
