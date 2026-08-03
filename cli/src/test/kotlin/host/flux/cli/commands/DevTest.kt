@@ -32,6 +32,7 @@ class DevTest {
                 "--main-class", "com.example.App",
                 "--app", "app",
                 "--app", "audittrail",
+                "--profile", "full-stack",
                 "--environment", "local",
                 "--port", "4200",
                 "--idp", "external",
@@ -51,6 +52,7 @@ class DevTest {
         assertEquals("0-SNAPSHOT", request?.devServerVersion)
         assertTrue(request!!.arguments.containsAll(listOf("--main-class", "com.example.App", "--fast-compiler")))
         assertTrue(request!!.arguments.containsAll(listOf("--app", "app", "--app", "audittrail")))
+        assertTrue(request!!.arguments.containsAll(listOf("--profile", "full-stack")))
         assertTrue(request!!.arguments.containsAll(listOf("--environment", "local")))
         assertTrue(request!!.arguments.containsAll(listOf("--idle-timeout", "4h")))
         assertTrue(request!!.arguments.containsAll(listOf("--port", "4200")))

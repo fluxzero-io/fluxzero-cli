@@ -125,6 +125,7 @@ class FluxzeroPluginFunctionalTest {
 
         assertTrue(result.output.contains("--background"), result.output)
         assertTrue(result.output.contains("--applications"), result.output)
+        assertTrue(result.output.contains("--profile"), result.output)
         assertTrue(result.output.contains("--environment"), result.output)
         assertTrue(result.output.contains("--frontend-command"), result.output)
         assertTrue(result.output.contains("--no-tests"), result.output)

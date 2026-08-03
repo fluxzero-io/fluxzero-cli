@@ -10,6 +10,7 @@ abstract class DevExtension @Inject constructor(objects: ObjectFactory) {
     val mainClass: Property<String> = objects.property(String::class.java)
     val applicationName: Property<String> = objects.property(String::class.java)
     val applications: ListProperty<String> = objects.listProperty(String::class.java).convention(emptyList())
+    val profile: Property<String> = objects.property(String::class.java)
     val environment: Property<String> = objects.property(String::class.java).convention("local")
     val port: Property<Int> = objects.property(Int::class.java)
     val idp: Property<String> = objects.property(String::class.java)

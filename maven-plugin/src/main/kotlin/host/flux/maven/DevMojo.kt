@@ -27,6 +27,9 @@ class DevMojo : AbstractMojo() {
     @Parameter(property = "fluxzero.dev.applications")
     private var applications: List<String> = emptyList()
 
+    @Parameter(property = "fluxzero.dev.profile")
+    private var profile: String? = null
+
     @Parameter(property = "fluxzero.dev.environment")
     private var environment: String? = null
 
@@ -99,6 +102,7 @@ class DevMojo : AbstractMojo() {
             addOption("--main-class", devMainClass)
             addOption("--application-name", devApplicationName)
             applications.forEach { addOption("--app", it) }
+            addOption("--profile", profile)
             addOption("--environment", environment)
             addOption("--port", port?.toString())
             addOption("--idp", idp)

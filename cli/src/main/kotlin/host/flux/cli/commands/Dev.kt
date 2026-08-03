@@ -46,9 +46,13 @@ class Dev(
         help = "Application/module or named project configuration to start; repeatable. " +
             "Starts all discovered applications by default."
     ).multiple()
+    private val profile by option(
+        "--profile",
+        help = "Named development profile from .fluxzero/dev.yaml."
+    )
     private val environment by option(
         "--environment",
-        help = "Application environment/profile. Defaults to local."
+        help = "Application environment exposed as ENVIRONMENT. Defaults to local."
     )
     private val port by option(
         "--port", "--gateway-port",
@@ -160,6 +164,7 @@ class Dev(
             addOption("--main-class", mainClass)
             addOption("--application-name", applicationName)
             applications.forEach { addOption("--app", it) }
+            addOption("--profile", profile)
             addOption("--environment", environment)
             addOption("--port", port?.toString())
             addOption("--idp", if (noIdp) "external" else idp)
