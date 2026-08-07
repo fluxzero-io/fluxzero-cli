@@ -10,6 +10,7 @@ import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
 import host.flux.dev.DevServerLauncher
+import host.flux.dev.DevStartupReadiness
 import java.nio.file.Path
 
 class Mcp(
@@ -33,7 +34,10 @@ class Mcp(
         val root = projectDirectory.toAbsolutePath().normalize()
         if (ensureDev) {
             val startExitCode = launcher.launch(
-                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, detached = true)
+                DevLaunchRequest(
+                    root, devServerVersion, DevLaunchTarget.SERVER, detached = true,
+                    startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
+                )
             )
             check(startExitCode == 0) {
                 "Fluxzero dev environment could not be started (exit code $startExitCode)."

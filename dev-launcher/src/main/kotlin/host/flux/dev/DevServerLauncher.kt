@@ -12,6 +12,7 @@ private const val PREFLIGHT_MAIN_CLASS = "io.fluxzero.devserver.DevServerPreflig
 private const val USE_DYNAMIC_PORT_EXIT_CODE = 75
 private const val CANCEL_STARTUP_EXIT_CODE = 76
 private const val ATTACHED_OWNER_DISCONNECTED_EXIT_CODE = 77
+private const val AGENT_READY_PROPERTY = "fluxzero.dev.control.agentReady"
 
 fun interface DevLauncher {
     fun launch(request: DevLaunchRequest): Int
@@ -69,7 +70,9 @@ class DevServerLauncher(
                         command = command(classpath, request)
                         active = false
                     }
-                    launchServer(command, projectDirectory, request.detached, shutdown, active)
+                    launchServer(
+                        command, projectDirectory, request.detached, shutdown, active, request.startupReadiness
+                    )
                 } else {
                     if (request.arguments.firstOrNull() == "attach") {
                         shutdown.expectStopped {
@@ -119,7 +122,8 @@ class DevServerLauncher(
     }
 
     private fun launchServer(
-        command: List<String>, projectDirectory: Path, detached: Boolean, shutdown: ShutdownOutcome, active: Boolean
+        command: List<String>, projectDirectory: Path, detached: Boolean, shutdown: ShutdownOutcome, active: Boolean,
+        startupReadiness: DevStartupReadiness
     ): Int {
         if (active) {
             if (detached) {
@@ -144,7 +148,7 @@ class DevServerLauncher(
             CANCEL_STARTUP_EXIT_CODE -> return 0
             else -> return preflightExitCode
         }
-        return if (detached) launchDetached(launchCommand, projectDirectory, shutdown)
+        return if (detached) launchDetached(launchCommand, projectDirectory, shutdown, startupReadiness)
         else launchAttached(launchCommand, projectDirectory, shutdown)
     }
 
@@ -217,11 +221,19 @@ class DevServerLauncher(
         return exitCode
     }
 
-    private fun launchDetached(command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome): Int {
+    private fun launchDetached(
+        command: List<String>, projectDirectory: Path, shutdown: ShutdownOutcome,
+        startupReadiness: DevStartupReadiness
+    ): Int {
         val bootstrapLog = projectDirectory.resolve(".fluxzero/dev/bootstrap.log")
         val pid = executor.startDetached(command, projectDirectory, bootstrapLog)
         shutdown.expectStopped { stopDetachedProcess(projectDirectory, pid) }
-        val waitCommand = command.takeWhile { it != "-cp" } + listOf(
+        val readinessOptions = if (startupReadiness == DevStartupReadiness.AGENT_CONTROL_PLANE) {
+            listOf("-D$AGENT_READY_PROPERTY=true")
+        } else {
+            emptyList()
+        }
+        val waitCommand = command.takeWhile { it != "-cp" } + readinessOptions + listOf(
             "-cp",
             command[command.indexOf("-cp") + 1],
             DevLaunchTarget.CONTROL.mainClass,
