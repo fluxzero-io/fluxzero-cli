@@ -9,11 +9,17 @@ enum class DevLaunchTarget(val mainClass: String) {
     CONFIG("io.fluxzero.devserver.DevProjectConfigMain")
 }
 
+enum class DevStartupReadiness {
+    APPLICATION,
+    AGENT_CONTROL_PLANE
+}
+
 data class DevLaunchRequest(
     val projectDirectory: Path,
     val devServerVersion: String? = null,
     val target: DevLaunchTarget = DevLaunchTarget.SERVER,
     val arguments: List<String> = emptyList(),
     val detached: Boolean = false,
-    val jvmOptions: List<String> = emptyList()
+    val jvmOptions: List<String> = emptyList(),
+    val startupReadiness: DevStartupReadiness = DevStartupReadiness.APPLICATION
 )

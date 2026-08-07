@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.testing.test
 import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
+import host.flux.dev.DevStartupReadiness
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
@@ -92,6 +93,7 @@ class DevTest {
         assertEquals(2, requests.size)
         assertEquals(DevLaunchTarget.SERVER, requests[0].target)
         assertTrue(requests[0].detached)
+        assertEquals(DevStartupReadiness.AGENT_CONTROL_PLANE, requests[0].startupReadiness)
         assertEquals(DevLaunchTarget.MCP_STDIO, requests[1].target)
         assertEquals("1-SNAPSHOT", requests[1].devServerVersion)
     }

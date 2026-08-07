@@ -475,6 +475,38 @@ class DevServerLauncherTest {
         val wait = commands.last().command
         assertTrue(wait.contains(DevLaunchTarget.CONTROL.mainClass))
         assertTrue(wait.containsAll(listOf("wait", "--pid", "4242")))
+        assertTrue(wait.none { it == "-Dfluxzero.dev.control.agentReady=true" })
+    }
+
+    @Test
+    fun `agent launch waits only for the dev control plane`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
+        val commands = mutableListOf<Invocation>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += Invocation(command, workingDirectory, outputMode)
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
+            }
+
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long = 4242
+        }
+
+        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
+                listOf("--project-dir", projectDirectory.toString()), detached = true,
+                startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
+            )
+        )
+
+        assertEquals(0, exitCode)
+        val wait = commands.last().command
+        assertTrue(wait.contains(DevLaunchTarget.CONTROL.mainClass))
+        assertTrue(wait.contains("-Dfluxzero.dev.control.agentReady=true"))
     }
 
     @Test
