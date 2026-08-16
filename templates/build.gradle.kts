@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.bundling.Zip
+import java.util.Properties
 
 plugins {
     kotlin("jvm")
@@ -18,12 +19,29 @@ dependencies {
 }
 
 val templateNames = listOf("flux-basic-java", "flux-basic-kotlin")
-val templateVersionToken = "@fluxzeroPluginVersion@"
-val latestReleasedPluginVersion = providers.gradleProperty("latestReleasedPluginVersion").orElse("1.10.0")
+val templateVersionsFile = layout.projectDirectory.file("template-versions.properties")
+val templateVersions = Properties().apply {
+    templateVersionsFile.asFile.inputStream().use(::load)
+}
+fun requiredTemplateVersion(name: String): String =
+    templateVersions.getProperty(name)?.takeIf(String::isNotBlank)
+        ?: error("Missing $name in ${templateVersionsFile.asFile}")
+
+val templateSdkVersion = providers.gradleProperty("templateSdkVersion")
+    .orElse(requiredTemplateVersion("fluxzeroSdkVersion"))
+val templateIdpVersion = providers.gradleProperty("templateIdpVersion")
+    .orElse(requiredTemplateVersion("fluxzeroIdpVersion"))
+val latestReleasedPluginVersion = providers.gradleProperty("latestReleasedPluginVersion")
+    .orElse(requiredTemplateVersion("fluxzeroPluginVersion"))
 val templatePluginVersion = providers.gradleProperty("templatePluginVersion").orElse(
     providers.provider {
         project.version.toString().takeUnless { it == "dev" } ?: latestReleasedPluginVersion.get()
     }
+)
+val templateVersionTokens = mapOf(
+    "@fluxzeroSdkVersion@" to templateSdkVersion,
+    "@fluxzeroIdpVersion@" to templateIdpVersion,
+    "@fluxzeroPluginVersion@" to templatePluginVersion
 )
 val templatesSourceDir = layout.projectDirectory.dir("src/main/template-sources")
 val preparedTemplatesDir = layout.buildDirectory.dir("prepared-template-sources")
@@ -40,10 +58,17 @@ val prepareTemplates by tasks.registering(Sync::class) {
             "**/.DS_Store"
         )
         filesMatching(listOf("**/pom.xml", "**/build.gradle.kts")) {
-            filter { line -> line.replace(templateVersionToken, templatePluginVersion.get()) }
+            filter { line ->
+                templateVersionTokens.entries.fold(line) { result, (token, version) ->
+                    result.replace(token, version.get())
+                }
+            }
         }
     }
     into(preparedTemplatesDir)
+    inputs.file(templateVersionsFile)
+    inputs.property("templateSdkVersion", templateSdkVersion)
+    inputs.property("templateIdpVersion", templateIdpVersion)
     inputs.property("templatePluginVersion", templatePluginVersion)
 }
 
@@ -74,7 +99,7 @@ val writeTemplateIndex by tasks.registering {
 
 val packageTemplates by tasks.registering {
     group = "build"
-    description = "Package the embedded project templates and inject the matching Fluxzero plugin version"
+    description = "Package the embedded project templates and inject their Fluxzero dependency versions"
     dependsOn(packagedTemplates, writeTemplateIndex)
 }
 
@@ -92,5 +117,7 @@ tasks.named("processResources") {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("templateSdkVersion", templateSdkVersion.get())
+    systemProperty("templateIdpVersion", templateIdpVersion.get())
     systemProperty("templatePluginVersion", templatePluginVersion.get())
 }

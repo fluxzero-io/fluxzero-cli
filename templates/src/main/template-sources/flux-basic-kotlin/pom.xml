@@ -16,20 +16,13 @@
         <kotlin-logging.version>7.0.14</kotlin-logging.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <fluxzero.version>1.230.0</fluxzero.version>
-        <fluxzero-idp.version>0.15.0</fluxzero-idp.version>
+        <fluxzero.version>@fluxzeroSdkVersion@</fluxzero.version>
+        <fluxzero-idp.version>@fluxzeroIdpVersion@</fluxzero-idp.version>
         <fluxzero.package.tag>${project.version}</fluxzero.package.tag>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>io.fluxzero</groupId>
-                <artifactId>fluxzero-bom</artifactId>
-                <version>${fluxzero.version}</version>
-                <scope>import</scope>
-                <type>pom</type>
-            </dependency>
             <dependency>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-bom</artifactId>
@@ -41,6 +34,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+            <dependency>
+                <groupId>io.fluxzero</groupId>
+                <artifactId>fluxzero-bom</artifactId>
+                <version>${fluxzero.version}</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
