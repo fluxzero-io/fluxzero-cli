@@ -33,16 +33,28 @@
       "groupSlug": "fluxzero-customer-template-dependencies"
     },
     {
-      "description": "Merge every verified customer template update",
+      "description": "Merge verified non-breaking customer template updates",
       "matchManagers": ["custom.regex"],
       "matchDepNames": [
         "io.fluxzero:fluxzero-bom",
         "io.fluxzero.idp:client",
         "io.fluxzero.tools:fluxzero-maven-plugin"
       ],
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": false
+    },
+    {
+      "description": "Require review for major customer template updates",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "io.fluxzero:fluxzero-bom",
+        "io.fluxzero.idp:client",
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ],
   "customManagers": [
