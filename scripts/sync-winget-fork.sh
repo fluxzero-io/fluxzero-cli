@@ -12,35 +12,17 @@ fail() {
 
 command -v gh >/dev/null 2>&1 || fail "The GitHub CLI is required."
 
-auth_response="$(gh api --include user)"
-oauth_scopes=""
-while IFS=: read -r header_name header_value; do
-  case "$header_name" in
-    [Xx]-[Oo][Aa][Uu][Tt][Hh]-[Ss][Cc][Oo][Pp][Ee][Ss])
-      oauth_scopes="${header_value//$'\r'/}"
-      oauth_scopes="${oauth_scopes#"${oauth_scopes%%[![:space:]]*}"}"
-      break
-      ;;
-  esac
-done <<< "$auth_response"
-[[ -n "$oauth_scopes" ]] || fail \
-  "WINGET_CREATE_GITHUB_TOKEN must be a classic PAT so its public_repo and workflow scopes can be verified."
-
-scope_list=",${oauth_scopes// /},"
-[[ "$scope_list" == *,public_repo,* || "$scope_list" == *,repo,* ]] || fail \
-  "WINGET_CREATE_GITHUB_TOKEN must include the public_repo scope."
-[[ "$scope_list" == *,workflow,* ]] || fail \
-  "WINGET_CREATE_GITHUB_TOKEN must include the workflow scope so upstream workflow changes can be synchronized."
-
 publisher="$(gh api user --jq .login)"
 [[ -n "$publisher" ]] || fail "Could not determine the WinGet publisher account from GH_TOKEN."
 
 fork_repository="$publisher/$fork_repository_name"
-fork_metadata="$(gh api "repos/$fork_repository" --jq '[.parent.full_name, .default_branch] | @tsv')"
-IFS=$'\t' read -r fork_parent fork_branch <<< "$fork_metadata"
+fork_metadata="$(gh api "repos/$fork_repository" --jq '[.parent.full_name, .default_branch, .permissions.push] | @tsv')"
+IFS=$'\t' read -r fork_parent fork_branch can_push <<< "$fork_metadata"
 [[ "$fork_parent" == "$upstream_repository" ]] || fail \
   "$fork_repository must be a fork of $upstream_repository, but its parent is ${fork_parent:-unknown}."
 [[ -n "$fork_branch" ]] || fail "Could not determine the default branch of $fork_repository."
+[[ "$can_push" == "true" ]] || fail \
+  "WINGET_FORK_SYNC_GITHUB_TOKEN must grant Contents read/write access to $fork_repository."
 
 upstream_branch="$(gh api "repos/$upstream_repository" --jq .default_branch)"
 [[ -n "$upstream_branch" ]] || fail "Could not determine the default branch of $upstream_repository."
@@ -79,7 +61,7 @@ if ! sync_output="$(gh api \
   "repos/$fork_repository/merge-upstream" \
   -f "branch=$fork_branch" 2>&1)"; then
   echo "$sync_output" >&2
-  fail "GitHub could not fast-forward the WinGet publisher fork. Ensure WINGET_CREATE_GITHUB_TOKEN is a classic PAT with public_repo and workflow scopes."
+  fail "GitHub could not fast-forward the WinGet publisher fork. Ensure WINGET_FORK_SYNC_GITHUB_TOKEN is a fine-grained PAT limited to $fork_repository with Contents read/write access."
 fi
 
 for retry_delay in 0 1 2 3 4; do
