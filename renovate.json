@@ -20,6 +20,51 @@
       "description": "Group all major updates into a single PR",
       "matchUpdateTypes": ["major"],
       "groupName": "all major dependencies"
+    },
+    {
+      "description": "Keep all embedded customer templates on one Fluxzero dependency set",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "io.fluxzero:fluxzero-bom",
+        "io.fluxzero.idp:client",
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "groupName": "Fluxzero customer template dependencies",
+      "groupSlug": "fluxzero-customer-template-dependencies"
+    },
+    {
+      "description": "Merge verified non-breaking customer template updates",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "io.fluxzero:fluxzero-bom",
+        "io.fluxzero.idp:client",
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false
+    },
+    {
+      "description": "Require review for major customer template updates",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "io.fluxzero:fluxzero-bom",
+        "io.fluxzero.idp:client",
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update centrally injected Fluxzero customer template versions",
+      "fileMatch": ["/^templates\\/template-versions\\.properties$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:\\w+)=(?<currentValue>\\S+)"
+      ]
     }
   ],
   "gradle": {
