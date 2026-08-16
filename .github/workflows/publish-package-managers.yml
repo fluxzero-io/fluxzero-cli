@@ -135,15 +135,28 @@ jobs:
     name: Submit WinGet manifest
     runs-on: windows-2022
     timeout-minutes: 10
-    env:
-      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
     steps:
-      - name: Require WinGet publisher token
+      - name: Check out CLI
+        uses: actions/checkout@v6
+
+      - name: Require WinGet publisher tokens
         shell: pwsh
+        env:
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+          WINGET_FORK_SYNC_GITHUB_TOKEN: ${{ secrets.WINGET_FORK_SYNC_GITHUB_TOKEN }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
             throw "WINGET_CREATE_GITHUB_TOKEN is required to submit Fluxzero releases to microsoft/winget-pkgs."
           }
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_FORK_SYNC_GITHUB_TOKEN)) {
+            throw "WINGET_FORK_SYNC_GITHUB_TOKEN is required to synchronize the WinGet publisher fork."
+          }
+
+      - name: Synchronize WinGet publisher fork
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_FORK_SYNC_GITHUB_TOKEN }}
+        run: scripts/sync-winget-fork.sh
 
       - name: Set up WingetCreate runtime
         uses: actions/setup-dotnet@v5
@@ -158,6 +171,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: |
           $manifestUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/f/Fluxzero/FluxzeroCLI/$env:VERSION/Fluxzero.FluxzeroCLI.yaml"

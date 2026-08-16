@@ -89,6 +89,9 @@ jobs:
           "cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar"
           "$RUNNER_TEMP/fluxzero-plugin-repository"
 
+      - name: Test WinGet fork synchronization
+        run: scripts/test-sync-winget-fork.sh
+
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v6
         with:

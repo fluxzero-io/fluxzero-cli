@@ -761,9 +761,16 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
   - Installation and uninstallation scripts
 
 Package-manager publishing requires the organization secrets `FLUXZERO_BOT_APP_ID` and
-`FLUXZERO_BOT_PRIVATE_KEY` for the `fluxzero-io/homebrew-tap` repository, plus a
-`WINGET_CREATE_GITHUB_TOKEN` classic PAT with `public_repo` scope from the account that has accepted
-Microsoft's contributor license agreement.
+`FLUXZERO_BOT_PRIVATE_KEY` for the `fluxzero-io/homebrew-tap` repository. WinGet publishing uses two tokens from the
+account that has accepted Microsoft's contributor license agreement:
+
+- `WINGET_CREATE_GITHUB_TOKEN`: a classic PAT with only the `public_repo` scope for WingetCreate submissions to
+  `microsoft/winget-pkgs`.
+- `WINGET_FORK_SYNC_GITHUB_TOKEN`: a fine-grained PAT limited to that account's `winget-pkgs` fork, with only
+  `Contents: Read and write`, for synchronizing the fork before WingetCreate runs.
+
+Keeping these tokens separate avoids granting a classic PAT the broad `repo` scope that GitHub automatically requires
+when its `workflow` scope is selected.
 
 ## License
 
