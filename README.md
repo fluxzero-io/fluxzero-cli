@@ -762,8 +762,9 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 
 Package-manager publishing requires the organization secrets `FLUXZERO_BOT_APP_ID` and
 `FLUXZERO_BOT_PRIVATE_KEY` for the `fluxzero-io/homebrew-tap` repository, plus a
-`WINGET_CREATE_GITHUB_TOKEN` classic PAT with `public_repo` scope from the account that has accepted
-Microsoft's contributor license agreement.
+`WINGET_CREATE_GITHUB_TOKEN` classic PAT with `public_repo` and `workflow` scopes from the account that has accepted
+Microsoft's contributor license agreement. The `workflow` scope lets the release synchronize that account's
+`winget-pkgs` fork even when upstream commits change GitHub Actions workflows.
 
 ## License
 

@@ -138,12 +138,21 @@ jobs:
     env:
       WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
     steps:
+      - name: Check out CLI
+        uses: actions/checkout@v6
+
       - name: Require WinGet publisher token
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
             throw "WINGET_CREATE_GITHUB_TOKEN is required to submit Fluxzero releases to microsoft/winget-pkgs."
           }
+
+      - name: Synchronize WinGet publisher fork
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+        run: scripts/sync-winget-fork.sh
 
       - name: Set up WingetCreate runtime
         uses: actions/setup-dotnet@v5
