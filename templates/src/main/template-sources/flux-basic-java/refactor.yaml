@@ -32,7 +32,7 @@ operations:
 
   - type: replace
     files: ["pom.xml"]
-    find: "<name>Flux Basic Java</name>"
+    find: "<name>Fluxzero Basic Java</name>"
     replace: "<name>${projectName}</name>"
 
   - type: replace
