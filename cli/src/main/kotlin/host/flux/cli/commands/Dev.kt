@@ -29,7 +29,7 @@ class Dev(
             "Run `fz dev config` to print the version-aligned configuration reference."
 
     private val action by argument(
-        help = "Action: start (default), config, list, attach, status, logs, or stop."
+        help = "Action: start (default), restart, config, list, attach, status, logs, or stop."
     ).optional()
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
@@ -107,7 +107,8 @@ class Dev(
     private val errors by option("--errors", help = "Show only warning and error log lines.").flag(default = false)
     private val json by option("--json", help = "Print machine-readable status or environment-list JSON.")
         .flag(default = false)
-    private val force by option("--force", help = "Force termination for the stop action.").flag(default = false)
+    private val force by option("--force", help = "Force termination for the stop or restart action.")
+        .flag(default = false)
     private val all by option("--all", help = "Apply the stop action to all registered dev environments.")
         .flag(default = false)
     private val idleTimeout by option(
@@ -118,15 +119,16 @@ class Dev(
     override fun run() {
         var root = projectDirectory.toAbsolutePath().normalize()
         val selectedAction = action ?: "start"
-        if (selectedAction !in setOf("start", "config", "list", "attach", "status", "logs", "stop")) {
+        if (selectedAction !in setOf("start", "restart", "config", "list", "attach", "status", "logs", "stop")) {
             throw UsageError(
-                "Unknown dev action '$selectedAction'. Expected start, config, list, attach, status, logs, or stop."
+                "Unknown dev action '$selectedAction'. Expected start, restart, config, list, attach, status, logs, " +
+                    "or stop."
             )
         }
         if (all && selectedAction != "stop") {
             throw UsageError("--all is only supported by fz dev stop")
         }
-        if (selectedAction == "start" && !isBuildProject(root)) {
+        if (selectedAction in setOf("start", "restart") && !isBuildProject(root)) {
             root = try {
                 projectInitializer.initialize(root)
             } catch (e: Exception) {
@@ -140,6 +142,25 @@ class Dev(
                 DevLaunchRequest(root, devServerVersion, DevLaunchTarget.CONFIG)
             )
             if (exitCode != 0) throw ProgramResult(exitCode)
+            return
+        }
+        if (selectedAction == "restart") {
+            val stopArguments = buildList {
+                add("stop")
+                addOption("--project-dir", root.toString())
+                addFlag("--force", force)
+            }
+            val stopExitCode = launcher.launch(
+                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.CONTROL, stopArguments)
+            )
+            if (stopExitCode != 0) throw ProgramResult(stopExitCode)
+
+            val restartExitCode = launcher.launch(
+                DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, startArguments(root), detached = true)
+            )
+            if (restartExitCode != 0 && restartExitCode != 130 && restartExitCode != 143) {
+                throw ProgramResult(restartExitCode)
+            }
             return
         }
         if (selectedAction != "start") {
@@ -159,38 +180,39 @@ class Dev(
             if (exitCode != 0) throw ProgramResult(exitCode)
             return
         }
-        val arguments = buildList {
-            addOption("--project-dir", root.toString())
-            addOption("--main-class", mainClass)
-            addOption("--application-name", applicationName)
-            applications.forEach { addOption("--app", it) }
-            addOption("--profile", profile)
-            addOption("--environment", environment)
-            addOption("--port", port?.toString())
-            addOption("--idp", if (noIdp) "external" else idp)
-            addOption("--namespace", namespace)
-            addFlag("--no-watch", noWatch)
-            addFlag("--no-compile-on-start", noCompileOnStart)
-            addFlag("--no-tests", noTests)
-            addFlag("--fast-compiler", fastCompiler)
-            addOption("--startup-timeout-ms", startupTimeout?.toString())
-            addOption("--graceful-shutdown-timeout-ms", shutdownTimeout?.toString())
-            addOption("--debounce-ms", debounce?.toString())
-            addOption("--idle-timeout", idleTimeout)
-            addOption("--frontend-command", frontendCommand)
-            addOption("--frontend-directory", frontendDirectory)
-            addOption("--frontend-setup-command", frontendSetupCommand)
-            addOption("--frontend-url", frontendUrl)
-            addFlag("--no-frontend", noFrontend)
-            backendPaths.forEach { addOption("--backend-path", it) }
-            appArgs.forEach { addOption("--app-arg", it) }
-        }
         val exitCode = launcher.launch(
-            DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, arguments, background)
+            DevLaunchRequest(root, devServerVersion, DevLaunchTarget.SERVER, startArguments(root), background)
         )
         if (exitCode != 0 && exitCode != 130 && exitCode != 143) {
             throw ProgramResult(exitCode)
         }
+    }
+
+    private fun startArguments(root: Path): List<String> = buildList {
+        addOption("--project-dir", root.toString())
+        addOption("--main-class", mainClass)
+        addOption("--application-name", applicationName)
+        applications.forEach { addOption("--app", it) }
+        addOption("--profile", profile)
+        addOption("--environment", environment)
+        addOption("--port", port?.toString())
+        addOption("--idp", if (noIdp) "external" else idp)
+        addOption("--namespace", namespace)
+        addFlag("--no-watch", noWatch)
+        addFlag("--no-compile-on-start", noCompileOnStart)
+        addFlag("--no-tests", noTests)
+        addFlag("--fast-compiler", fastCompiler)
+        addOption("--startup-timeout-ms", startupTimeout?.toString())
+        addOption("--graceful-shutdown-timeout-ms", shutdownTimeout?.toString())
+        addOption("--debounce-ms", debounce?.toString())
+        addOption("--idle-timeout", idleTimeout)
+        addOption("--frontend-command", frontendCommand)
+        addOption("--frontend-directory", frontendDirectory)
+        addOption("--frontend-setup-command", frontendSetupCommand)
+        addOption("--frontend-url", frontendUrl)
+        addFlag("--no-frontend", noFrontend)
+        backendPaths.forEach { addOption("--backend-path", it) }
+        appArgs.forEach { addOption("--app-arg", it) }
     }
 
     private fun MutableList<String>.addFlag(name: String, enabled: Boolean) {

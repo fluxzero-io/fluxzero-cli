@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dev environment restart**: `fz dev restart` fully stops and reinitializes the project environment, waits for the
+  fresh runtime and applications to become ready, reruns startup commands, and leaves the replacement running in the
+  background.
 - **Dev project configuration**: `fz dev config` prints the version-aligned `.fluxzero/dev.yaml` reference directly
   from the current compatible dev server, and `fz dev --help` points humans and coding agents to the command.
 
