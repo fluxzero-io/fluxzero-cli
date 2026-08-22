@@ -201,6 +201,18 @@ jobs:
           trap cleanup_dev_smoke EXIT
           "$CLI" dev --project-dir dev-smoke --background --no-compile-on-start --no-tests --no-frontend
           "$CLI" dev status --project-dir dev-smoke
+          before_session="$(sed -nE 's/.*"sessionId"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' \
+            dev-smoke/.fluxzero/dev/session.json | head -1)"
+          test -n "$before_session"
+          "$CLI" dev restart --project-dir dev-smoke --no-compile-on-start --no-tests --no-frontend
+          "$CLI" dev status --project-dir dev-smoke
+          after_session="$(sed -nE 's/.*"sessionId"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' \
+            dev-smoke/.fluxzero/dev/session.json | head -1)"
+          test -n "$after_session"
+          if [[ "$before_session" == "$after_session" ]]; then
+            echo "ERROR: fz dev restart did not replace the dev session"
+            exit 1
+          fi
           "$CLI" dev stop --project-dir dev-smoke --force
           trap - EXIT
 
