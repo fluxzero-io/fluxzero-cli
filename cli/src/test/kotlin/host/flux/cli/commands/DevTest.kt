@@ -128,6 +128,52 @@ class DevTest {
     }
 
     @Test
+    fun `restart stops the current environment and starts a fresh detached environment`() {
+        mavenProject()
+        val requests = mutableListOf<DevLaunchRequest>()
+        val launcher = DevLauncher { captured -> requests += captured; 0 }
+
+        val result = Dev(launcher).test(
+            listOf(
+                "restart",
+                "--project-dir", projectDirectory.toString(),
+                "--dev-server-version", "1.6.5",
+                "--profile", "dashboard-auditlog",
+                "--port", "4200",
+                "--force"
+            )
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(2, requests.size)
+        assertEquals(DevLaunchTarget.CONTROL, requests[0].target)
+        assertEquals("1.6.5", requests[0].devServerVersion)
+        assertTrue(requests[0].arguments.containsAll(listOf("stop", "--force")))
+        assertEquals(DevLaunchTarget.SERVER, requests[1].target)
+        assertEquals("1.6.5", requests[1].devServerVersion)
+        assertTrue(requests[1].detached)
+        assertTrue(requests[1].arguments.containsAll(listOf("--profile", "dashboard-auditlog", "--port", "4200")))
+    }
+
+    @Test
+    fun `restart does not start a new environment when stopping fails`() {
+        mavenProject()
+        val requests = mutableListOf<DevLaunchRequest>()
+        val launcher = DevLauncher { captured ->
+            requests += captured
+            17
+        }
+
+        val result = Dev(launcher).test(
+            listOf("restart", "--project-dir", projectDirectory.toString())
+        )
+
+        assertEquals(17, result.statusCode)
+        assertEquals(1, requests.size)
+        assertEquals(DevLaunchTarget.CONTROL, requests.single().target)
+    }
+
+    @Test
     fun `rejects start outside a Maven or Gradle project before launching`() {
         var launched = false
         val result = Dev({ launched = true; 0 }, DevProjectInitializer { null }).test(

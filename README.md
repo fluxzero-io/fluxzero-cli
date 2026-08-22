@@ -179,6 +179,7 @@ fz dev status --json
 fz dev logs --follow
 fz dev logs --follow --errors
 fz dev logs --follow --app orders
+fz dev restart
 fz dev stop
 fz dev stop --force
 fz dev stop --all
@@ -189,6 +190,12 @@ fz dev config
 project, applications, browser URL, and whether it is running, unresponsive, or stale. Project-specific control
 commands still use the current project or `--project-dir`.
 `fz dev stop --all` stops every registered environment and removes stale or legacy macOS launchd registrations.
+
+`fz dev restart` performs a complete reinitialization: it stops the current environment and all managed processes,
+starts a fresh in-memory runtime from the current project configuration and any supplied start options, waits for
+readiness, and returns with the new environment running in the background. Startup commands run again against the new
+runtime. If no environment is active, `restart` starts one. For example, use `fz dev restart --profile auditlog` to
+restart with a named configuration profile.
 
 `logs --follow` closes automatically when the environment stops, so it is safe to use as a long-running agent command.
 `fz dev config` prints the complete, valid `.fluxzero/dev.yaml` reference owned by the current compatible dev-server
