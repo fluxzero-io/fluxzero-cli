@@ -472,14 +472,27 @@ class DevTest {
 
     private fun verifyGreenfieldMcpTransition(buildSystem: String) {
         val cliJarValue = System.getenv("FLUXZERO_CLI_E2E_JAR")
+        val cliExecutableValue = System.getenv("FLUXZERO_CLI_E2E_EXECUTABLE")
         val devServerJarValue = System.getenv("FLUXZERO_MCP_E2E_DEV_SERVER_JAR")
         assumeTrue(
-            !cliJarValue.isNullOrBlank() && !devServerJarValue.isNullOrBlank(),
-            "Set FLUXZERO_CLI_E2E_JAR and FLUXZERO_MCP_E2E_DEV_SERVER_JAR to run the process smoke."
+            (!cliJarValue.isNullOrBlank() || !cliExecutableValue.isNullOrBlank()) &&
+                !devServerJarValue.isNullOrBlank(),
+            "Set one of FLUXZERO_CLI_E2E_JAR or FLUXZERO_CLI_E2E_EXECUTABLE, plus " +
+                "FLUXZERO_MCP_E2E_DEV_SERVER_JAR, to run the process smoke."
         )
-        val cliJar = Path.of(requireNotNull(cliJarValue)).toAbsolutePath().normalize()
+        require(cliJarValue.isNullOrBlank() || cliExecutableValue.isNullOrBlank()) {
+            "Set only one CLI process candidate"
+        }
+        val cliCommand = if (!cliExecutableValue.isNullOrBlank()) {
+            val executable = Path.of(cliExecutableValue).toAbsolutePath().normalize()
+            assumeTrue(Files.isExecutable(executable), "FLUXZERO_CLI_E2E_EXECUTABLE must identify an executable CLI.")
+            listOf(executable.toString())
+        } else {
+            val cliJar = Path.of(requireNotNull(cliJarValue)).toAbsolutePath().normalize()
+            assumeTrue(Files.isRegularFile(cliJar), "FLUXZERO_CLI_E2E_JAR must identify a runnable CLI JAR.")
+            listOf(javaExecutable(), "-jar", cliJar.toString())
+        }
         val devServerJar = Path.of(requireNotNull(devServerJarValue)).toAbsolutePath().normalize()
-        assumeTrue(Files.isRegularFile(cliJar), "FLUXZERO_CLI_E2E_JAR must identify a runnable CLI JAR.")
         assumeTrue(
             Files.isRegularFile(devServerJar),
             "FLUXZERO_MCP_E2E_DEV_SERVER_JAR must identify a standalone dev-server JAR."
@@ -489,10 +502,7 @@ class DevTest {
         installE2eDevServer(devServerJar, isolatedHome, devServerVersion)
         Files.list(projectDirectory).use { entries -> assertEquals(0, entries.count()) }
         val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-empty-mcp-", ".stderr")
-        val command = listOf(
-            javaExecutable(),
-            "-Duser.home=$isolatedHome",
-            "-jar", cliJar.toString(),
+        val command = cliCommand + listOf(
             "mcp",
             "--project-dir", projectDirectory.toString(),
             "--dev-server-version", devServerVersion,
@@ -500,7 +510,7 @@ class DevTest {
         )
         var process: Process? = null
         try {
-            process = ProcessBuilder(command)
+            process = processBuilder(command, isolatedHome)
                 .redirectError(stderrFile.toFile())
                 .start()
             val reader = process.inputStream.bufferedReader()
@@ -539,7 +549,7 @@ class DevTest {
                     .none { Files.exists(projectDirectory.resolve(it)) }
             )
 
-            val initOutput = runInit(cliJar, isolatedHome, buildSystem)
+            val initOutput = runInit(cliCommand, isolatedHome, buildSystem)
             val expectedBuildFile = if (buildSystem == "maven") "pom.xml" else "build.gradle.kts"
             assertTrue(Files.isRegularFile(projectDirectory.resolve(expectedBuildFile)), initOutput)
 
@@ -567,7 +577,7 @@ class DevTest {
                 process.destroyForcibly()
                 process.waitFor(5, TimeUnit.SECONDS)
             }
-            stopProcess(cliJar, isolatedHome, devServerVersion, projectDirectory)
+            stopProcess(cliCommand, isolatedHome, devServerVersion, projectDirectory)
             Files.deleteIfExists(stderrFile)
         }
     }
@@ -786,11 +796,8 @@ class DevTest {
         error("Timed out waiting for MCP response $id. stdout=$output stderr=${Files.readString(stderrFile)}")
     }
 
-    private fun runInit(cliJar: Path, isolatedHome: Path, buildSystem: String): String {
-        val init = ProcessBuilder(
-            javaExecutable(),
-            "-Duser.home=$isolatedHome",
-            "-jar", cliJar.toString(),
+    private fun runInit(cliCommand: List<String>, isolatedHome: Path, buildSystem: String): String {
+        val init = processBuilder(cliCommand + listOf(
             "init",
             "--dir", projectDirectory.toString(),
             "--in-place",
@@ -798,7 +805,7 @@ class DevTest {
             "--name", "greenfield-$buildSystem",
             "--package", "com.example.greenfield",
             "--build", buildSystem
-        ).redirectErrorStream(true).start()
+        ), isolatedHome).redirectErrorStream(true).start()
         check(init.waitFor(30, TimeUnit.SECONDS)) {
             init.destroyForcibly()
             "fz init did not complete within 30 seconds"
@@ -822,16 +829,15 @@ class DevTest {
 
     private fun compileState(status: String): String? = COMPILE_STATE.find(status)?.groupValues?.get(1)
 
-    private fun stopProcess(cliJar: Path, isolatedHome: Path, devServerVersion: String, projectDirectory: Path) {
-        val stop = ProcessBuilder(
-            javaExecutable(),
-            "-Duser.home=$isolatedHome",
-            "-jar", cliJar.toString(),
+    private fun stopProcess(
+        cliCommand: List<String>, isolatedHome: Path, devServerVersion: String, projectDirectory: Path
+    ) {
+        val stop = processBuilder(cliCommand + listOf(
             "dev", "stop",
             "--project-dir", projectDirectory.toString(),
             "--dev-server-version", devServerVersion,
             "--force"
-        ).redirectErrorStream(true).start()
+        ), isolatedHome).redirectErrorStream(true).start()
         if (!stop.waitFor(20, TimeUnit.SECONDS)) {
             stop.destroyForcibly()
             stop.waitFor(5, TimeUnit.SECONDS)
@@ -840,6 +846,12 @@ class DevTest {
             "Could not stop empty-directory smoke environment: ${stop.inputStream.bufferedReader().readText()}"
         }
     }
+
+    private fun processBuilder(command: List<String>, isolatedHome: Path): ProcessBuilder =
+        ProcessBuilder(command).also { builder ->
+            builder.environment()["HOME"] = isolatedHome.toString()
+            builder.command().add(1, "-Duser.home=$isolatedHome")
+        }
 
     private fun javaExecutable(): String = Path.of(
         System.getProperty("java.home"),
