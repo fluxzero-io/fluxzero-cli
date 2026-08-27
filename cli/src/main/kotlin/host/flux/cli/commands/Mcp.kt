@@ -20,17 +20,17 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 private const val DEV_SERVER_PREFLIGHT_MAIN = "io.fluxzero.devserver.DevServerPreflightMain"
-private const val EMPTY_DEV_READINESS_ATTEMPTS = 10
-private const val EMPTY_DEV_READINESS_RETRY_MILLIS = 100L
-private const val EMPTY_DEV_READINESS_TIMEOUT_MILLIS = 10_000L
+private const val DEV_MCP_READINESS_ATTEMPTS = 10
+private const val DEV_MCP_READINESS_RETRY_MILLIS = 100L
+private const val DEV_MCP_READINESS_TIMEOUT_MILLIS = 10_000L
 private val SESSION_STATUS = Regex("\"status\"\\s*:\\s*\"([^\"]+)\"")
 private val MCP_STATE = Regex("\"mcp\"\\s*:\\s*\\{[^}]*\"state\"\\s*:\\s*\"([^\"]+)\"")
 
 class Mcp(
     private val launcher: DevLauncher = DevServerLauncher(McpCommandExecutor()),
-    private val readinessAttempts: Int = EMPTY_DEV_READINESS_ATTEMPTS,
-    private val readinessPause: () -> Unit = { Thread.sleep(EMPTY_DEV_READINESS_RETRY_MILLIS) },
-    private val readinessTimeoutMillis: Long = EMPTY_DEV_READINESS_TIMEOUT_MILLIS,
+    private val readinessAttempts: Int = DEV_MCP_READINESS_ATTEMPTS,
+    private val readinessPause: () -> Unit = { Thread.sleep(DEV_MCP_READINESS_RETRY_MILLIS) },
+    private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
     private val monotonicNanos: () -> Long = System::nanoTime
 ) : CliktCommand() {
     init {
@@ -51,23 +51,14 @@ class Mcp(
         "--ensure-dev",
         help = "Start one background dev environment when this project does not already have an active session."
     ).flag(default = false)
-    private val allowEmpty by option(
-        "--allow-empty",
-        help = "Start the ensured dev environment without compiling a project on startup; requires --ensure-dev."
-    ).flag(default = false)
-
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
-        if (allowEmpty && !ensureDev) {
-            throw UsageError("--allow-empty requires --ensure-dev.")
-        }
         if (ensureDev) {
             val startExitCode = launchInterruptibly(
                 DevLaunchRequest(
                     root,
                     devServerVersion,
                     DevLaunchTarget.SERVER,
-                    arguments = if (allowEmpty) listOf("--no-compile-on-start") else emptyList(),
                     detached = true,
                     startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
                 ),
@@ -83,16 +74,14 @@ class Mcp(
             DevLaunchTarget.MCP_STDIO,
             listOf("--project-dir", root.toString())
         )
-        val exitCode = if (allowEmpty) launchEmptyMcpWhenReady(root, mcpRequest) else launchInterruptibly(
-            mcpRequest,
-            "Interrupted while running the Fluxzero MCP adapter."
-        )
+        val exitCode = if (ensureDev) launchMcpWhenReady(root, mcpRequest)
+        else launchInterruptibly(mcpRequest, "Interrupted while running the Fluxzero MCP adapter.")
         check(exitCode == 0 || exitCode == 130 || exitCode == 143) {
             "Fluxzero MCP adapter exited with code $exitCode."
         }
     }
 
-    private fun launchEmptyMcpWhenReady(root: Path, request: DevLaunchRequest): Int {
+    private fun launchMcpWhenReady(root: Path, request: DevLaunchRequest): Int {
         val startedAt = monotonicNanos()
         val timeoutNanos = TimeUnit.MILLISECONDS.toNanos(readinessTimeoutMillis)
         var attemptsMade = 0
@@ -104,7 +93,7 @@ class Mcp(
             attemptsMade++
             lastExitCode = launchInterruptibly(
                 request,
-                "Interrupted while waiting for the empty Fluxzero dev environment to expose MCP."
+                "Interrupted while waiting for the Fluxzero dev environment to expose MCP."
             )
             if (lastExitCode == 0 || lastExitCode == 130 || lastExitCode == 143) return lastExitCode
 
@@ -124,7 +113,7 @@ class Mcp(
             ")."
         }
         throw UsageError(
-            "The empty Fluxzero dev environment started, but its MCP adapter was not ready after " +
+            "The Fluxzero dev environment started, but its MCP adapter was not ready after " +
                 "$attemptsMade launch attempts (last exit code $lastExitCode$retryBound " +
                 "The adapter error output above contains the failure details. Inspect " +
                 "${root.resolve(".fluxzero/dev/bootstrap.log")} and run fz dev status before trying again."
@@ -149,7 +138,7 @@ class Mcp(
         try {
             readinessPause()
         } catch (_: InterruptedException) {
-            interrupted("Interrupted while waiting for the empty Fluxzero dev environment to expose MCP.")
+            interrupted("Interrupted while waiting for the Fluxzero dev environment to expose MCP.")
         }
     }
 
@@ -161,7 +150,7 @@ class Mcp(
 
     private fun ensureNotInterrupted() {
         if (Thread.currentThread().isInterrupted) {
-            throw UsageError("Interrupted while waiting for the empty Fluxzero dev environment to expose MCP.")
+            throw UsageError("Interrupted while waiting for the Fluxzero dev environment to expose MCP.")
         }
     }
 

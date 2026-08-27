@@ -12,6 +12,8 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.BufferedReader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,7 +99,7 @@ class DevTest {
     }
 
     @Test
-    fun `mcp command can ensure one background environment before connecting`() {
+    fun `mcp command can ensure one background environment in an empty workspace before connecting`() {
         val requests = mutableListOf<DevLaunchRequest>()
         val launcher = DevLauncher { captured -> requests += captured; 0 }
         val root = projectDirectory.toAbsolutePath().normalize()
@@ -128,45 +130,7 @@ class DevTest {
     }
 
     @Test
-    fun `mcp command can ensure an empty background environment before connecting`() {
-        val requests = mutableListOf<DevLaunchRequest>()
-        val launcher = DevLauncher { captured -> requests += captured; 0 }
-        val root = projectDirectory.toAbsolutePath().normalize()
-
-        val result = Mcp(launcher).test(
-            listOf(
-                "--project-dir", projectDirectory.toString(),
-                "--dev-server-version", "1-SNAPSHOT",
-                "--ensure-dev",
-                "--allow-empty"
-            )
-        )
-
-        assertEquals(0, result.statusCode)
-        assertEquals(
-            listOf(
-                DevLaunchRequest(
-                    root,
-                    "1-SNAPSHOT",
-                    DevLaunchTarget.SERVER,
-                    arguments = listOf("--no-compile-on-start"),
-                    detached = true,
-                    startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
-                ),
-                DevLaunchRequest(
-                    root,
-                    "1-SNAPSHOT",
-                    DevLaunchTarget.MCP_STDIO,
-                    arguments = listOf("--project-dir", root.toString())
-                )
-            ),
-            requests
-        )
-        assertTrue(requests.none { it.target == DevLaunchTarget.CONTROL })
-    }
-
-    @Test
-    fun `mcp command retries empty environment readiness before starting stdio`() {
+    fun `mcp command retries development MCP readiness before starting stdio`() {
         val sessionDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev"))
         val sessionFile = sessionDirectory.resolve("session.json")
         Files.writeString(
@@ -190,7 +154,7 @@ class DevTest {
         }
 
         val result = Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
         )
 
         assertEquals(0, result.statusCode)
@@ -207,7 +171,7 @@ class DevTest {
     }
 
     @Test
-    fun `mcp command fails when empty environment never becomes ready`() {
+    fun `mcp command fails when development MCP never becomes ready`() {
         val requests = mutableListOf<DevLaunchRequest>()
         var pauses = 0
         val launcher = DevLauncher { captured ->
@@ -216,7 +180,7 @@ class DevTest {
         }
 
         val result = Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
         )
 
         assertEquals(1, result.statusCode)
@@ -230,7 +194,7 @@ class DevTest {
     }
 
     @Test
-    fun `mcp command preserves interruption while waiting for empty environment`() {
+    fun `mcp command preserves interruption while waiting for development MCP`() {
         val requests = mutableListOf<DevLaunchRequest>()
         val launcher = DevLauncher { captured ->
             requests += captured
@@ -243,11 +207,11 @@ class DevTest {
                 readinessAttempts = 3,
                 readinessPause = { throw InterruptedException("test interruption") }
             ).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
 
             assertEquals(1, result.statusCode)
-            assertTrue(result.output.contains("Interrupted while waiting for the empty Fluxzero dev environment to expose MCP"))
+            assertTrue(result.output.contains("Interrupted while waiting for the Fluxzero dev environment to expose MCP"))
             assertTrue(Thread.currentThread().isInterrupted)
             assertEquals(listOf(DevLaunchTarget.SERVER, DevLaunchTarget.MCP_STDIO), requests.map(DevLaunchRequest::target))
         } finally {
@@ -271,7 +235,7 @@ class DevTest {
 
         val failure = assertFailsWith<IllegalStateException> {
             Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
         }
 
@@ -291,7 +255,7 @@ class DevTest {
 
         val failure = assertFailsWith<IllegalStateException> {
             Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
         }
 
@@ -311,7 +275,7 @@ class DevTest {
             }
 
             val result = Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
 
             assertEquals(0, result.statusCode, "exit code $interruptedExitCode")
@@ -331,11 +295,11 @@ class DevTest {
 
         try {
             val result = Mcp(launcher, readinessAttempts = 3, readinessPause = {}).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
 
             assertEquals(1, result.statusCode)
-            assertTrue(result.output.contains("Interrupted while waiting for the empty Fluxzero dev environment to expose MCP"))
+            assertTrue(result.output.contains("Interrupted while waiting for the Fluxzero dev environment to expose MCP"))
             assertTrue(Thread.currentThread().isInterrupted)
             assertEquals(listOf(DevLaunchTarget.SERVER, DevLaunchTarget.MCP_STDIO), requests.map(DevLaunchRequest::target))
         } finally {
@@ -353,7 +317,7 @@ class DevTest {
 
         try {
             val result = Mcp(launcher).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
             )
 
             assertEquals(1, result.statusCode)
@@ -387,7 +351,7 @@ class DevTest {
             readinessTimeoutMillis = 10,
             monotonicNanos = { elapsedNanos }
         ).test(
-            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev", "--allow-empty")
+            listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
         )
 
         assertEquals(1, result.statusCode)
@@ -396,26 +360,6 @@ class DevTest {
         assertTrue(result.output.contains("fz dev status"))
         assertEquals(1, requests.count { it.target == DevLaunchTarget.MCP_STDIO })
         assertEquals(1, pauses)
-    }
-
-    @Test
-    fun `mcp command keeps legacy ensure dev behavior outside empty mode`() {
-        val requests = mutableListOf<DevLaunchRequest>()
-        var pauses = 0
-        val launcher = DevLauncher { captured ->
-            requests += captured
-            if (captured.target == DevLaunchTarget.MCP_STDIO) 1 else 0
-        }
-
-        val failure = assertFailsWith<IllegalStateException> {
-            Mcp(launcher, readinessAttempts = 3, readinessPause = { pauses++ }).test(
-                listOf("--project-dir", projectDirectory.toString(), "--ensure-dev")
-            )
-        }
-
-        assertTrue(failure.message.orEmpty().contains("Fluxzero MCP adapter exited with code 1"))
-        assertEquals(listOf(DevLaunchTarget.SERVER, DevLaunchTarget.MCP_STDIO), requests.map(DevLaunchRequest::target))
-        assertEquals(0, pauses)
     }
 
     @Test
@@ -517,39 +461,42 @@ class DevTest {
     }
 
     @Test
-    fun `mcp command rejects allow empty without ensure dev`() {
-        val requests = mutableListOf<DevLaunchRequest>()
-        val launcher = DevLauncher { captured -> requests += captured; 0 }
-
-        val result = Mcp(launcher).test(
-            listOf("--project-dir", projectDirectory.toString(), "--allow-empty")
-        )
-
-        assertEquals(1, result.statusCode)
-        assertTrue(result.output.contains("--allow-empty requires --ensure-dev"))
-        assertTrue(requests.isEmpty())
+    fun `empty directory MCP process stays connected while Maven project is generated in place`() {
+        verifyGreenfieldMcpTransition("maven")
     }
 
     @Test
-    fun `empty directory MCP process initializes and lists tools end to end`() {
+    fun `empty directory MCP process stays connected while Gradle project is generated in place`() {
+        verifyGreenfieldMcpTransition("gradle")
+    }
+
+    private fun verifyGreenfieldMcpTransition(buildSystem: String) {
         val cliJarValue = System.getenv("FLUXZERO_CLI_E2E_JAR")
-        val devServerVersion = System.getenv("FLUXZERO_MCP_E2E_DEV_SERVER_VERSION")
+        val devServerJarValue = System.getenv("FLUXZERO_MCP_E2E_DEV_SERVER_JAR")
         assumeTrue(
-            !cliJarValue.isNullOrBlank() && !devServerVersion.isNullOrBlank(),
-            "Set FLUXZERO_CLI_E2E_JAR and FLUXZERO_MCP_E2E_DEV_SERVER_VERSION to run the process smoke."
+            !cliJarValue.isNullOrBlank() && !devServerJarValue.isNullOrBlank(),
+            "Set FLUXZERO_CLI_E2E_JAR and FLUXZERO_MCP_E2E_DEV_SERVER_JAR to run the process smoke."
         )
         val cliJar = Path.of(requireNotNull(cliJarValue)).toAbsolutePath().normalize()
+        val devServerJar = Path.of(requireNotNull(devServerJarValue)).toAbsolutePath().normalize()
         assumeTrue(Files.isRegularFile(cliJar), "FLUXZERO_CLI_E2E_JAR must identify a runnable CLI JAR.")
+        assumeTrue(
+            Files.isRegularFile(devServerJar),
+            "FLUXZERO_MCP_E2E_DEV_SERVER_JAR must identify a standalone dev-server JAR."
+        )
+        val devServerVersion = "1.99.0"
+        val isolatedHome = Files.createDirectory(projectDirectory.resolveSibling("${projectDirectory.fileName}-home"))
+        installE2eDevServer(devServerJar, isolatedHome, devServerVersion)
         Files.list(projectDirectory).use { entries -> assertEquals(0, entries.count()) }
         val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-empty-mcp-", ".stderr")
         val command = listOf(
             javaExecutable(),
+            "-Duser.home=$isolatedHome",
             "-jar", cliJar.toString(),
             "mcp",
             "--project-dir", projectDirectory.toString(),
-            "--dev-server-version", requireNotNull(devServerVersion),
-            "--ensure-dev",
-            "--allow-empty"
+            "--dev-server-version", devServerVersion,
+            "--ensure-dev"
         )
         var process: Process? = null
         try {
@@ -574,11 +521,45 @@ class DevTest {
             val tools = readProtocolResponse(process, reader, 2, stderrFile)
             assertTrue(tools.contains("\"tools\":["), tools)
             assertTrue(tools.contains("\"name\":\"get_status\""), tools)
+
+            writer.write(
+                """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"""
+            )
+            writer.newLine()
+            writer.flush()
+            val initialStatus = readProtocolResponse(process, reader, 3, stderrFile)
+            assertTrue(initialStatus.contains("\"status\":\"running\""), initialStatus)
+            assertTrue(initialStatus.contains("\"mcp\":{\"name\":\"mcp\",\"state\":\"running\""), initialStatus)
+            val sessionId = requireNotNull(SESSION_ID.find(initialStatus)?.groupValues?.get(1)) {
+                "get_status did not expose a session id: $initialStatus"
+            }
             assertTrue(Files.isDirectory(projectDirectory.resolve(".fluxzero/dev")))
             assertTrue(
                 listOf("pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts")
                     .none { Files.exists(projectDirectory.resolve(it)) }
             )
+
+            val initOutput = runInit(cliJar, isolatedHome, buildSystem)
+            val expectedBuildFile = if (buildSystem == "maven") "pom.xml" else "build.gradle.kts"
+            assertTrue(Files.isRegularFile(projectDirectory.resolve(expectedBuildFile)), initOutput)
+
+            var latestStatus = initialStatus
+            val compileDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2)
+            var requestId = 4
+            while (System.nanoTime() < compileDeadline && compileState(latestStatus) != "succeeded") {
+                writer.write(
+                    """{"jsonrpc":"2.0","id":$requestId,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"""
+                )
+                writer.newLine()
+                writer.flush()
+                latestStatus = readProtocolResponse(process, reader, requestId++, stderrFile)
+                if (compileState(latestStatus) == "failed") break
+                Thread.sleep(100)
+            }
+            assertEquals("succeeded", compileState(latestStatus),
+                         "Generated $buildSystem project did not compile. init=$initOutput status=$latestStatus " +
+                             "stderr=${Files.readString(stderrFile)}")
+            assertTrue(latestStatus.contains("\"sessionId\":\"$sessionId\""), latestStatus)
         } finally {
             process?.outputStream?.runCatching { close() }
             process?.destroy()
@@ -586,7 +567,7 @@ class DevTest {
                 process.destroyForcibly()
                 process.waitFor(5, TimeUnit.SECONDS)
             }
-            stopProcess(cliJar, requireNotNull(devServerVersion), projectDirectory)
+            stopProcess(cliJar, isolatedHome, devServerVersion, projectDirectory)
             Files.deleteIfExists(stderrFile)
         }
     }
@@ -805,9 +786,46 @@ class DevTest {
         error("Timed out waiting for MCP response $id. stdout=$output stderr=${Files.readString(stderrFile)}")
     }
 
-    private fun stopProcess(cliJar: Path, devServerVersion: String, projectDirectory: Path) {
+    private fun runInit(cliJar: Path, isolatedHome: Path, buildSystem: String): String {
+        val init = ProcessBuilder(
+            javaExecutable(),
+            "-Duser.home=$isolatedHome",
+            "-jar", cliJar.toString(),
+            "init",
+            "--dir", projectDirectory.toString(),
+            "--in-place",
+            "--template", "flux-basic-java",
+            "--name", "greenfield-$buildSystem",
+            "--package", "com.example.greenfield",
+            "--build", buildSystem
+        ).redirectErrorStream(true).start()
+        check(init.waitFor(30, TimeUnit.SECONDS)) {
+            init.destroyForcibly()
+            "fz init did not complete within 30 seconds"
+        }
+        val output = init.inputStream.bufferedReader().readText()
+        check(init.exitValue() == 0) { "fz init failed: $output" }
+        return output
+    }
+
+    private fun installE2eDevServer(source: Path, isolatedHome: Path, version: String) {
+        val versionDirectory = isolatedHome.resolve(".fluxzero/cache/dev-server/$version")
+        Files.createDirectories(versionDirectory)
+        val artifact = versionDirectory.resolve("fluxzero-dev-server-$version-standalone.jar")
+        Files.copy(source, artifact, StandardCopyOption.REPLACE_EXISTING)
+        Files.writeString(
+            artifact.resolveSibling("${artifact.fileName}.sha256"),
+            MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(artifact))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) } + "\n"
+        )
+    }
+
+    private fun compileState(status: String): String? = COMPILE_STATE.find(status)?.groupValues?.get(1)
+
+    private fun stopProcess(cliJar: Path, isolatedHome: Path, devServerVersion: String, projectDirectory: Path) {
         val stop = ProcessBuilder(
             javaExecutable(),
+            "-Duser.home=$isolatedHome",
             "-jar", cliJar.toString(),
             "dev", "stop",
             "--project-dir", projectDirectory.toString(),
@@ -828,4 +846,11 @@ class DevTest {
         "bin",
         if (System.getProperty("os.name").lowercase().contains("windows")) "java.exe" else "java"
     ).toString()
+
+    companion object {
+        private val SESSION_ID = Regex("\\\"sessionId\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
+        private val COMPILE_STATE = Regex(
+            "\\\"compile\\\"\\s*:\\s*\\{[^}]*\\\"state\\\"\\s*:\\s*\\\"([^\\\"]+)\\\""
+        )
+    }
 }
