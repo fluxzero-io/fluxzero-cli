@@ -25,6 +25,11 @@ operations:
     find: "com.example.app"
     replace: "${package}"
 
+  - type: replace
+    files: [ ".run/*.xml" ]
+    find: "flux-basic-kotlin"
+    replace: "${artifactId}"
+
   # Replace imports in Kotlin files
   - type: replace
     files: ["**/*.kt"]

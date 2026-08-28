@@ -12,6 +12,11 @@ operations:
     find: "com.example.app"
     replace: "${package}"
 
+  - type: replace
+    files: [ ".run/*.xml" ]
+    find: "flux-basic-java"
+    replace: "${artifactId}"
+
   # Replace imports in Java files
   - type: replace
     files: ["**/*.java"]

@@ -153,6 +153,34 @@ class InitTest {
     }
 
     @Test
+    fun `real templates use the generated artifact id as IntelliJ module`() {
+        listOf(
+            "flux-basic-java" to "generated-java",
+            "flux-basic-kotlin" to "generated-kotlin"
+        ).forEach { (template, artifactId) ->
+            val target = tempDir.resolve(template)
+            Files.createDirectories(target)
+
+            val result = Init().test(
+                listOf(
+                    "--template", template,
+                    "--name", artifactId,
+                    "--package", "com.example.app",
+                    "--artifact-id", artifactId,
+                    "--build", "maven",
+                    "--dir", target.toString(),
+                    "--in-place"
+                )
+            )
+
+            Assertions.assertEquals(0, result.statusCode, result.stderr)
+            val runConfiguration = Files.readString(target.resolve(".run/All tests.run.xml"))
+            Assertions.assertTrue(runConfiguration.contains("<module name=\"$artifactId\" />"))
+            Assertions.assertFalse(runConfiguration.contains("<module name=\"$template\" />"))
+        }
+    }
+
+    @Test
     fun `prompts for name when not provided`() {
         every { mockPrompt.readLine(match { it.contains("project name") }) } returns "prompted-name"
         every { mockPrompt.readLine(match { it.contains("Enter package") }) } returns "com.test.app"
