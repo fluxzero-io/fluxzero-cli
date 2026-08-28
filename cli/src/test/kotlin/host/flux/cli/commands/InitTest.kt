@@ -10,10 +10,16 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.test.Test
 
 class InitTest {
+
+    @TempDir
+    lateinit var tempDir: Path
 
     private lateinit var mockPrompt: Prompt
     private lateinit var mockInitService: ScaffoldService
@@ -58,6 +64,92 @@ class InitTest {
 
         verify(exactly = 1) { mockInitService.scaffoldProject(any()) }
         Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
+    }
+
+    @Test
+    fun `passes explicit in-place generation to the scaffold service`() {
+        initCommand = Init(
+            scaffoldService = mockInitService,
+            prompt = mockPrompt
+        )
+
+        val result = initCommand.test(
+            listOf(
+                "--template", "webapp",
+                "--name", "valid_name",
+                "--package", "com.test.myapp",
+                "--build", "maven",
+                "--dir", Paths.get("").toAbsolutePath().toString(),
+                "--in-place"
+            )
+        )
+
+        verify(exactly = 1) {
+            mockInitService.scaffoldProject(match { it.inPlace })
+        }
+        Assertions.assertTrue(result.stdout.contains("Project initialized successfully"))
+    }
+
+    @Test
+    fun `help distinguishes parent and in-place targets`() {
+        val result = Init(
+            scaffoldService = mockInitService,
+            prompt = mockPrompt
+        ).test("--help")
+
+        Assertions.assertEquals(0, result.statusCode)
+        Assertions.assertTrue(result.stdout.contains("--in-place"))
+        Assertions.assertTrue(result.stdout.contains("Parent directory for the named project"))
+        Assertions.assertTrue(result.stdout.contains("Generate directly in --dir"))
+    }
+
+    @Test
+    fun `named child generation remains the default`() {
+        initCommand = Init(
+            scaffoldService = mockInitService,
+            prompt = mockPrompt
+        )
+
+        initCommand.test(
+            listOf(
+                "--template", "webapp",
+                "--name", "valid_name",
+                "--package", "com.test.myapp",
+                "--build", "maven"
+            )
+        )
+
+        verify(exactly = 1) {
+            mockInitService.scaffoldProject(match { !it.inPlace })
+        }
+    }
+
+    @Test
+    fun `real template generates in place alongside managed dev state`() {
+        val session = tempDir.resolve(".fluxzero/dev/session.json")
+        Files.createDirectories(session.parent)
+        Files.writeString(session, "{\"status\":\"starting\"}")
+
+        val result = Init().test(
+            listOf(
+                "--template", "flux-basic-java",
+                "--name", "Example App",
+                "--package", "com.example.app",
+                "--group-id", "com.example",
+                "--artifact-id", "example-app",
+                "--description", "Test application",
+                "--build", "maven",
+                "--dir", tempDir.toString(),
+                "--in-place"
+            )
+        )
+
+        Assertions.assertEquals(0, result.statusCode, result.stderr)
+        Assertions.assertTrue(Files.isRegularFile(tempDir.resolve("pom.xml")))
+        Assertions.assertTrue(Files.isExecutable(tempDir.resolve("mvnw")))
+        Assertions.assertTrue(Files.isRegularFile(tempDir.resolve(".fluxzero/dev.yaml")))
+        Assertions.assertEquals("{\"status\":\"starting\"}", Files.readString(session))
+        Assertions.assertTrue(result.stdout.contains(tempDir.toAbsolutePath().toString()))
     }
 
     @Test

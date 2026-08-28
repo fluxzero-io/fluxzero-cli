@@ -37,67 +37,95 @@ class ScaffoldService(
             
             // Determine output directory
             val baseDir = request.outputDir?.let { Paths.get(it) } ?: Paths.get("")
-            val outputDir = if (request.useOutputDirectory) baseDir else baseDir.resolve(normalizedName)
-            
-            // Check if directory already exists
-            if (Files.exists(outputDir) && Files.list(outputDir).use { it.findFirst().isPresent }) {
-                return ScaffoldResult(
-                    success = false,
-                    message = "Directory '${outputDir.absolute()}' already exists and is not empty",
-                    error = "Directory exists"
-                )
-            }
-            
-            // Extract template
-            templateService.extractTemplate(request.template, outputDir)
-            
-            // Apply template refactoring
-            val variables = TemplateVariables(
-                packageName = request.packageName,
-                projectName = normalizedName,
-                groupId = request.groupId,
-                artifactId = request.artifactId,
-                applicationId = request.applicationId,
-                description = request.description,
-                buildSystem = request.buildSystem
-            )
-            val refactorResult = templateRefactor.refactorTemplate(
-                templateRoot = outputDir,
-                variables = variables
-            )
-            
-            // If refactoring failed, return the error
-            if (!refactorResult.success) {
-                return ScaffoldResult(
-                    success = false,
-                    message = refactorResult.message,
-                    error = refactorResult.error
-                )
-            }
+            val outputDir = if (request.inPlace) baseDir else baseDir.resolve(normalizedName)
 
-            ensureBuildWrappersExecutable(outputDir)
-            
-            // Initialize Git if requested
-            if (request.initGit) {
-                initializeGit(outputDir)
-            }
-            
-            val finalMessage = buildString {
-                append("Successfully generated your project at '${outputDir.absolute()}'")
-                if (refactorResult.warnings.isNotEmpty()) {
-                    append("\n\nWarnings during template refactoring:")
-                    refactorResult.warnings.forEach { warning ->
-                        append("\n- $warning")
+            val targetLock = if (request.inPlace) InPlaceScaffoldPublisher.acquireTargetLock(outputDir) else null
+            try {
+                // Check under the in-place lock; publish performs the same check again
+                // immediately before moving any staged content.
+                if (Files.exists(outputDir) && !isAvailableTarget(outputDir, request.inPlace)) {
+                    return ScaffoldResult(
+                        success = false,
+                        message = if (request.inPlace) {
+                            "Directory '${outputDir.absolute()}' contains files other than managed .fluxzero/dev state"
+                        } else {
+                            "Directory '${outputDir.absolute()}' already exists and is not empty"
+                        },
+                        error = "Directory exists"
+                    )
+                }
+
+                val templateRoot = if (request.inPlace) {
+                    InPlaceScaffoldPublisher.createStagingDirectory(outputDir)
+                } else {
+                    outputDir
+                }
+                try {
+                    // Extract and refactor away from an active workspace so failures cannot
+                    // expose partial project files or mutate managed development state.
+                    templateService.extractTemplate(request.template, templateRoot)
+                    if (request.inPlace) {
+                        InPlaceScaffoldPublisher.validateStagedTemplate(templateRoot)
+                    }
+
+                    val variables = TemplateVariables(
+                        packageName = request.packageName,
+                        projectName = normalizedName,
+                        groupId = request.groupId,
+                        artifactId = request.artifactId,
+                        applicationId = request.applicationId,
+                        description = request.description,
+                        buildSystem = request.buildSystem
+                    )
+                    val refactorResult = templateRefactor.refactorTemplate(
+                        templateRoot = templateRoot,
+                        variables = variables
+                    )
+
+                    if (!refactorResult.success) {
+                        return ScaffoldResult(
+                            success = false,
+                            message = refactorResult.message,
+                            error = refactorResult.error
+                        )
+                    }
+
+                    if (request.inPlace) {
+                        InPlaceScaffoldPublisher.validateStagedTemplate(templateRoot)
+                    }
+                    ensureBuildWrappersExecutable(templateRoot)
+
+                    if (request.inPlace) {
+                        InPlaceScaffoldPublisher.publish(templateRoot, outputDir)
+                    }
+
+                    if (request.initGit) {
+                        initializeGit(outputDir)
+                    }
+
+                    val finalMessage = buildString {
+                        append("Successfully generated your project at '${outputDir.absolute()}'")
+                        if (refactorResult.warnings.isNotEmpty()) {
+                            append("\n\nWarnings during template refactoring:")
+                            refactorResult.warnings.forEach { warning ->
+                                append("\n- $warning")
+                            }
+                        }
+                    }
+
+                    ScaffoldResult(
+                        success = true,
+                        message = finalMessage,
+                        outputPath = outputDir.absolute().toString()
+                    )
+                } finally {
+                    if (request.inPlace) {
+                        InPlaceScaffoldPublisher.deleteStagingDirectory(templateRoot)
                     }
                 }
+            } finally {
+                targetLock?.close()
             }
-            
-            ScaffoldResult(
-                success = true,
-                message = finalMessage,
-                outputPath = outputDir.absolute().toString()
-            )
-            
         } catch (e: Exception) {
             ScaffoldResult(
                 success = false,
@@ -105,6 +133,12 @@ class ScaffoldService(
                 error = e.message
             )
         }
+    }
+
+    private fun isAvailableTarget(outputDir: Path, inPlace: Boolean): Boolean {
+        if (inPlace) return InPlaceScaffoldPublisher.isAvailableTarget(outputDir)
+        if (!Files.isDirectory(outputDir) || Files.isSymbolicLink(outputDir)) return false
+        return Files.list(outputDir).use { children -> children.findFirst().isEmpty }
     }
 
     private fun ensureBuildWrappersExecutable(outputDir: Path) {
@@ -136,7 +170,8 @@ class ScaffoldService(
         val tempDir = Files.createTempDirectory("flux-scaffold-")
         
         val modifiedRequest = request.copy(
-            outputDir = tempDir.toString()
+            outputDir = tempDir.toString(),
+            inPlace = false
         )
         
         return scaffoldProject(modifiedRequest)

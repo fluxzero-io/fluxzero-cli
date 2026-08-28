@@ -3,9 +3,7 @@ package host.flux.templates.services
 import host.flux.templates.models.TemplateInfo
 import java.io.FileNotFoundException
 import java.io.InputStream
-import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipInputStream
 
 class ClasspathTemplateService(private val resourceRoot: String = "/templates") : TemplateService {
 
@@ -21,35 +19,15 @@ class ClasspathTemplateService(private val resourceRoot: String = "/templates") 
     }
 
     override fun extractTemplate(templateName: String, targetDir: Path) {
-        val zipStream: InputStream = openZipStream(templateName, targetDir)
-        extractZip(zipStream, targetDir)
+        val zipStream: InputStream = openZipStream(templateName)
+        ZipTemplateExtractor.extract(zipStream, targetDir)
     }
 
-    private fun extractZip(zipStream: InputStream, targetDir: Path) {
-        ZipInputStream(zipStream).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val outPath = targetDir.resolve(entry.name).normalize()
-
-                if (entry.isDirectory) {
-                    Files.createDirectories(outPath)
-                } else {
-                    Files.createDirectories(outPath.parent)
-                    Files.newOutputStream(outPath).use { out -> zip.copyTo(out) }
-                }
-
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
-        }
-    }
-
-    private fun openZipStream(templateName: String, targetDir: Path): InputStream {
+    private fun openZipStream(templateName: String): InputStream {
         val resourcePath = "$resourceRoot/$templateName.zip"
         val zipStream: InputStream = this::class.java.getResourceAsStream(resourcePath)
             ?: throw FileNotFoundException("Template '$templateName' not found in classpath at $resourcePath")
 
-        Files.createDirectories(targetDir)
         return zipStream
     }
 

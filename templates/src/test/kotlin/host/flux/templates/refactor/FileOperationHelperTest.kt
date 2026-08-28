@@ -62,6 +62,24 @@ class FileOperationHelperTest {
     }
 
     @Test
+    fun `resolveWithinRoot accepts a nested relative operation path`() {
+        assertEquals(
+            tempDir.resolve("src/main/java").toAbsolutePath().normalize(),
+            FileOperationHelper.resolveWithinRoot(tempDir, "src/main/java")
+        )
+    }
+
+    @Test
+    fun `resolveWithinRoot rejects parent traversal and absolute paths`() {
+        assertFailsWith<IllegalArgumentException> {
+            FileOperationHelper.resolveWithinRoot(tempDir, "../outside.txt")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            FileOperationHelper.resolveWithinRoot(tempDir, tempDir.parent.resolve("outside.txt").toString())
+        }
+    }
+
+    @Test
     fun `replaceInFile should replace content correctly`() {
         val testFile = tempDir.resolve("test.txt")
         Files.writeString(testFile, "Hello world, this is a test world!")

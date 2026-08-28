@@ -55,7 +55,7 @@ class DevProjectInitializerTest {
         assertEquals(directory.toAbsolutePath(), initializer.initialize(directory))
         verify {
             service.scaffoldProject(match {
-                it.useOutputDirectory && it.outputDir == directory.toString() && it.name == "example"
+                it.inPlace && it.outputDir == directory.toString() && it.name == "example"
             })
         }
     }
@@ -73,7 +73,7 @@ class DevProjectInitializerTest {
         )
 
         assertEquals(generated, initializer.initialize(directory))
-        verify { service.scaffoldProject(match { !it.useOutputDirectory && it.name == "example" }) }
+        verify { service.scaffoldProject(match { !it.inPlace && it.name == "example" }) }
     }
 
     private class QueuePrompt(vararg answers: String) : Prompt {
