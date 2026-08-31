@@ -174,6 +174,32 @@ jobs:
           WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: |
+          function Assert-WinGetRuntimeDependency([string]$prUrl) {
+            $pr = gh pr view $prUrl `
+              --repo microsoft/winget-pkgs `
+              --json headRepositoryOwner,headRepository,headRefName | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not inspect submitted WinGet pull request $prUrl."
+            }
+
+            $headRepository = "$($pr.headRepositoryOwner.login)/$($pr.headRepository.name)"
+            $manifestPath = "manifests/f/Fluxzero/FluxzeroCLI/$env:VERSION/Fluxzero.FluxzeroCLI.installer.yaml"
+            $encodedContent = gh api `
+              "repos/$headRepository/contents/$manifestPath`?ref=$($pr.headRefName)" `
+              --jq .content
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not read the submitted WinGet installer manifest from $prUrl."
+            }
+
+            $manifestFile = Join-Path $env:RUNNER_TEMP "Fluxzero.FluxzeroCLI.installer.yaml"
+            $content = [Convert]::FromBase64String(($encodedContent -join "").Trim())
+            [IO.File]::WriteAllBytes($manifestFile, $content)
+            bash scripts/verify-winget-runtime-dependency.sh $manifestFile
+            if ($LASTEXITCODE -ne 0) {
+              throw "The submitted WinGet manifest omits the Visual C++ runtime required by fz.exe: $prUrl"
+            }
+          }
+
           $manifestUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/f/Fluxzero/FluxzeroCLI/$env:VERSION/Fluxzero.FluxzeroCLI.yaml"
           curl.exe -fsS -o NUL $manifestUrl
           if ($LASTEXITCODE -eq 0) {
@@ -189,6 +215,7 @@ jobs:
             --jq '.[0].url'
           if (-not [string]::IsNullOrWhiteSpace($existingPr)) {
             Write-Host "WinGet update already pending: $existingPr"
+            Assert-WinGetRuntimeDependency $existingPr
             exit 0
           }
 
@@ -209,7 +236,39 @@ jobs:
           }
 
           $url = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$env:VERSION/flux-windows-amd64.zip"
+          $manifestOutput = Join-Path $env:RUNNER_TEMP "winget-manifests"
           .\wingetcreate.exe update Fluxzero.FluxzeroCLI `
             --urls $url `
             --version $env:VERSION `
-            --submit
+            --out $manifestOutput
+          if ($LASTEXITCODE -ne 0) {
+            throw "WingetCreate could not generate the Fluxzero CLI $env:VERSION manifest."
+          }
+
+          $installerManifests = @(Get-ChildItem $manifestOutput -Recurse -Filter '*.installer.yaml')
+          if ($installerManifests.Count -ne 1) {
+            throw "Expected one generated WinGet installer manifest, found $($installerManifests.Count)."
+          }
+          bash scripts/ensure-winget-runtime-dependency.sh $installerManifests[0].FullName
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not declare the Visual C++ runtime required by fz.exe."
+          }
+
+          .\wingetcreate.exe submit `
+            --prtitle "New version: Fluxzero.FluxzeroCLI version $env:VERSION" `
+            --no-open `
+            $installerManifests[0].DirectoryName
+          if ($LASTEXITCODE -ne 0) {
+            throw "WingetCreate could not submit the Fluxzero CLI $env:VERSION manifest."
+          }
+
+          $submittedPr = gh pr list `
+            --repo microsoft/winget-pkgs `
+            --state open `
+            --search "Fluxzero.FluxzeroCLI $env:VERSION in:title" `
+            --json url `
+            --jq '.[0].url'
+          if ([string]::IsNullOrWhiteSpace($submittedPr)) {
+            throw "WingetCreate completed without exposing a pull request for Fluxzero CLI $env:VERSION."
+          }
+          Assert-WinGetRuntimeDependency $submittedPr
