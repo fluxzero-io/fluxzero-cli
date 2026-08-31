@@ -12,6 +12,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class InstallationServiceTest {
@@ -44,6 +45,25 @@ class InstallationServiceTest {
         val alias = binary.resolveSibling("fluxzero")
         assertTrue(Files.isExecutable(alias))
         assertContentEquals(Files.readAllBytes(binary), Files.readAllBytes(alias))
+    }
+
+    @Test
+    fun `upgrades Homebrew installations through Homebrew`() {
+        val executable = homeDirectory.resolve("Cellar/fluxzero/1.17.0/bin/fz")
+        Files.createDirectories(executable.parent)
+        Files.writeString(executable, "binary")
+        val invoked = mutableListOf<ManagedPackageInstallation>()
+        val service = DefaultInstallationService(
+            httpClient = mockk(),
+            homeDir = homeDirectory,
+            executablePath = executable,
+            managedUpgrade = invoked::add,
+        )
+
+        val result = service.install()
+
+        assertEquals(InstallResult.ManagedUpgrade("Homebrew"), result)
+        assertEquals(listOf(ManagedPackageInstallation.HOMEBREW), invoked)
     }
 
     private fun service(currentVersion: String?, includeBinaryDownload: Boolean = true): DefaultInstallationService {

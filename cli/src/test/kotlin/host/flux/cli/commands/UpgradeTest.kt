@@ -50,17 +50,14 @@ class UpgradeTest {
     }
 
     @Test
-    fun `redirects externally managed installation to its package manager`() {
+    fun `reports successful package manager upgrade`() {
         val installer = mockk<InstallationService>()
-        every { installer.install() } returns InstallResult.ExternallyManaged(
-            "Homebrew", "brew update && brew upgrade fluxzero"
-        )
+        every { installer.install() } returns InstallResult.ManagedUpgrade("Homebrew")
 
         val result = Upgrade(installer).test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stdout.contains("This Fluxzero CLI installation is managed by Homebrew."))
-        assertTrue(result.stdout.contains("Upgrade with: brew update && brew upgrade fluxzero"))
+        assertTrue(result.stdout.contains("Fluxzero CLI update completed using Homebrew"))
     }
 
     @Test
@@ -72,7 +69,8 @@ class UpgradeTest {
         val result = cmd.test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stderr.contains("Error: Installation failed: Could not download binary. Please try reinstalling using the installation script at https://fluxzero.io/docs/getting-started"))
+        assertTrue(result.output.contains("Installation failed: Could not download binary."), result.output)
         assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
+        assertTrue(result.statusCode != 0)
     }
 }

@@ -9,6 +9,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.TimeUnit
 
 interface InstallationService {
     fun install(): InstallResult
@@ -20,18 +21,20 @@ internal const val PRIMARY_LATEST_API_URL =
 internal const val PRIMARY_BINARY_URL_TEMPLATE =
     "https://github.com/fluxzero-io/fluxzero-cli/releases/download/%s/%s"
 
-open class DefaultInstallationService(
+internal open class DefaultInstallationService(
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.ALWAYS)
         .build(),
     private val homeDir: Path = Paths.get(System.getProperty("user.home")),
     private val updateService: UpdateService = UpdateService,
     private val executablePath: Path? = ManagedPackageInstallation.currentExecutablePath(),
+    private val managedUpgrade: (ManagedPackageInstallation) -> Unit = ManagedPackageUpgradeExecutor::execute,
 ) : InstallationService {
 
     override fun install(): InstallResult {
         ManagedPackageInstallation.detect(executablePath)?.let {
-            return InstallResult.ExternallyManaged(it.displayName, it.upgradeCommand)
+            managedUpgrade(it)
+            return InstallResult.ManagedUpgrade(it.displayName)
         }
 
         val latest = fetchLatestTag() ?: throw IllegalStateException(
@@ -218,6 +221,34 @@ open class DefaultInstallationService(
             }
         } catch (_: Exception) {
             // Ignore cleanup failures
+        }
+    }
+}
+
+internal object ManagedPackageUpgradeExecutor {
+    fun execute(installation: ManagedPackageInstallation) {
+        installation.upgradeCommands.forEach { command ->
+            val process = try {
+                ProcessBuilder(command).inheritIO().start()
+            } catch (e: Exception) {
+                throw IllegalStateException(
+                    "Could not start ${installation.displayName}: ${e.message ?: e.javaClass.simpleName}",
+                    e,
+                )
+            }
+            val exitCode = try {
+                process.waitFor()
+            } catch (e: InterruptedException) {
+                process.destroy()
+                if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                }
+                Thread.currentThread().interrupt()
+                throw IllegalStateException("${installation.displayName} upgrade was interrupted", e)
+            }
+            check(exitCode == 0) {
+                "${installation.displayName} upgrade failed with exit code $exitCode"
+            }
         }
     }
 }

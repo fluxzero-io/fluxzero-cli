@@ -29,7 +29,7 @@ class MainTest {
     @Test
     fun `root help uses current Fluxzero branding and task descriptions`() {
         val result = FluxCli()
-            .subcommands(Init(), Dev(), Mcp(), Version(), Upgrade(), Templates())
+            .subcommands(Init(), Dev(), Templates(), Upgrade(), Mcp(), Version())
             .test("--help")
 
         assertEquals(0, result.statusCode)
@@ -37,7 +37,33 @@ class MainTest {
         assertTrue(result.output.contains("Build, run, and manage Fluxzero applications"), result.output)
         assertTrue(result.output.contains("Create a new Fluxzero application"), result.output)
         assertTrue(result.output.contains("Run and control the local Fluxzero development environment"), result.output)
-        assertTrue(result.output.contains("Connect an agent to the local Fluxzero development environment"), result.output)
+        assertTrue(result.output.contains("Upgrade the Fluxzero CLI"), result.output)
+        assertTrue(result.output.contains("-V, --version"), result.output)
+        assertTrue(!result.output.contains("Connect an agent to the local Fluxzero development environment"), result.output)
+        assertTrue(!result.output.contains("Print the installed Fluxzero CLI version"), result.output)
+        assertTrue(result.output.indexOf("Commands:") < result.output.indexOf("Options:"), result.output)
         assertTrue(!result.output.contains("flux-cli"), result.output)
+    }
+
+    @Test
+    fun `standard version option and compatible command remain available`() {
+        val command = FluxCli().subcommands(Version())
+
+        val optionResult = command.test("--version")
+        val commandResult = command.test("version")
+
+        assertEquals(0, optionResult.statusCode)
+        assertEquals(0, commandResult.statusCode)
+        assertEquals("dev", optionResult.output.trim())
+        assertEquals("dev", commandResult.output.trim())
+    }
+
+    @Test
+    fun `version and upgrade skip the redundant startup update check`() {
+        assertTrue(!shouldCheckForUpdates(arrayOf("--version")))
+        assertTrue(!shouldCheckForUpdates(arrayOf("-V")))
+        assertTrue(!shouldCheckForUpdates(arrayOf("version")))
+        assertTrue(!shouldCheckForUpdates(arrayOf("upgrade")))
+        assertTrue(shouldCheckForUpdates(arrayOf("dev")))
     }
 }

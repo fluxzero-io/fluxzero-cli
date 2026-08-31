@@ -39,6 +39,8 @@ class Mcp(
     private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
     private val monotonicNanos: () -> Long = System::nanoTime
 ) : CliktCommand() {
+    override val hiddenFromHelp: Boolean = true
+
     init {
         require(readinessAttempts > 0) { "readinessAttempts must be greater than zero" }
         require(readinessTimeoutMillis >= 0) { "readinessTimeoutMillis must not be negative" }
