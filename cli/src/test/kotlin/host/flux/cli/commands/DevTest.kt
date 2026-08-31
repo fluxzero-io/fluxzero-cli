@@ -8,13 +8,18 @@ import host.flux.dev.DevLauncher
 import host.flux.dev.DevStartupReadiness
 import host.flux.dev.OutputMode
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.io.TempDir
 import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -127,6 +132,46 @@ class DevTest {
             ),
             requests
         )
+        assertTrue(Files.isRegularFile(projectDirectory.resolve(".fluxzero/dev/ensure.lock")))
+    }
+
+    @Test
+    fun `workspace start coordinator serializes concurrent clients`() {
+        val active = AtomicInteger()
+        val maximumActive = AtomicInteger()
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val secondEntered = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val first = executor.submit<Int> {
+                WorkspaceDevStartCoordinator.start(projectDirectory) {
+                    maximumActive.accumulateAndGet(active.incrementAndGet(), ::maxOf)
+                    firstEntered.countDown()
+                    releaseFirst.await(5, TimeUnit.SECONDS)
+                    active.decrementAndGet()
+                    1
+                }
+            }
+            assertTrue(firstEntered.await(5, TimeUnit.SECONDS))
+            val second = executor.submit<Int> {
+                WorkspaceDevStartCoordinator.start(projectDirectory) {
+                    maximumActive.accumulateAndGet(active.incrementAndGet(), ::maxOf)
+                    secondEntered.countDown()
+                    active.decrementAndGet()
+                    2
+                }
+            }
+
+            assertTrue(!secondEntered.await(150, TimeUnit.MILLISECONDS))
+            releaseFirst.countDown()
+            assertEquals(1, first.get(5, TimeUnit.SECONDS))
+            assertEquals(2, second.get(5, TimeUnit.SECONDS))
+            assertEquals(1, maximumActive.get())
+        } finally {
+            releaseFirst.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -460,6 +505,7 @@ class DevTest {
         )
     }
 
+    @Tag("greenfield-mcp-release-e2e")
     @Test
     fun `empty directory MCP process stays connected while Maven project is generated in place`() {
         verifyGreenfieldMcpTransition("maven")
@@ -470,36 +516,76 @@ class DevTest {
         verifyGreenfieldMcpTransition("gradle")
     }
 
+    @Tag("greenfield-mcp-concurrency-e2e")
+    @Test
+    fun `concurrent empty directory MCP clients share one background environment`() {
+        val fixture = e2eFixture()
+        Files.list(projectDirectory).use { entries -> assertEquals(0, entries.count()) }
+        val command = fixture.cliCommand + listOf(
+            "mcp",
+            "--project-dir", projectDirectory.toString(),
+            "--dev-server-version", fixture.devServerVersion,
+            "--ensure-dev"
+        )
+        val clients = mutableListOf<E2eMcpClient>()
+        try {
+            repeat(8) { index ->
+                val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-concurrent-mcp-$index-", ".stderr")
+                val process = processBuilder(command, fixture.isolatedHome)
+                    .redirectError(stderrFile.toFile())
+                    .start()
+                val writer = process.outputStream.bufferedWriter()
+                writer.write(
+                    """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"concurrent-empty-directory-test-$index","version":"1"}}}"""
+                )
+                writer.newLine()
+                writer.flush()
+                clients += E2eMcpClient(process, process.inputStream.bufferedReader(), writer, stderrFile)
+            }
+
+            val sessionIds = clients.map { client ->
+                val initialize = readProtocolResponse(client.process, client.reader, 1, client.stderrFile)
+                assertTrue(initialize.contains("\"name\":\"fluxzero-dev-stdio\""), initialize)
+                client.writer.write("""{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}""")
+                client.writer.newLine()
+                client.writer.write(
+                    """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"""
+                )
+                client.writer.newLine()
+                client.writer.flush()
+                val status = readProtocolResponse(client.process, client.reader, 2, client.stderrFile)
+                assertTrue(status.contains(projectDirectory.toString()), status)
+                requireNotNull(SESSION_ID.find(status)?.groupValues?.get(1)) {
+                    "get_status did not expose a session id: $status"
+                }
+            }
+
+            assertEquals(1, sessionIds.distinct().size, "Concurrent MCP clients started multiple dev sessions")
+            assertTrue(Files.isRegularFile(projectDirectory.resolve(".fluxzero/dev/session.json")))
+        } finally {
+            clients.forEach { client ->
+                client.writer.runCatching { close() }
+                client.process.destroy()
+                if (!client.process.waitFor(5, TimeUnit.SECONDS)) {
+                    client.process.destroyForcibly()
+                    client.process.waitFor(5, TimeUnit.SECONDS)
+                }
+                Files.deleteIfExists(client.stderrFile)
+            }
+            stopProcess(
+                fixture.cliCommand,
+                fixture.isolatedHome,
+                fixture.devServerVersion,
+                projectDirectory
+            )
+        }
+    }
+
     private fun verifyGreenfieldMcpTransition(buildSystem: String) {
-        val cliJarValue = System.getenv("FLUXZERO_CLI_E2E_JAR")
-        val cliExecutableValue = System.getenv("FLUXZERO_CLI_E2E_EXECUTABLE")
-        val devServerJarValue = System.getenv("FLUXZERO_MCP_E2E_DEV_SERVER_JAR")
-        assumeTrue(
-            (!cliJarValue.isNullOrBlank() || !cliExecutableValue.isNullOrBlank()) &&
-                !devServerJarValue.isNullOrBlank(),
-            "Set one of FLUXZERO_CLI_E2E_JAR or FLUXZERO_CLI_E2E_EXECUTABLE, plus " +
-                "FLUXZERO_MCP_E2E_DEV_SERVER_JAR, to run the process smoke."
-        )
-        require(cliJarValue.isNullOrBlank() || cliExecutableValue.isNullOrBlank()) {
-            "Set only one CLI process candidate"
-        }
-        val cliCommand = if (!cliExecutableValue.isNullOrBlank()) {
-            val executable = Path.of(cliExecutableValue).toAbsolutePath().normalize()
-            assumeTrue(Files.isExecutable(executable), "FLUXZERO_CLI_E2E_EXECUTABLE must identify an executable CLI.")
-            listOf(executable.toString())
-        } else {
-            val cliJar = Path.of(requireNotNull(cliJarValue)).toAbsolutePath().normalize()
-            assumeTrue(Files.isRegularFile(cliJar), "FLUXZERO_CLI_E2E_JAR must identify a runnable CLI JAR.")
-            listOf(javaExecutable(), "-jar", cliJar.toString())
-        }
-        val devServerJar = Path.of(requireNotNull(devServerJarValue)).toAbsolutePath().normalize()
-        assumeTrue(
-            Files.isRegularFile(devServerJar),
-            "FLUXZERO_MCP_E2E_DEV_SERVER_JAR must identify a standalone dev-server JAR."
-        )
-        val devServerVersion = "1.99.0"
-        val isolatedHome = Files.createDirectory(projectDirectory.resolveSibling("${projectDirectory.fileName}-home"))
-        installE2eDevServer(devServerJar, isolatedHome, devServerVersion)
+        val fixture = e2eFixture()
+        val cliCommand = fixture.cliCommand
+        val isolatedHome = fixture.isolatedHome
+        val devServerVersion = fixture.devServerVersion
         Files.list(projectDirectory).use { entries -> assertEquals(0, entries.count()) }
         val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-empty-mcp-", ".stderr")
         val command = cliCommand + listOf(
@@ -540,6 +626,7 @@ class DevTest {
             val initialStatus = readProtocolResponse(process, reader, 3, stderrFile)
             assertTrue(initialStatus.contains("\"status\":\"running\""), initialStatus)
             assertTrue(initialStatus.contains("\"mcp\":{\"name\":\"mcp\",\"state\":\"running\""), initialStatus)
+            assertTrue(initialStatus.contains(projectDirectory.toString()), initialStatus)
             val sessionId = requireNotNull(SESSION_ID.find(initialStatus)?.groupValues?.get(1)) {
                 "get_status did not expose a session id: $initialStatus"
             }
@@ -580,6 +667,39 @@ class DevTest {
             stopProcess(cliCommand, isolatedHome, devServerVersion, projectDirectory)
             Files.deleteIfExists(stderrFile)
         }
+    }
+
+    private fun e2eFixture(): E2eFixture {
+        val cliJarValue = System.getenv("FLUXZERO_CLI_E2E_JAR")
+        val cliExecutableValue = System.getenv("FLUXZERO_CLI_E2E_EXECUTABLE")
+        val devServerJarValue = System.getenv("FLUXZERO_MCP_E2E_DEV_SERVER_JAR")
+        assumeTrue(
+            (!cliJarValue.isNullOrBlank() || !cliExecutableValue.isNullOrBlank()) &&
+                !devServerJarValue.isNullOrBlank(),
+            "Set one of FLUXZERO_CLI_E2E_JAR or FLUXZERO_CLI_E2E_EXECUTABLE, plus " +
+                "FLUXZERO_MCP_E2E_DEV_SERVER_JAR, to run the process smoke."
+        )
+        require(cliJarValue.isNullOrBlank() || cliExecutableValue.isNullOrBlank()) {
+            "Set only one CLI process candidate"
+        }
+        val cliCommand = if (!cliExecutableValue.isNullOrBlank()) {
+            val executable = Path.of(cliExecutableValue).toAbsolutePath().normalize()
+            assumeTrue(Files.isExecutable(executable), "FLUXZERO_CLI_E2E_EXECUTABLE must identify an executable CLI.")
+            listOf(executable.toString())
+        } else {
+            val cliJar = Path.of(requireNotNull(cliJarValue)).toAbsolutePath().normalize()
+            assumeTrue(Files.isRegularFile(cliJar), "FLUXZERO_CLI_E2E_JAR must identify a runnable CLI JAR.")
+            listOf(javaExecutable(), "-jar", cliJar.toString())
+        }
+        val devServerJar = Path.of(requireNotNull(devServerJarValue)).toAbsolutePath().normalize()
+        assumeTrue(
+            Files.isRegularFile(devServerJar),
+            "FLUXZERO_MCP_E2E_DEV_SERVER_JAR must identify a standalone dev-server JAR."
+        )
+        val devServerVersion = "1.99.0"
+        val isolatedHome = Files.createDirectory(projectDirectory.resolveSibling("${projectDirectory.fileName}-home"))
+        installE2eDevServer(devServerJar, isolatedHome, devServerVersion)
+        return E2eFixture(cliCommand, isolatedHome, devServerVersion)
     }
 
     @Test
@@ -850,7 +970,10 @@ class DevTest {
     private fun processBuilder(command: List<String>, isolatedHome: Path): ProcessBuilder =
         ProcessBuilder(command).also { builder ->
             builder.environment()["HOME"] = isolatedHome.toString()
-            builder.command().add(1, "-Duser.home=$isolatedHome")
+            builder.environment()["USERPROFILE"] = isolatedHome.toString()
+            if (Path.of(command.first()).toAbsolutePath().normalize() == Path.of(javaExecutable()).toAbsolutePath()) {
+                builder.command().add(1, "-Duser.home=$isolatedHome")
+            }
         }
 
     private fun javaExecutable(): String = Path.of(
@@ -865,4 +988,17 @@ class DevTest {
             "\\\"compile\\\"\\s*:\\s*\\{[^}]*\\\"state\\\"\\s*:\\s*\\\"([^\\\"]+)\\\""
         )
     }
+
+    private data class E2eFixture(
+        val cliCommand: List<String>,
+        val isolatedHome: Path,
+        val devServerVersion: String
+    )
+
+    private data class E2eMcpClient(
+        val process: Process,
+        val reader: BufferedReader,
+        val writer: BufferedWriter,
+        val stderrFile: Path
+    )
 }

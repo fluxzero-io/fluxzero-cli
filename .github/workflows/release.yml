@@ -77,6 +77,14 @@ jobs:
           }
           echo "API JAR functionality test successful!"
 
+      - name: Verify greenfield MCP onboarding
+        env:
+          FLUXZERO_CLI_E2E_JAR: ${{ github.workspace }}/cli/build/libs/fluxzero-cli-${{ needs.version.outputs.version }}.jar
+          FLUXZERO_MCP_E2E_DEV_SERVER_JAR: ${{ runner.temp }}/fluxzero-dev-server-standalone.jar
+        run: |
+          scripts/download-latest-dev-server.sh "$FLUXZERO_MCP_E2E_DEV_SERVER_JAR"
+          ./gradlew :cli:greenfieldMcpE2e -PappVersion=${{ needs.version.outputs.version }}
+
       - name: Publish candidate plugins locally
         run: >-
           ./gradlew :maven-plugin:publishToMavenLocal :gradle-plugin:publishToMavenLocal

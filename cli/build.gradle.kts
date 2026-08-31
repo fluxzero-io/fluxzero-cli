@@ -1,4 +1,5 @@
 import org.apache.tools.ant.filters.ReplaceTokens
+import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.tasks.Jar
 import java.util.jar.Attributes
 import java.util.jar.JarFile
@@ -102,6 +103,30 @@ val verifyRunnableJar by tasks.registering {
 
 tasks.check {
     dependsOn(verifyRunnableJar)
+}
+
+val greenfieldMcpE2e by tasks.registering(Test::class) {
+    description = "Verifies greenfield MCP bootstrap with the release candidate CLI"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("greenfield-mcp-release-e2e", "greenfield-mcp-concurrency-e2e")
+    }
+    outputs.upToDateWhen { false }
+    shouldRunAfter(tasks.test)
+}
+
+val greenfieldMcpConcurrencyE2e by tasks.registering(Test::class) {
+    description = "Verifies concurrent greenfield MCP bootstrap with a native CLI"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("greenfield-mcp-concurrency-e2e")
+    }
+    outputs.upToDateWhen { false }
+    shouldRunAfter(tasks.test)
 }
 
 tasks.register<Copy>("generateScripts") {

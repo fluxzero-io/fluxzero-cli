@@ -74,16 +74,14 @@ class InheritedIoCommandExecutorTest {
     fun `detached child survives launcher scope and writes bootstrap log`() {
         val directory = Files.createTempDirectory("fluxzero-detached-executor")
         val log = directory.resolve("bootstrap.log")
-        val executor = InheritedIoCommandExecutor()
+        val executor = InheritedIoCommandExecutor(launchdEnabled = false)
 
-        val pid = withShellDetach {
-            executor.supervise(onShutdown = { }) {
-                executor.startDetached(
-                    listOf(javaExecutable(), "-cp", fixtureClasspath(), ExecutorChildFixture::class.java.name),
-                    directory,
-                    log
-                )
-            }
+        val pid = executor.supervise(onShutdown = { }) {
+            executor.startDetached(
+                listOf(javaExecutable(), "-cp", fixtureClasspath(), ExecutorChildFixture::class.java.name),
+                directory,
+                log
+            )
         }
 
         val process = ProcessHandle.of(pid).orElseThrow()
