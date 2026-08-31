@@ -777,8 +777,9 @@ account that has accepted Microsoft's contributor license agreement:
 
 - `WINGET_CREATE_GITHUB_TOKEN`: a classic PAT with only the `public_repo` scope for WingetCreate submissions to
   `microsoft/winget-pkgs`.
-- `WINGET_FORK_SYNC_GITHUB_TOKEN`: a fine-grained PAT limited to that account's `winget-pkgs` fork, with only
-  `Contents: Read and write`, for synchronizing the fork before WingetCreate runs.
+- `WINGET_FORK_SYNC_GITHUB_TOKEN`: a fine-grained PAT limited to that account's `winget-pkgs` fork, with
+  `Contents: Read and write` and `Workflows: Read and write`, for synchronizing the fork before WingetCreate runs.
+  GitHub requires the latter whenever the upstream synchronization includes changes under `.github/workflows`.
 
 Keeping these tokens separate avoids granting a classic PAT the broad `repo` scope that GitHub automatically requires
 when its `workflow` scope is selected.

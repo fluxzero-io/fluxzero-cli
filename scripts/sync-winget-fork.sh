@@ -61,7 +61,7 @@ if ! sync_output="$(gh api \
   "repos/$fork_repository/merge-upstream" \
   -f "branch=$fork_branch" 2>&1)"; then
   echo "$sync_output" >&2
-  fail "GitHub could not fast-forward the WinGet publisher fork. Ensure WINGET_FORK_SYNC_GITHUB_TOKEN is a fine-grained PAT limited to $fork_repository with Contents read/write access."
+  fail "GitHub could not fast-forward the WinGet publisher fork. Ensure WINGET_FORK_SYNC_GITHUB_TOKEN is a fine-grained PAT limited to $fork_repository with Contents and Workflows read/write access. Workflows permission is required when upstream changed files under .github/workflows."
 fi
 
 for retry_delay in 0 1 2 3 4; do

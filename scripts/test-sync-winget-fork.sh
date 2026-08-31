@@ -77,6 +77,7 @@ if output="$(run_sync sync-failure 2>&1)"; then
 fi
 [[ "$output" == *"HTTP 422"* ]]
 [[ "$output" == *"fine-grained PAT"* ]]
-[[ "$output" == *"Contents read/write access"* ]]
+[[ "$output" == *"Contents and Workflows read/write access"* ]]
+[[ "$output" == *"upstream changed files under .github/workflows"* ]]
 
 echo "WinGet fork synchronization tests passed."
