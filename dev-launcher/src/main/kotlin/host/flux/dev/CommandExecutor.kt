@@ -42,7 +42,9 @@ fun interface CommandExecutor {
         )
 }
 
-class InheritedIoCommandExecutor : CommandExecutor {
+class InheritedIoCommandExecutor(
+    private val launchdEnabled: Boolean? = null
+) : CommandExecutor {
     private val activeScope = AtomicReference<ExecutionScope>()
 
     override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
@@ -86,7 +88,7 @@ class InheritedIoCommandExecutor : CommandExecutor {
                 .redirectError(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
                 .start().pid()
         }
-        if (isMac() && !java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) {
+        if (usesLaunchd()) {
             return startWithLaunchd(command, workingDirectory, outputFile)
         }
         val bootstrap = ProcessBuilder(
@@ -108,14 +110,14 @@ class InheritedIoCommandExecutor : CommandExecutor {
     }
 
     override fun releaseDetached(workingDirectory: Path) {
-        if (!isMac() || java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) return
+        if (!usesLaunchd()) return
         val domain = "gui/${userId()}"
         bootout(domain, launchdLabel(workingDirectory))
         runCatching { java.nio.file.Files.deleteIfExists(launchdPlist(workingDirectory)) }
     }
 
     override fun releaseAllDetached() {
-        if (!isMac() || java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell")) return
+        if (!usesLaunchd()) return
         val domain = "gui/${userId()}"
         val listed = ProcessBuilder("/bin/launchctl", "list").redirectErrorStream(true).start()
         val output = listed.inputStream.bufferedReader().readText()
@@ -346,6 +348,9 @@ class InheritedIoCommandExecutor : CommandExecutor {
     private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
 
     private fun isMac() = System.getProperty("os.name").lowercase().contains("mac")
+
+    private fun usesLaunchd(): Boolean = launchdEnabled
+        ?: (isMac() && !java.lang.Boolean.getBoolean("fluxzero.dev.detach.shell"))
 }
 
 internal fun fluxzeroLaunchdLabels(output: String): List<String> = output.lineSequence()

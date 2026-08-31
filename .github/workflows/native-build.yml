@@ -216,6 +216,16 @@ jobs:
           "$CLI" dev stop --project-dir dev-smoke --force
           trap - EXIT
 
+      - name: Integration test - Concurrent greenfield MCP clients
+        if: matrix.os == 'macos-arm64'
+        shell: bash
+        env:
+          FLUXZERO_CLI_E2E_EXECUTABLE: ${{ github.workspace }}/cli/build/native/nativeCompile/flux
+          FLUXZERO_MCP_E2E_DEV_SERVER_JAR: ${{ runner.temp }}/fluxzero-dev-server-standalone.jar
+        run: |
+          scripts/download-latest-dev-server.sh "$FLUXZERO_MCP_E2E_DEV_SERVER_JAR"
+          ./gradlew :cli:greenfieldMcpConcurrencyE2e
+
       - name: Test installation script
         shell: bash
         run: |

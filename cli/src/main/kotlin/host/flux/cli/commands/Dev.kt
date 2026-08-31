@@ -23,7 +23,7 @@ class Dev(
     private val launcher: DevLauncher = DevServerLauncher(),
     private val projectInitializer: DevProjectInitializer = InteractiveDevProjectInitializer()
 ) : CliktCommand() {
-    override fun help(context: Context): String = "Start the local Fluxzero development environment"
+    override fun help(context: Context): String = "Run and control the local Fluxzero development environment"
     override fun helpEpilog(context: Context): String =
         "Shared project defaults belong in .fluxzero/dev.yaml. " +
             "Run `fz dev config` to print the version-aligned configuration reference."

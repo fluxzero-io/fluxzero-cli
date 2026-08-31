@@ -43,4 +43,16 @@ class ManagedPackageInstallationTest {
     fun `leaves direct installations self managed`() {
         assertNull(ManagedPackageInstallation.detect(tempDirectory.resolve(".fluxzero/bin/fz")))
     }
+
+    @Test
+    fun `uses package manager commands without a shell`() {
+        assertEquals(
+            listOf(listOf("brew", "upgrade", "fluxzero")),
+            ManagedPackageInstallation.HOMEBREW.upgradeCommands,
+        )
+        assertEquals(
+            listOf(listOf("winget", "upgrade", "--exact", "--id", "Fluxzero.FluxzeroCLI")),
+            ManagedPackageInstallation.WINGET.upgradeCommands,
+        )
+    }
 }

@@ -15,9 +15,14 @@ import host.flux.dev.DevServerLauncher
 import host.flux.dev.DevStartupReadiness
 import host.flux.dev.InheritedIoCommandExecutor
 import host.flux.dev.OutputMode
+import java.nio.channels.FileChannel
+import java.nio.channels.FileLockInterruptionException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 
 private const val DEV_SERVER_PREFLIGHT_MAIN = "io.fluxzero.devserver.DevServerPreflightMain"
 private const val DEV_MCP_READINESS_ATTEMPTS = 10
@@ -28,17 +33,20 @@ private val MCP_STATE = Regex("\"mcp\"\\s*:\\s*\\{[^}]*\"state\"\\s*:\\s*\"([^\"
 
 class Mcp(
     private val launcher: DevLauncher = DevServerLauncher(McpCommandExecutor()),
+    private val coordinateStart: (Path, () -> Int) -> Int = WorkspaceDevStartCoordinator::start,
     private val readinessAttempts: Int = DEV_MCP_READINESS_ATTEMPTS,
     private val readinessPause: () -> Unit = { Thread.sleep(DEV_MCP_READINESS_RETRY_MILLIS) },
     private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
     private val monotonicNanos: () -> Long = System::nanoTime
 ) : CliktCommand() {
+    override val hiddenFromHelp: Boolean = true
+
     init {
         require(readinessAttempts > 0) { "readinessAttempts must be greater than zero" }
         require(readinessTimeoutMillis >= 0) { "readinessTimeoutMillis must not be negative" }
     }
 
-    override fun help(context: Context): String = "Connect stdio MCP to the active Fluxzero dev environment"
+    override fun help(context: Context): String = "Connect an agent to the local Fluxzero development environment"
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Fluxzero project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)
@@ -54,16 +62,22 @@ class Mcp(
     override fun run() {
         val root = projectDirectory.toAbsolutePath().normalize()
         if (ensureDev) {
-            val startExitCode = launchInterruptibly(
-                DevLaunchRequest(
-                    root,
-                    devServerVersion,
-                    DevLaunchTarget.SERVER,
-                    detached = true,
-                    startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
-                ),
-                "Interrupted while starting the Fluxzero dev environment."
-            )
+            val startExitCode = try {
+                coordinateStart(root) {
+                    launchInterruptibly(
+                        DevLaunchRequest(
+                            root,
+                            devServerVersion,
+                            DevLaunchTarget.SERVER,
+                            detached = true,
+                            startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
+                        ),
+                        "Interrupted while starting the Fluxzero dev environment."
+                    )
+                }
+            } catch (_: InterruptedException) {
+                interrupted("Interrupted while waiting to start the Fluxzero dev environment.")
+            }
             check(startExitCode == 0) {
                 "Fluxzero dev environment could not be started (exit code $startExitCode)."
             }
@@ -161,7 +175,7 @@ class Mcp(
 }
 
 internal class McpCommandExecutor(
-    private val delegate: CommandExecutor = InheritedIoCommandExecutor()
+    private val delegate: CommandExecutor = InheritedIoCommandExecutor(launchdEnabled = false)
 ) : CommandExecutor {
     override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int =
         delegate.execute(command, workingDirectory, routedOutput(command, outputMode))
@@ -193,6 +207,30 @@ internal class McpCommandExecutor(
             OutputMode.STDOUT_TO_STDERR
         } else {
             outputMode
+        }
+    }
+}
+
+internal object WorkspaceDevStartCoordinator {
+    private val processLocks = ConcurrentHashMap<Path, ReentrantLock>()
+
+    fun start(root: Path, action: () -> Int): Int {
+        val lockFile = root.toAbsolutePath().normalize().resolve(".fluxzero/dev/ensure.lock")
+        Files.createDirectories(lockFile.parent)
+        val processLock = processLocks.computeIfAbsent(lockFile) { ReentrantLock() }
+        processLock.lockInterruptibly()
+        try {
+            FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
+                try {
+                    channel.lock().use { return action() }
+                } catch (e: FileLockInterruptionException) {
+                    throw InterruptedException("Interrupted while acquiring the Fluxzero dev start lock").apply {
+                        initCause(e)
+                    }
+                }
+            }
+        } finally {
+            processLock.unlock()
         }
     }
 }

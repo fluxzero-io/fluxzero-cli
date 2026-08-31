@@ -5,10 +5,16 @@ import java.nio.file.Paths
 
 internal enum class ManagedPackageInstallation(
     val displayName: String,
-    val upgradeCommand: String,
+    val upgradeCommands: List<List<String>>,
 ) {
-    HOMEBREW("Homebrew", "brew update && brew upgrade fluxzero"),
-    WINGET("WinGet", "winget upgrade --exact --id Fluxzero.FluxzeroCLI");
+    HOMEBREW(
+        "Homebrew",
+        listOf(listOf("brew", "upgrade", "fluxzero")),
+    ),
+    WINGET(
+        "WinGet",
+        listOf(listOf("winget", "upgrade", "--exact", "--id", "Fluxzero.FluxzeroCLI")),
+    );
 
     companion object {
         fun detect(executablePath: Path?): ManagedPackageInstallation? {

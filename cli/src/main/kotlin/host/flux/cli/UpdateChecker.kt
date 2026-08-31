@@ -35,7 +35,7 @@ object UpdateChecker {
                 val tagRegex = "\"tag_name\"\\s*:\\s*\"([^\"]+)\"".toRegex()
                 val latest = tagRegex.find(response.body())?.groupValues?.get(1)
                 if (latest != null && isNewer(currentVersion, latest)) {
-                    notify("A new version of fluxzero-cli is available: $latest (current: $currentVersion)")
+                    notify("A new version of the Fluxzero CLI is available: $latest (current: $currentVersion)")
                 }
             }
         } catch (_: Exception) {
@@ -43,4 +43,3 @@ object UpdateChecker {
         }
     }
 }
-

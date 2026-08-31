@@ -7,8 +7,9 @@ import host.flux.cli.services.VersionService
 class Version(
     private val versionService: VersionService = VersionService
 ) : CliktCommand() {
+    override val hiddenFromHelp: Boolean = true
 
-    override fun help(context: Context): String = "Print the release version of the fluxzero-cli"
+    override fun help(context: Context): String = "Print the installed Fluxzero CLI version"
 
     override fun run() {
         echo(versionService.getCurrentVersion())
