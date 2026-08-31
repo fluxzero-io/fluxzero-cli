@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 ##
-## This script installs the fluxzero-cli native executable for Windows.
+## This script installs the fluxzero-cli native package for Windows.
 ## No Java required!
 ##
 
@@ -31,8 +31,51 @@ switch ($ARCH) {
     }
 }
 
-$BINARY_NAME = "flux-windows-$ARCH_NAME.exe"
-$BINARY_URL = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$VERSION/$BINARY_NAME"
+$PACKAGE_NAME = "flux-windows-$ARCH_NAME.zip"
+$PACKAGE_URL = "https://github.com/fluxzero-io/fluxzero-cli/releases/download/$VERSION/$PACKAGE_NAME"
+
+function Test-IsArchive([string]$Source) {
+    return [System.IO.Path]::GetExtension($Source).Equals(".zip", [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Install-Archive([string]$Source) {
+    $TEMP_DIR = Join-Path ([System.IO.Path]::GetTempPath()) "fluxzero-cli-$([System.Guid]::NewGuid())"
+    $ARCHIVE_PATH = Join-Path $TEMP_DIR $PACKAGE_NAME
+    $EXTRACT_DIR = Join-Path $TEMP_DIR "package"
+    New-Item -ItemType Directory -Path $EXTRACT_DIR -Force | Out-Null
+    try {
+        if (Test-Path $Source) {
+            Copy-Item $Source $ARCHIVE_PATH -Force
+        } else {
+            Invoke-WebRequest -Uri $Source -OutFile $ARCHIVE_PATH -UseBasicParsing
+        }
+        Expand-Archive -Path $ARCHIVE_PATH -DestinationPath $EXTRACT_DIR -Force
+
+        $PACKAGE_BINARY = Join-Path $EXTRACT_DIR "fz.exe"
+        if (-not (Test-Path $PACKAGE_BINARY) -or (Get-Item $PACKAGE_BINARY).Length -eq 0) {
+            throw "The Windows package does not contain a valid fz.exe."
+        }
+        $RUNTIME_FILES = @(Get-ChildItem $EXTRACT_DIR -File -Filter "*.dll")
+        if ($RUNTIME_FILES.Count -eq 0) {
+            throw "The Windows package does not contain its Visual C++ runtime libraries."
+        }
+
+        Copy-Item $PACKAGE_BINARY $FLUX_BINARY -Force
+        foreach ($RUNTIME_FILE in $RUNTIME_FILES) {
+            Copy-Item $RUNTIME_FILE.FullName (Join-Path $FLUX_BIN_DIR $RUNTIME_FILE.Name) -Force
+        }
+    } finally {
+        Remove-Item $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Install-Executable([string]$Source) {
+    if (Test-Path $Source) {
+        Copy-Item $Source $FLUX_BINARY -Force
+    } else {
+        Invoke-WebRequest -Uri $Source -OutFile $FLUX_BINARY -UseBasicParsing
+    }
+}
 
 Write-Host "Creating installation directories..."
 Write-Host "Target directory: $FLUX_BIN_DIR"
@@ -49,32 +92,20 @@ if (-not (Test-Path $FLUX_BIN_DIR)) {
 }
 
 Write-Host "Platform: windows-$ARCH_NAME"
-Write-Host "Binary: $BINARY_NAME"
+Write-Host "Package: $PACKAGE_NAME"
 
 if ($Binary) {
-    Write-Host "Using custom binary: $Binary"
-    
-    # Check if it's a local file or URL
-    if (Test-Path $Binary) {
-        Write-Host "Copying local binary..."
-        Write-Host "From: $Binary"
-        Write-Host "To: $FLUX_BINARY"
-        try {
-            Copy-Item $Binary $FLUX_BINARY -Force
-            Write-Host "Copy completed successfully"
-        } catch {
-            Write-Host "Error: Failed to copy binary from $Binary" -ForegroundColor Red
-            Write-Host "Exception: $($_.Exception.Message)"
-            exit 1
+    Write-Host "Using custom package or executable: $Binary"
+    try {
+        if (Test-IsArchive $Binary) {
+            Install-Archive $Binary
+        } else {
+            Install-Executable $Binary
         }
-    } else {
-        Write-Host "Downloading binary from custom URL..."
-        try {
-            Invoke-WebRequest -Uri $Binary -OutFile $FLUX_BINARY -UseBasicParsing
-        } catch {
-            Write-Host "Error: Failed to download binary from $Binary" -ForegroundColor Red
-            exit 1
-        }
+    } catch {
+        Write-Host "Error: Failed to install from $Binary" -ForegroundColor Red
+        Write-Host "Exception: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
     }
     
     if (-not (Test-Path $FLUX_BINARY) -or (Get-Item $FLUX_BINARY).Length -eq 0) {
@@ -82,7 +113,7 @@ if ($Binary) {
         exit 1
     }
     
-    Write-Host "Custom binary installation successful." -ForegroundColor Green
+    Write-Host "Custom installation successful." -ForegroundColor Green
 } elseif ((Test-Path $FLUX_BINARY) -and -not $Force) {
     Write-Host "$FLUX_BINARY already exists. Skipping installation. Run 'fz upgrade' or use -Force to reinstall." -ForegroundColor Yellow
 } else {
@@ -90,28 +121,29 @@ if ($Binary) {
         Write-Host "Forcing reinstallation of $FLUX_BINARY..."
     }
     
-    Write-Host "Checking if $BINARY_NAME is available at remote URL..."
+    Write-Host "Checking if $PACKAGE_NAME is available at remote URL..."
     try {
-        $response = Invoke-WebRequest -Uri $BINARY_URL -Method Head -UseBasicParsing
+        $response = Invoke-WebRequest -Uri $PACKAGE_URL -Method Head -UseBasicParsing
         if ($response.StatusCode -ne 200) {
             throw "HTTP status $($response.StatusCode)"
         }
     } catch {
         Write-Host "Error: Remote file not available. $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "URL: $BINARY_URL" -ForegroundColor Red
+        Write-Host "URL: $PACKAGE_URL" -ForegroundColor Red
         exit 1
     }
 
-    Write-Host "Downloading $BINARY_NAME..."
+    Write-Host "Downloading $PACKAGE_NAME..."
     try {
-        Invoke-WebRequest -Uri $BINARY_URL -OutFile $FLUX_BINARY -UseBasicParsing
+        Install-Archive $PACKAGE_URL
     } catch {
-        Write-Host "Error: Failed to download $BINARY_NAME. Please check your internet connection and try again." -ForegroundColor Red
+        Write-Host "Error: Failed to install $PACKAGE_NAME. Please check your internet connection and try again." -ForegroundColor Red
+        Write-Host "Exception: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 
     if (-not (Test-Path $FLUX_BINARY) -or (Get-Item $FLUX_BINARY).Length -eq 0) {
-        Write-Host "Error: $BINARY_NAME was downloaded but is empty. Please try again." -ForegroundColor Red
+        Write-Host "Error: $PACKAGE_NAME was installed without a valid fz.exe. Please try again." -ForegroundColor Red
         exit 1
     }
 
