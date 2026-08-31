@@ -100,6 +100,9 @@ jobs:
       - name: Test WinGet fork synchronization
         run: scripts/test-sync-winget-fork.sh
 
+      - name: Test WinGet runtime dependency validation
+        run: scripts/test-verify-winget-runtime-dependency.sh
+
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v6
         with:

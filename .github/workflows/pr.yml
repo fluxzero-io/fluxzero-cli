@@ -46,5 +46,8 @@ jobs:
       - name: Test WinGet fork synchronization
         run: scripts/test-sync-winget-fork.sh
 
+      - name: Test WinGet runtime dependency validation
+        run: scripts/test-verify-winget-runtime-dependency.sh
+
       - name: Test macOS DMG detach recovery
         run: scripts/test-package-dmg-detach.sh
