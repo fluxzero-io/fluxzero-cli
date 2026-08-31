@@ -16,6 +16,14 @@ class DevServerArtifactCacheTest {
     lateinit var cacheDirectory: Path
 
     @Test
+    fun `uses explicit cache directory independently of native user home`() {
+        assertEquals(
+            cacheDirectory,
+            defaultDevServerCacheDirectory(mapOf(DEV_SERVER_CACHE_ENVIRONMENT_VARIABLE to cacheDirectory.toString()))
+        )
+    }
+
+    @Test
     fun `downloads verifies and reuses stable artifact`() {
         val bytes = "verified standalone jar".encodeToByteArray()
         var downloads = 0
