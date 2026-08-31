@@ -528,6 +528,7 @@ class DevTest {
             "--ensure-dev"
         )
         val clients = mutableListOf<E2eMcpClient>()
+        var verificationCompleted = false
         try {
             repeat(8) { index ->
                 val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-concurrent-mcp-$index-", ".stderr")
@@ -562,6 +563,10 @@ class DevTest {
 
             assertEquals(1, sessionIds.distinct().size, "Concurrent MCP clients started multiple dev sessions")
             assertTrue(Files.isRegularFile(projectDirectory.resolve(".fluxzero/dev/session.json")))
+            clients.forEach { client ->
+                assertTrue(client.process.isAlive, Files.readString(client.stderrFile))
+            }
+            verificationCompleted = true
         } finally {
             clients.forEach { client ->
                 client.writer.runCatching { close() }
@@ -576,7 +581,8 @@ class DevTest {
                 fixture.cliCommand,
                 fixture.isolatedHome,
                 fixture.devServerVersion,
-                projectDirectory
+                projectDirectory,
+                requireSuccess = verificationCompleted
             )
         }
     }
@@ -586,6 +592,7 @@ class DevTest {
         val cliCommand = fixture.cliCommand
         val isolatedHome = fixture.isolatedHome
         val devServerVersion = fixture.devServerVersion
+        var verificationCompleted = false
         Files.list(projectDirectory).use { entries -> assertEquals(0, entries.count()) }
         val stderrFile = Files.createTempFile(projectDirectory.parent, "fluxzero-empty-mcp-", ".stderr")
         val command = cliCommand + listOf(
@@ -657,6 +664,7 @@ class DevTest {
                          "Generated $buildSystem project did not compile. init=$initOutput status=$latestStatus " +
                              "stderr=${Files.readString(stderrFile)}")
             assertTrue(latestStatus.contains("\"sessionId\":\"$sessionId\""), latestStatus)
+            verificationCompleted = true
         } finally {
             process?.outputStream?.runCatching { close() }
             process?.destroy()
@@ -664,7 +672,10 @@ class DevTest {
                 process.destroyForcibly()
                 process.waitFor(5, TimeUnit.SECONDS)
             }
-            stopProcess(cliCommand, isolatedHome, devServerVersion, projectDirectory)
+            stopProcess(
+                cliCommand, isolatedHome, devServerVersion, projectDirectory,
+                requireSuccess = verificationCompleted
+            )
             Files.deleteIfExists(stderrFile)
         }
     }
@@ -950,7 +961,8 @@ class DevTest {
     private fun compileState(status: String): String? = COMPILE_STATE.find(status)?.groupValues?.get(1)
 
     private fun stopProcess(
-        cliCommand: List<String>, isolatedHome: Path, devServerVersion: String, projectDirectory: Path
+        cliCommand: List<String>, isolatedHome: Path, devServerVersion: String, projectDirectory: Path,
+        requireSuccess: Boolean = true
     ) {
         val stop = processBuilder(cliCommand + listOf(
             "dev", "stop",
@@ -962,8 +974,11 @@ class DevTest {
             stop.destroyForcibly()
             stop.waitFor(5, TimeUnit.SECONDS)
         }
-        check(stop.exitValue() == 0) {
-            "Could not stop empty-directory smoke environment: ${stop.inputStream.bufferedReader().readText()}"
+        val output = stop.inputStream.bufferedReader().readText()
+        if (requireSuccess) {
+            check(!stop.isAlive && stop.exitValue() == 0) {
+                "Could not stop empty-directory smoke environment: $output"
+            }
         }
     }
 
@@ -971,6 +986,8 @@ class DevTest {
         ProcessBuilder(command).also { builder ->
             builder.environment()["HOME"] = isolatedHome.toString()
             builder.environment()["USERPROFILE"] = isolatedHome.toString()
+            builder.environment()["FLUXZERO_DEV_SERVER_CACHE"] =
+                isolatedHome.resolve(".fluxzero/cache/dev-server").toString()
             if (Path.of(command.first()).toAbsolutePath().normalize() == Path.of(javaExecutable()).toAbsolutePath()) {
                 builder.command().add(1, "-Duser.home=$isolatedHome")
             }

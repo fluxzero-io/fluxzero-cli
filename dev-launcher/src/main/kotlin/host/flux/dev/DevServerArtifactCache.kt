@@ -12,8 +12,11 @@ import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.time.Duration
 
-internal fun defaultDevServerCacheDirectory(): Path =
-    Path.of(System.getProperty("user.home"), ".fluxzero", "cache", "dev-server")
+internal const val DEV_SERVER_CACHE_ENVIRONMENT_VARIABLE = "FLUXZERO_DEV_SERVER_CACHE"
+
+internal fun defaultDevServerCacheDirectory(environment: Map<String, String> = System.getenv()): Path =
+    environment[DEV_SERVER_CACHE_ENVIRONMENT_VARIABLE]?.takeIf(String::isNotBlank)?.let(Path::of)
+        ?: Path.of(System.getProperty("user.home"), ".fluxzero", "cache", "dev-server")
 
 class DevServerArtifactCache(
     private val cacheDirectory: Path = defaultDevServerCacheDirectory(),
