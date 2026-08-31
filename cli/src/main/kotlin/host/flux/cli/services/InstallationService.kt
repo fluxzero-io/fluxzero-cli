@@ -121,7 +121,7 @@ open class DefaultInstallationService(
         val binaryName = getBinaryName(platform, arch)
 
         // Inform user about download  
-        System.err.println("Downloading fluxzero-cli $tag for $platform-$arch...")
+        System.err.println("Downloading Fluxzero CLI $tag for $platform-$arch...")
 
         // Download native binary - try primary repository first, then fallback
         val binaryResponse = downloadBinary(tag, binaryName)

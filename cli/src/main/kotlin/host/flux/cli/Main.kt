@@ -1,6 +1,7 @@
 package host.flux.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
@@ -17,7 +18,7 @@ import host.flux.cli.services.UpdateService
  * Checks for updates on startup and then launches the CLI.
  */
 
-class FluxCli : CliktCommand() {
+class FluxCli : CliktCommand(name = "fz") {
     init {
         context {
             // Load default configuration options
@@ -27,6 +28,9 @@ class FluxCli : CliktCommand() {
             )
         }
     }
+
+    override fun help(context: Context): String =
+        "Build, run, and manage Fluxzero applications"
 
     override fun run() = Unit
 }
@@ -38,7 +42,10 @@ fun main(args: Array<String>) {
         if (currentVersion != "dev" && !currentVersion.endsWith("SNAPSHOT")) {
             val updateInfo = UpdateService.checkForUpdates(currentVersion)
             if (updateInfo.hasUpdate) {
-                System.err.println("A new version of fluxzero-cli is available: ${updateInfo.latestVersion} (current: $currentVersion)")
+                System.err.println(
+                    "A new version of the Fluxzero CLI is available: " +
+                        "${updateInfo.latestVersion} (current: $currentVersion)"
+                )
             }
         }
         FluxCli()

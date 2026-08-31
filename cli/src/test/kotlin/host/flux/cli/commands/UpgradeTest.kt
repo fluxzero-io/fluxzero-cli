@@ -19,8 +19,8 @@ class UpgradeTest {
         val result = cmd.test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stdout.contains("Checking fluxzero-cli installation..."))
-        assertTrue(result.stdout.contains("✅ fluxzero-cli upgraded from v1.0.0 to v1.2.3"))
+        assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
+        assertTrue(result.stdout.contains("✅ Fluxzero CLI upgraded from v1.0.0 to v1.2.3"))
     }
 
     @Test
@@ -32,8 +32,8 @@ class UpgradeTest {
         val result = cmd.test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stdout.contains("Checking fluxzero-cli installation..."))
-        assertTrue(result.stdout.contains("fluxzero-cli is already up to date (current version: v1.2.3)"))
+        assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
+        assertTrue(result.stdout.contains("Fluxzero CLI is already up to date (current version: v1.2.3)"))
     }
 
     @Test
@@ -45,8 +45,8 @@ class UpgradeTest {
         val result = cmd.test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stdout.contains("Checking fluxzero-cli installation..."))
-        assertTrue(result.stdout.contains("✅ fluxzero-cli installed (version: v1.2.3)"))
+        assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
+        assertTrue(result.stdout.contains("✅ Fluxzero CLI installed (version: v1.2.3)"))
     }
 
     @Test
@@ -59,7 +59,7 @@ class UpgradeTest {
         val result = Upgrade(installer).test(emptyList())
 
         verify(exactly = 1) { installer.install() }
-        assertTrue(result.stdout.contains("This fluxzero-cli installation is managed by Homebrew."))
+        assertTrue(result.stdout.contains("This Fluxzero CLI installation is managed by Homebrew."))
         assertTrue(result.stdout.contains("Upgrade with: brew update && brew upgrade fluxzero"))
     }
 
@@ -73,6 +73,6 @@ class UpgradeTest {
 
         verify(exactly = 1) { installer.install() }
         assertTrue(result.stderr.contains("Error: Installation failed: Could not download binary. Please try reinstalling using the installation script at https://fluxzero.io/docs/getting-started"))
-        assertTrue(result.stdout.contains("Checking fluxzero-cli installation..."))
+        assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
     }
 }

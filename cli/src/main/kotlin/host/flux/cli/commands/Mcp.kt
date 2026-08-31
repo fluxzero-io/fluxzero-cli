@@ -44,7 +44,7 @@ class Mcp(
         require(readinessTimeoutMillis >= 0) { "readinessTimeoutMillis must not be negative" }
     }
 
-    override fun help(context: Context): String = "Connect stdio MCP to the active Fluxzero dev environment"
+    override fun help(context: Context): String = "Connect an agent to the local Fluxzero development environment"
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Fluxzero project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)

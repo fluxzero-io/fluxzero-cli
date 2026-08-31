@@ -23,7 +23,7 @@ class Init(
 ) : CliktCommand() {
     private val actualPrompt: Prompt by lazy { prompt ?: JLinePrompt() }
 
-    override fun help(context: Context): String = "Initialize a new Flux application"
+    override fun help(context: Context): String = "Create a new Fluxzero application"
 
     val template by option("--template", help = "Name of the template to generate your application with")
 

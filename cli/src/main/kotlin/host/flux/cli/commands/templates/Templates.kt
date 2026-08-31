@@ -9,7 +9,7 @@ class Templates : CliktCommand() {
         subcommands(List())
     }
 
-    override fun help(context: Context): String = "Manage Flux templates"
+    override fun help(context: Context): String = "Manage Fluxzero project templates"
 
     override fun run() = Unit
 }
