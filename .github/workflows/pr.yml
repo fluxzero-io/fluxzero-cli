@@ -69,14 +69,21 @@ jobs:
       - name: Test macOS DMG detach recovery
         run: scripts/test-package-dmg-detach.sh
 
+      - name: Prepare candidate native-build artifact
+        if: steps.changes.outputs.windows-package == 'true'
+        shell: bash
+        run: |
+          artifact_root="build/pr-native-artifact/cli/build"
+          mkdir -p "$artifact_root/libs" "$artifact_root/release-scripts"
+          cp "cli/build/libs/fluxzero-cli-$CANDIDATE_VERSION.jar" "$artifact_root/libs/"
+          cp cli/build/release-scripts/* "$artifact_root/release-scripts/"
+
       - name: Upload candidate JAR and install scripts
         if: steps.changes.outputs.windows-package == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: jar-artifact
-          path: |
-            cli/build/libs/fluxzero-cli-${{ env.CANDIDATE_VERSION }}.jar
-            cli/build/release-scripts/
+          path: build/pr-native-artifact/
 
   windows-package:
     needs: build-and-test
