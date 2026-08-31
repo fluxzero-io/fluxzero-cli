@@ -81,6 +81,27 @@ jobs:
             test -x "$OUTPUT_DIRECTORY/flux"
           fi
 
+      - name: Bundle Windows runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ./scripts/collect-windows-runtime.ps1 `
+            -Executable cli/build/native/nativeCompile/flux.exe `
+            -Destination cli/build/native/nativeCompile
+
+      - name: Package Windows distribution
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $packageDirectory = Join-Path $env:RUNNER_TEMP "fluxzero-windows-package"
+          New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
+          Copy-Item cli/build/native/nativeCompile/flux.exe (Join-Path $packageDirectory "fz.exe")
+          Copy-Item cli/build/native/nativeCompile/*.dll $packageDirectory
+          Compress-Archive `
+            -Path "$packageDirectory/*" `
+            -DestinationPath cli/build/native/nativeCompile/flux-windows-amd64.zip `
+            -Force
+
       - name: Set up dev server Java
         uses: actions/setup-java@v5
         with:
@@ -237,11 +258,11 @@ jobs:
           
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell script
-            BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux.exe"
+            PACKAGE_PATH="$(pwd)/cli/build/native/nativeCompile/flux-windows-amd64.zip"
             INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.ps1"
             
             echo "Testing PowerShell installation script..."
-            pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
+            pwsh -File "$INSTALL_SCRIPT" -Binary "$PACKAGE_PATH" -InstallPath
             
             # Debug: List what was actually installed
             echo "Contents of $TEST_HOME/.fluxzero/bin/:"
@@ -254,6 +275,10 @@ jobs:
             fi
             if [ ! -f "$TEST_HOME/.fluxzero/bin/fluxzero.exe" ]; then
               echo "ERROR: fluxzero.exe alias was not installed correctly!"
+              exit 1
+            fi
+            if ! compgen -G "$TEST_HOME/.fluxzero/bin/*.dll" >/dev/null; then
+              echo "ERROR: Visual C++ runtime libraries were not installed!"
               exit 1
             fi
             
@@ -324,12 +349,12 @@ jobs:
           
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             # Test PowerShell scripts
-            BINARY_PATH="$(pwd)/cli/build/native/nativeCompile/flux.exe"
+            PACKAGE_PATH="$(pwd)/cli/build/native/nativeCompile/flux-windows-amd64.zip"
             INSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/install.ps1"
             UNINSTALL_SCRIPT="$(pwd)/build/cli/build/release-scripts/uninstall.ps1"
             
             echo "Installing first..."
-            pwsh -File "$INSTALL_SCRIPT" -Binary "$BINARY_PATH" -InstallPath
+            pwsh -File "$INSTALL_SCRIPT" -Binary "$PACKAGE_PATH" -InstallPath
             
             # Verify installation exists
             if [ ! -f "$TEST_HOME/.fluxzero/bin/fz.exe" ]; then
@@ -393,8 +418,20 @@ jobs:
           fi
 
       - name: Upload native executable
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}
-          path: ./cli/build/native/nativeCompile/flux${{ runner.os == 'Windows' && '.exe' || '' }}
+          path: ./cli/build/native/nativeCompile/flux
+          retention-days: 30
+
+      - name: Upload Windows executable and runtime
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            ./cli/build/native/nativeCompile/flux.exe
+            ./cli/build/native/nativeCompile/*.dll
+            ./cli/build/native/nativeCompile/flux-windows-amd64.zip
           retention-days: 30

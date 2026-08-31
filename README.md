@@ -32,19 +32,22 @@ iwr -useb https://github.com/fluxzero-io/fluxzero-cli/releases/latest/download/i
 
 The installer will:
 - 🎯 **Auto-detect** your platform and architecture
-- 📦 **Download native binary** (no Java required)
+- 📦 **Download the native package** (no Java required; the Windows package includes its Visual C++ runtime)
 - ⚡ **Install to `~/.fluxzero/bin/fz`** 
 - 🔗 **Add to PATH** (optional - you'll be prompted)
 - ✅ **Verify installation** with test commands
 
-### Option 3: Manual Native Executable Download
+### Option 3: Manual Native Download
 
-Download the native executable for your platform from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases):
+Download the native package or executable for your platform from the [releases page](https://github.com/fluxzero-io/fluxzero-cli/releases):
 
 - **Linux x86_64**: `flux-linux-amd64`
 - **macOS Intel**: `flux-macos-amd64`
 - **macOS Apple Silicon**: `flux-macos-arm64`
-- **Windows x64**: `flux-windows-amd64.exe`
+- **Windows x64**: `flux-windows-amd64.zip` (extract all files into one directory)
+
+The raw Windows `.exe` release asset is retained for compatibility and tooling. On a clean Windows installation, use
+WinGet, `install.ps1`, or the complete ZIP so the required runtime libraries are installed as well.
 
 ```bash
 # Example for macOS Apple Silicon
@@ -53,9 +56,9 @@ chmod +x fz
 sudo mv fz /usr/local/bin/fz
 ```
 
-**Benefits of native executables:**
+**Benefits of native downloads:**
 - ⚡ **5x faster startup** (~0.27s vs ~1.36s for JAR)
-- 📦 **Self-contained** (no Java installation required)
+- 📦 **No Java installation required**
 - 🚀 **Instant execution** (no JVM warm-up time)
 - 🌍 **Cross-platform** (Linux, macOS, Windows)
 
