@@ -14,6 +14,9 @@ class JLinePrompt(
 ) : Prompt {
     private val reader = LineReaderBuilder.builder().terminal(terminal).build()
 
+    override fun isInteractive(): Boolean = terminal.type != Terminal.TYPE_DUMB &&
+        terminal.type != Terminal.TYPE_DUMB_COLOR
+
     override fun readLine(prompt: String): String = reader.readLine(prompt)
 
     override fun select(question: String, options: List<String>, defaultIndex: Int): Int {

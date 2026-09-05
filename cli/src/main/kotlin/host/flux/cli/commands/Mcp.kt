@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
+import host.flux.cli.services.JavaSetup
 import host.flux.dev.CommandExecutor
 import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
@@ -32,13 +33,17 @@ private val SESSION_STATUS = Regex("\"status\"\\s*:\\s*\"([^\"]+)\"")
 private val MCP_STATE = Regex("\"mcp\"\\s*:\\s*\\{[^}]*\"state\"\\s*:\\s*\"([^\"]+)\"")
 
 class Mcp(
-    private val launcher: DevLauncher = DevServerLauncher(McpCommandExecutor()),
+    launcher: DevLauncher? = null,
     private val coordinateStart: (Path, () -> Int) -> Int = WorkspaceDevStartCoordinator::start,
     private val readinessAttempts: Int = DEV_MCP_READINESS_ATTEMPTS,
     private val readinessPause: () -> Unit = { Thread.sleep(DEV_MCP_READINESS_RETRY_MILLIS) },
     private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
     private val monotonicNanos: () -> Long = System::nanoTime
 ) : CliktCommand() {
+    private val launcher = launcher ?: DevServerLauncher(
+        McpCommandExecutor(), javaRuntimeProvider = JavaSetup.nonInteractive()
+    )
+
     override val hiddenFromHelp: Boolean = true
 
     init {

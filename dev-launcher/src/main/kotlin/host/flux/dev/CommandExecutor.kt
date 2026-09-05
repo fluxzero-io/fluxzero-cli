@@ -18,6 +18,9 @@ enum class OutputMode {
 fun interface CommandExecutor {
     fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int
 
+    fun useJava(runtime: JavaRuntime) {
+    }
+
     fun executeCleanup(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int =
         execute(command, workingDirectory, outputMode)
 
@@ -46,6 +49,11 @@ class InheritedIoCommandExecutor(
     private val launchdEnabled: Boolean? = null
 ) : CommandExecutor {
     private val activeScope = AtomicReference<ExecutionScope>()
+    private val javaRuntime = AtomicReference<JavaRuntime>()
+
+    override fun useJava(runtime: JavaRuntime) {
+        javaRuntime.set(runtime)
+    }
 
     override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
         val scope = activeScope.get()
@@ -63,6 +71,7 @@ class InheritedIoCommandExecutor(
             .redirectInput(ProcessBuilder.Redirect.from(java.io.File(nullInput)))
             .redirectError(if (outputMode == OutputMode.DISCARD) ProcessBuilder.Redirect.DISCARD
                            else ProcessBuilder.Redirect.INHERIT)
+        configureJavaEnvironment(builder)
         builder.redirectOutput(if (outputMode == OutputMode.INHERIT) ProcessBuilder.Redirect.INHERIT
                                else ProcessBuilder.Redirect.DISCARD)
         val process = builder.start()
@@ -81,12 +90,13 @@ class InheritedIoCommandExecutor(
             StandardOpenOption.TRUNCATE_EXISTING
         )
         if (isWindows()) {
-            return ProcessBuilder(command)
+            val builder = ProcessBuilder(command)
                 .directory(workingDirectory.toFile())
                 .redirectInput(ProcessBuilder.Redirect.from(java.io.File("NUL")))
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
                 .redirectError(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
-                .start().pid()
+            configureJavaEnvironment(builder)
+            return builder.start().pid()
         }
         if (usesLaunchd()) {
             return startWithLaunchd(command, workingDirectory, outputFile)
@@ -100,10 +110,11 @@ class InheritedIoCommandExecutor(
         )
             .directory(workingDirectory.toFile())
             .redirectError(ProcessBuilder.Redirect.appendTo(outputFile.toFile()))
-            .start()
-        val pid = bootstrap.inputStream.bufferedReader().readLine()?.trim()?.toLongOrNull()
+        configureJavaEnvironment(bootstrap)
+        val bootstrapProcess = bootstrap.start()
+        val pid = bootstrapProcess.inputStream.bufferedReader().readLine()?.trim()?.toLongOrNull()
             ?: error("Detached process bootstrap did not report a PID. See $outputFile")
-        check(bootstrap.waitFor(2, TimeUnit.SECONDS) && bootstrap.exitValue() == 0) {
+        check(bootstrapProcess.waitFor(2, TimeUnit.SECONDS) && bootstrapProcess.exitValue() == 0) {
             "Detached process bootstrap failed. See $outputFile"
         }
         return pid
@@ -133,6 +144,16 @@ class InheritedIoCommandExecutor(
         val plist = launchdPlist(workingDirectory)
         val arguments = listOf("/bin/zsh", "-lc", "exec \"\$@\"", "fluxzero-dev") + command
         val argumentXml = arguments.joinToString("\n") { "      <string>${xml(it)}</string>" }
+        val environmentXml = javaRuntime.get()?.let { runtime ->
+            val path = withJavaOnPath(System.getenv("PATH").orEmpty(), runtime)
+            """
+              <key>EnvironmentVariables</key>
+              <dict>
+                <key>JAVA_HOME</key><string>${xml(runtime.home.toString())}</string>
+                <key>PATH</key><string>${xml(path)}</string>
+              </dict>
+            """.trimIndent()
+        }.orEmpty()
         java.nio.file.Files.writeString(
             plist,
             """
@@ -146,6 +167,7 @@ class InheritedIoCommandExecutor(
             $argumentXml
               </array>
               <key>WorkingDirectory</key><string>${xml(workingDirectory.toString())}</string>
+$environmentXml
               <key>StandardOutPath</key><string>${xml(outputFile.toString())}</string>
               <key>StandardErrorPath</key><string>${xml(outputFile.toString())}</string>
               <key>RunAtLoad</key><false/>
@@ -250,6 +272,7 @@ class InheritedIoCommandExecutor(
             .directory(workingDirectory.toFile())
             .redirectInput(ProcessBuilder.Redirect.INHERIT)
             .redirectError(ProcessBuilder.Redirect.INHERIT)
+        configureJavaEnvironment(builder)
         configureBuildJvm(builder, command)
         if (outputMode == OutputMode.INHERIT) {
             builder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
@@ -290,13 +313,28 @@ class InheritedIoCommandExecutor(
         val existing = builder.environment()[variable].orEmpty()
         val required = buildList {
             add("--enable-native-access=ALL-UNNAMED")
-            if (Runtime.version().feature() >= 24) add("--sun-misc-unsafe-memory-access=allow")
+            if ((javaRuntime.get()?.feature ?: Runtime.version().feature()) >= 24) {
+                add("--sun-misc-unsafe-memory-access=allow")
+            }
         }
         val missing = required.filterNot(existing::contains)
         if (missing.isNotEmpty()) {
             builder.environment()[variable] = (listOf(existing) + missing)
                 .filter(String::isNotBlank).joinToString(" ")
         }
+    }
+
+    private fun configureJavaEnvironment(builder: ProcessBuilder) {
+        javaRuntime.get()?.let { runtime ->
+            builder.environment()["JAVA_HOME"] = runtime.home.toString()
+            builder.environment()["PATH"] = withJavaOnPath(builder.environment()["PATH"].orEmpty(), runtime)
+        }
+    }
+
+    private fun withJavaOnPath(path: String, runtime: JavaRuntime): String {
+        val separator = if (isWindows()) ";" else ":"
+        val bin = runtime.executable.parent.toString()
+        return (listOf(bin) + path.split(separator).filter { it.isNotBlank() && it != bin }).joinToString(separator)
     }
 
     private inner class ExecutionScope(

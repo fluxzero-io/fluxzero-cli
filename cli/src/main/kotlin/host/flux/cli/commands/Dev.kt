@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.types.long
 import com.github.ajalt.clikt.parameters.types.path
+import host.flux.cli.services.JavaSetup
 import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
@@ -20,9 +21,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class Dev(
-    private val launcher: DevLauncher = DevServerLauncher(),
+    launcher: DevLauncher? = null,
     private val projectInitializer: DevProjectInitializer = InteractiveDevProjectInitializer()
 ) : CliktCommand() {
+    private val launcher = launcher ?: DevServerLauncher(javaRuntimeProvider = JavaSetup())
+
     override fun help(context: Context): String = "Run and control the local Fluxzero development environment"
     override fun helpEpilog(context: Context): String =
         "Shared project defaults belong in .fluxzero/dev.yaml. " +

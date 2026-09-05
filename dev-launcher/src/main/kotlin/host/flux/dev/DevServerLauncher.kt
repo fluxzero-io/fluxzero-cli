@@ -23,6 +23,7 @@ class DevServerLauncher(
     private val environment: Map<String, String> = System.getenv(),
     versionResolver: DevServerVersionResolver? = null,
     classpathResolver: DevServerClasspathResolver? = null,
+    javaRuntimeProvider: JavaRuntimeProvider? = null,
     private val messageSink: (String) -> Unit = { System.err.println(it) }
 ) : DevLauncher {
     private val executor = executor ?: InheritedIoCommandExecutor()
@@ -30,8 +31,12 @@ class DevServerLauncher(
     private val classpathResolver = classpathResolver ?: DevServerClasspathResolver(
         this.executor, messageSink = messageSink
     )
+    private val javaRuntimeProvider = javaRuntimeProvider ?: JavaRuntimeDiscovery(environment)
 
     override fun launch(request: DevLaunchRequest): Int {
+        val javaRuntime = javaRuntimeProvider.resolve()
+        if (javaRuntime.feature < REQUIRED_JAVA_FEATURE) throw JavaRequiredException()
+        executor.useJava(javaRuntime)
         val projectDirectory = request.projectDirectory.toAbsolutePath().normalize()
         val activeSession = activeSession(projectDirectory)
         val requestedVersion = request.devServerVersion?.takeIf { it.isNotBlank() }
@@ -62,12 +67,12 @@ class DevServerLauncher(
                     reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive,
                     projectPin = projectPin
                 )
-                var command = command(classpath, request)
+                var command = command(classpath, request, javaRuntime)
                 if (request.target == DevLaunchTarget.SERVER) {
                     var active = likelyActive && probe(command, projectDirectory)
                     if (likelyActive && !active) {
                         classpath = classpathResolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
-                        command = command(classpath, request)
+                        command = command(classpath, request, javaRuntime)
                         active = false
                     }
                     launchServer(
@@ -104,10 +109,12 @@ class DevServerLauncher(
         }
     }
 
-    private fun command(classpath: String, request: DevLaunchRequest): List<String> = listOf(
-        javaExecutable(),
+    private fun command(
+        classpath: String, request: DevLaunchRequest, javaRuntime: JavaRuntime
+    ): List<String> = listOf(
+        javaRuntime.executable.toString(),
         "--enable-native-access=ALL-UNNAMED"
-    ) + unsafeMemoryOption() + request.jvmOptions + listOf(
+    ) + unsafeMemoryOption(javaRuntime) + request.jvmOptions + listOf(
         "-cp",
         classpath,
         request.target.mainClass
@@ -320,21 +327,8 @@ class DevServerLauncher(
         executor.releaseDetached(projectDirectory)
     }
 
-    private fun javaExecutable(): String {
-        val executableName = if (isWindows()) "java.exe" else "java"
-        return sequenceOf(environment["JAVA_HOME"], System.getProperty("java.home"))
-            .mapNotNull { javaHome ->
-                javaHome?.takeIf(String::isNotBlank)?.let {
-                    runCatching { Path.of(it, "bin", executableName) }.getOrNull()
-                }
-            }
-            .firstOrNull(Files::isRegularFile)
-            ?.toString()
-            ?: executableName
-    }
-
-    private fun unsafeMemoryOption(): List<String> =
-        if (Runtime.version().feature() >= 24) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
+    private fun unsafeMemoryOption(javaRuntime: JavaRuntime): List<String> =
+        if (javaRuntime.feature >= 24) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
 
     private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
 

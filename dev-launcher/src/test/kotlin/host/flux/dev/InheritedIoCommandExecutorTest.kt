@@ -71,6 +71,28 @@ class InheritedIoCommandExecutorTest {
     }
 
     @Test
+    fun `build processes use the selected java installation`() {
+        val directory = Files.createTempDirectory("fluxzero-selected-java")
+        val wrapper = directory.resolve("mvnw")
+        Files.writeString(
+            wrapper,
+            "#!/bin/sh\nprintf '%s\\n%s' \"\$JAVA_HOME\" \"\$PATH\" > java-environment.txt\n"
+        )
+        wrapper.toFile().setExecutable(true)
+        val home = Path.of(System.getProperty("java.home")).toRealPath()
+        val java = home.resolve("bin/java").toRealPath()
+        val executor = InheritedIoCommandExecutor().apply {
+            useJava(JavaRuntime(home, java, 25))
+        }
+
+        assertEquals(0, executor.execute(listOf(wrapper.toString()), directory, OutputMode.INHERIT))
+
+        val environment = Files.readAllLines(directory.resolve("java-environment.txt"))
+        assertEquals(home.toString(), environment[0])
+        assertEquals(java.parent.toString(), environment[1].substringBefore(":"))
+    }
+
+    @Test
     fun `detached child survives launcher scope and writes bootstrap log`() {
         val directory = Files.createTempDirectory("fluxzero-detached-executor")
         val log = directory.resolve("bootstrap.log")

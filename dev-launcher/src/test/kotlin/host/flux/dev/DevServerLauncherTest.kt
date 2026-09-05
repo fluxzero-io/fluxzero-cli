@@ -6,6 +6,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DevServerLauncherTest {
@@ -711,32 +712,56 @@ class DevServerLauncherTest {
     }
 
     @Test
-    fun `uses java from path when native runtime has no java home`() {
+    fun `uses the java runtime selected for the launch`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         val commands = mutableListOf<List<String>>()
-        val executor = CommandExecutor { command, _, _ ->
-            commands += command
-            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
-                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+        var configuredRuntime: JavaRuntime? = null
+        val executor = object : CommandExecutor {
+            override fun useJava(runtime: JavaRuntime) {
+                configuredRuntime = runtime
             }
-            0
-        }
-        val javaHome = System.getProperty("java.home")
-        System.clearProperty("java.home")
-        try {
-            DevServerLauncher(executor, emptyMap()) { }.launch(
-                DevLaunchRequest(
-                    projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
-                    listOf("status", "--project-dir", projectDirectory.toString())
-                )
-            )
-        } finally {
-            if (javaHome != null) System.setProperty("java.home", javaHome)
-        }
 
-        assertEquals("java", commands.last().first())
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += command
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
+            }
+        }
+        val runtime = JavaRuntime(projectDirectory, projectDirectory.resolve("bin/java"), 25)
+        DevServerLauncher(
+            executor,
+            emptyMap(),
+            javaRuntimeProvider = JavaRuntimeProvider { runtime },
+            messageSink = {}
+        ).launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
+                listOf("status", "--project-dir", projectDirectory.toString())
+            )
+        )
+
+        assertEquals(runtime, configuredRuntime)
+        assertEquals(runtime.executable.toString(), commands.last().first())
+        assertTrue(commands.last().contains("--sun-misc-unsafe-memory-access=allow"))
         assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
+    }
+
+    @Test
+    fun `rejects a selected java runtime older than the supported version`() {
+        val runtime = JavaRuntime(projectDirectory, projectDirectory.resolve("bin/java"), 24)
+        val launcher = DevServerLauncher(
+            CommandExecutor { _, _, _ -> error("should not execute") },
+            emptyMap(),
+            javaRuntimeProvider = JavaRuntimeProvider { runtime },
+            messageSink = {}
+        )
+
+        assertFailsWith<JavaRequiredException> {
+            launcher.launch(DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.CONTROL))
+        }
     }
 
     @Test

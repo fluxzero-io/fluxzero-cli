@@ -144,6 +144,10 @@ credentials are allocated and discovered automatically through `.fluxzero/dev/se
 The application main class is detected from compiled Java or Kotlin classes. Use `--main-class` only when a project
 contains multiple executable entrypoints and the intended one is ambiguous.
 
+Fluxzero uses Java 25 for local development. When it is not available, interactive use offers to install it through
+Homebrew or WinGet. Agent-driven use reports the same requirement without opening a prompt, so the agent can ask for
+permission, perform the installation, and retry the original command.
+
 ```bash
 fz dev
 ```
@@ -444,7 +448,7 @@ FluxZero CLI installs to:
 ## Requirements
 
 - **Native executables**: Self-contained for regular CLI commands
-- **Development server**: Java 25 or higher available through `JAVA_HOME` or `PATH`
+- **Development server**: Java 25 or higher; `fz dev` detects it and can offer installation through Homebrew or WinGet
 - **JAR version**: Java 21 or higher for regular CLI commands; `fz dev` has the development-server requirement above
 
 ## Templates
