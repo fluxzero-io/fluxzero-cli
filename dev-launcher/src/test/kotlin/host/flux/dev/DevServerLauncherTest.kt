@@ -6,6 +6,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DevServerLauncherTest {
@@ -33,7 +34,7 @@ class DevServerLauncherTest {
                 return 4242
             }
         }
-        val launcher = DevServerLauncher(executor, mapOf("JAVA_HOME" to projectDirectory.toString())) { }
+        val launcher = launcher(executor, mapOf("JAVA_HOME" to projectDirectory.toString()))
 
         val exitCode = launcher.launch(
             DevLaunchRequest(
@@ -54,9 +55,7 @@ class DevServerLauncherTest {
         assertTrue(commands[1].command.contains("io.fluxzero.devserver.DevServerPreflightMain"))
         assertEquals(OutputMode.INHERIT, commands[2].outputMode)
         assertTrue(serverCommand.contains("--enable-native-access=ALL-UNNAMED"))
-        if (Runtime.version().feature() >= 24) {
-            assertTrue(serverCommand.contains("--sun-misc-unsafe-memory-access=allow"))
-        }
+        assertTrue(serverCommand.contains("--sun-misc-unsafe-memory-access=allow"))
         assertTrue(!serverCommand.contains("-Dfluxzero.dev.launcherOwnsShutdown=true"))
         assertTrue(serverCommand.contains(DevLaunchTarget.SERVER.mainClass))
         assertTrue(serverCommand.contains("--fast-compiler"))
@@ -73,7 +72,7 @@ class DevServerLauncherTest {
         val commands = mutableListOf<List<String>>()
         val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.MCP_STDIO)
         )
 
@@ -93,9 +92,7 @@ class DevServerLauncherTest {
         }) { }
         val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
 
-        DevServerLauncher(
-            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
-        ) { }.launch(
+        launcher(executor, versionResolver = resolver, classpathResolver = classpathResolver).launch(
             DevLaunchRequest(projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("status"))
         )
 
@@ -120,9 +117,7 @@ class DevServerLauncherTest {
         }) { }
         val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
 
-        DevServerLauncher(
-            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
-        ) { }.launch(
+        launcher(executor, versionResolver = resolver, classpathResolver = classpathResolver).launch(
             DevLaunchRequest(projectDirectory, target = DevLaunchTarget.CONFIG)
         )
 
@@ -150,9 +145,7 @@ class DevServerLauncherTest {
             if (uri.toString().endsWith(".sha256")) sha256(bytes).encodeToByteArray() else bytes
         }) { }
         val classpathResolver = DevServerClasspathResolver(executor, artifacts) { }
-        val launcher = DevServerLauncher(
-            executor, emptyMap(), versionResolver = resolver, classpathResolver = classpathResolver
-        ) { }
+        val launcher = launcher(executor, versionResolver = resolver, classpathResolver = classpathResolver)
 
         launcher.launch(DevLaunchRequest(
             projectDirectory, target = DevLaunchTarget.CONTROL, arguments = listOf("list")
@@ -193,7 +186,7 @@ class DevServerLauncherTest {
             override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path) = 4242L
         }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -212,7 +205,7 @@ class DevServerLauncherTest {
         val commands = mutableListOf<List<String>>()
         val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL, listOf("status"))
         )
 
@@ -242,7 +235,7 @@ class DevServerLauncherTest {
         }
 
         val resolver = DevServerVersionResolver({ error("an active session must not check for updates") }) { }
-        val exitCode = DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+        val exitCode = launcher(executor, versionResolver = resolver).launch(
             DevLaunchRequest(projectDirectory, target = DevLaunchTarget.SERVER)
         )
 
@@ -265,7 +258,7 @@ class DevServerLauncherTest {
         val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
         val resolver = DevServerVersionResolver({ error("an active session must not check for updates") }) { }
 
-        DevServerLauncher(executor, emptyMap(), versionResolver = resolver) { }.launch(
+        launcher(executor, versionResolver = resolver).launch(
             DevLaunchRequest(projectDirectory, "1.9.0", DevLaunchTarget.CONTROL, listOf("status"))
         )
 
@@ -278,7 +271,7 @@ class DevServerLauncherTest {
     fun `reports one clean stop when snapshot resolution is interrupted`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val messages = mutableListOf<String>()
-        val launcher = DevServerLauncher(CommandExecutor { _, _, _ -> 130 }, emptyMap(), messageSink = messages::add)
+        val launcher = launcher(CommandExecutor { _, _, _ -> 130 }, messageSink = messages::add)
 
         val exitCode = launcher.launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
@@ -321,7 +314,7 @@ class DevServerLauncherTest {
             override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path) = 4242L
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
+        val exitCode = launcher(executor, messageSink = messages::add).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -362,7 +355,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
+        val exitCode = launcher(executor, messageSink = messages::add).launch(
             DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
         )
 
@@ -386,7 +379,7 @@ class DevServerLauncherTest {
             if (command.contains("attach")) 130 else 0
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap(), messageSink = messages::add).launch(
+        val exitCode = launcher(executor, messageSink = messages::add).launch(
             DevLaunchRequest(
                 projectDirectory, "1.2.3", DevLaunchTarget.CONTROL,
                 listOf("attach", "--project-dir", projectDirectory.toString())
@@ -433,7 +426,7 @@ class DevServerLauncherTest {
             }
         }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -462,7 +455,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(
                 projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
                 listOf("--project-dir", projectDirectory.toString()), detached = true
@@ -495,7 +488,7 @@ class DevServerLauncherTest {
             override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long = 4242
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(
                 projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
                 listOf("--project-dir", projectDirectory.toString()), detached = true,
@@ -529,7 +522,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(
                 projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER,
                 listOf("--project-dir", projectDirectory.toString(), "--port", "4200"), detached = true
@@ -558,7 +551,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -583,7 +576,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.SERVER)
         )
 
@@ -617,7 +610,7 @@ class DevServerLauncherTest {
             "OP_SERVICE_ACCOUNT_TOKEN" to "never-forward-this"
         )
 
-        DevServerLauncher(executor, environment) { }.launch(
+        launcher(executor, environment).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", detached = true)
         )
 
@@ -641,7 +634,7 @@ class DevServerLauncherTest {
             0
         }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(
                 projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
                 listOf("status", "--project-dir", projectDirectory.toString())
@@ -679,7 +672,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.SERVER)
         )
 
@@ -702,7 +695,7 @@ class DevServerLauncherTest {
             }
         }
 
-        val exitCode = DevServerLauncher(executor, emptyMap()) { }.launch(
+        val exitCode = launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.CONTROL, listOf("stop", "--all"))
         )
 
@@ -711,32 +704,56 @@ class DevServerLauncherTest {
     }
 
     @Test
-    fun `uses java from path when native runtime has no java home`() {
+    fun `uses the java runtime selected for the launch`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         val commands = mutableListOf<List<String>>()
-        val executor = CommandExecutor { command, _, _ ->
-            commands += command
-            command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
-                Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+        var configuredRuntime: JavaRuntime? = null
+        val executor = object : CommandExecutor {
+            override fun useJava(runtime: JavaRuntime) {
+                configuredRuntime = runtime
             }
-            0
-        }
-        val javaHome = System.getProperty("java.home")
-        System.clearProperty("java.home")
-        try {
-            DevServerLauncher(executor, emptyMap()) { }.launch(
-                DevLaunchRequest(
-                    projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
-                    listOf("status", "--project-dir", projectDirectory.toString())
-                )
-            )
-        } finally {
-            if (javaHome != null) System.setProperty("java.home", javaHome)
-        }
 
-        assertEquals("java", commands.last().first())
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += command
+                command.firstOrNull { it.startsWith("-Dmdep.outputFile=") }?.let {
+                    Files.writeString(Path.of(it.substringAfter('=')), dependency.toString())
+                }
+                return 0
+            }
+        }
+        val runtime = JavaRuntime(projectDirectory, projectDirectory.resolve("bin/java"), 25)
+        DevServerLauncher(
+            executor,
+            emptyMap(),
+            javaRuntimeProvider = JavaRuntimeProvider { runtime },
+            messageSink = {}
+        ).launch(
+            DevLaunchRequest(
+                projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL,
+                listOf("status", "--project-dir", projectDirectory.toString())
+            )
+        )
+
+        assertEquals(runtime, configuredRuntime)
+        assertEquals(runtime.executable.toString(), commands.last().first())
+        assertTrue(commands.last().contains("--sun-misc-unsafe-memory-access=allow"))
         assertTrue(commands.last().contains(DevLaunchTarget.CONTROL.mainClass))
+    }
+
+    @Test
+    fun `rejects a selected java runtime older than the supported version`() {
+        val runtime = JavaRuntime(projectDirectory, projectDirectory.resolve("bin/java"), 24)
+        val launcher = DevServerLauncher(
+            CommandExecutor { _, _, _ -> error("should not execute") },
+            emptyMap(),
+            javaRuntimeProvider = JavaRuntimeProvider { runtime },
+            messageSink = {}
+        )
+
+        assertFailsWith<JavaRequiredException> {
+            launcher.launch(DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.CONTROL))
+        }
     }
 
     @Test
@@ -753,7 +770,7 @@ class DevServerLauncherTest {
             0
         }
 
-        DevServerLauncher(executor, emptyMap()) { }.launch(
+        launcher(executor).launch(
             DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL, listOf("status"))
         )
 
@@ -768,6 +785,23 @@ class DevServerLauncherTest {
         val command: List<String>,
         val workingDirectory: Path,
         val outputMode: OutputMode
+    )
+
+    private fun launcher(
+        executor: CommandExecutor,
+        environment: Map<String, String> = emptyMap(),
+        versionResolver: DevServerVersionResolver? = null,
+        classpathResolver: DevServerClasspathResolver? = null,
+        messageSink: (String) -> Unit = {}
+    ): DevServerLauncher = DevServerLauncher(
+        executor = executor,
+        environment = environment,
+        versionResolver = versionResolver,
+        classpathResolver = classpathResolver,
+        javaRuntimeProvider = JavaRuntimeProvider {
+            JavaRuntime(projectDirectory, projectDirectory.resolve("bin/java"), REQUIRED_JAVA_FEATURE)
+        },
+        messageSink = messageSink
     )
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
