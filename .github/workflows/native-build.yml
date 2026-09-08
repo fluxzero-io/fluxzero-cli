@@ -108,6 +108,13 @@ jobs:
           distribution: temurin
           java-version: '25'
 
+      - name: Verify dev server Java installation
+        shell: bash
+        run: |
+          # Check and warm up the newly installed JDK before the CLI's bounded discovery probe.
+          java -version
+          javac -version
+
       - name: Verify native image
         shell: bash
         run: |
