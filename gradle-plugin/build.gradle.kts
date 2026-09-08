@@ -151,3 +151,23 @@ tasks.check {
 tasks.test {
     useJUnitPlatform()
 }
+
+// Use the same publications (including the Gradle marker) and signing as Central.
+publishing {
+    repositories {
+        maven {
+            name = "FluxzeroPackages"
+            url = uri(providers.gradleProperty("fluxzeroPackagesUrl")
+                .getOrElse("https://packages.fluxzero.io/publish/maven"))
+            if (url.scheme != "file") {
+                credentials {
+                    username = "github-actions"
+                    password = providers.environmentVariable("FLUXZERO_PACKAGES_TOKEN").orNull
+                }
+                authentication {
+                    create<org.gradle.authentication.http.BasicAuthentication>("basic")
+                }
+            }
+        }
+    }
+}

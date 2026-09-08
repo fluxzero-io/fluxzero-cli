@@ -791,6 +791,26 @@ account that has accepted Microsoft's contributor license agreement:
 Keeping these tokens separate avoids granting a classic PAT the broad `repo` scope that GitHub automatically requires
 when its `workflow` scope is selected.
 
+### Build-plugin releases
+
+The release workflow publishes the existing Maven and Gradle publications (including
+`io.fluxzero.tools.gradle.plugin`'s marker) to `https://packages.fluxzero.io/publish/maven`
+with standard Gradle Maven Publish tasks, then verifies independent consumers using
+`https://packages.fluxzero.io/maven` before starting Maven Central publication.
+GitHub OIDC uses audience `https://packages.fluxzero.io/maven`; only the publishing job
+has `id-token: write`. Existing GPG signing secrets and Central credentials are retained.
+
+A reserved version is never uploaded again on a workflow rerun. If either repository
+contains an incomplete release, fix the cause and start a new Release workflow to
+reserve the next version. Do not rebuild or overwrite already published release bytes.
+
+Run `scripts/test-plugin-publication.sh` to publish with an ephemeral signing key to a
+temporary file repository, verify the existing attachments/signatures, and execute Maven
+and Gradle consumers with empty caches. Run `scripts/verify-published-plugins.sh VERSION
+https://packages.fluxzero.io/maven` to qualify a live release. The Maven consumer checks
+repository provenance; Gradle exclusively routes Fluxzero coordinates, including the
+plugin marker, to the repository being qualified. Central is used for third-party dependencies.
+
 ## License
 
 The CLI and build plugins are licensed under the EUPL-1.2; see `LICENSE`. The embedded starter-template sources under
