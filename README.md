@@ -821,3 +821,19 @@ The CLI and build plugins are licensed under the EUPL-1.2; see `LICENSE`. The em
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Maven files in GitHub Releases
+
+Future GitHub Releases also retain the exact files published to Fluxzero
+Packages: POMs, JARs and attached artifacts, signatures, and available checksum
+sidecars. The workflow downloads these bytes from Packages rather than taking
+files from a later Central build. Existing distribution assets are preserved.
+Use an exact asset filename when downloading a particular JAR; a broad `*.jar`
+pattern also matches sources, Javadoc and other modules.
+
+The collector (`.github/scripts/collect-maven-assets.py`) verifies checksums and
+fails on missing required files or duplicate flat asset names. The CLI workflow lists its
+plugin publications explicitly, including the Gradle marker and module metadata;
+update that list when those publications change. Mutable repository-wide
+`maven-metadata.xml` and directory indexes are not release assets. No manifest,
+archive, historical backfill or restore tool is generated.
