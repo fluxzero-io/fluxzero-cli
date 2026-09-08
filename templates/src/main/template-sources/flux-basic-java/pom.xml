@@ -18,6 +18,23 @@
 		<fluxzero.package.tag>${project.version}</fluxzero.package.tag>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>fluxzero</id>
+			<url>https://packages.fluxzero.io/maven</url>
+			<releases><enabled>true</enabled></releases>
+			<snapshots><enabled>false</enabled></snapshots>
+		</repository>
+	</repositories>
+	<pluginRepositories>
+		<pluginRepository>
+			<id>fluxzero-plugins</id>
+			<url>https://packages.fluxzero.io/maven</url>
+			<releases><enabled>true</enabled></releases>
+			<snapshots><enabled>false</enabled></snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
