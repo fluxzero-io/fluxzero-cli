@@ -143,15 +143,20 @@ jobs:
         shell: bash
         run: |
           set +x
-          token=$(curl --fail --silent --show-error --get \
-            --data-urlencode 'audience=https://packages.fluxzero.io/publish/maven' \
-            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -er '.value')
-          echo "::add-mask::$token"
-          export FLUXZERO_PACKAGES_TOKEN="$token"
-          ./gradlew :maven-plugin:publishAllPublicationsToFluxzeroPackagesRepository \
-                    :gradle-plugin:publishAllPublicationsToFluxzeroPackagesRepository \
-                    -PappVersion="${{ needs.version.outputs.version }}"
+          # GitHub tokens expire after five minutes. Refresh before each publication.
+          # Publish the marker last, after its implementation is available.
+          for publication_task in \
+            :maven-plugin:publishMavenPublicationToFluxzeroPackagesRepository \
+            :gradle-plugin:publishPluginMavenPublicationToFluxzeroPackagesRepository \
+            :gradle-plugin:publishFluxzeroPluginMarkerMavenPublicationToFluxzeroPackagesRepository; do
+            token=$(curl --fail --silent --show-error --get \
+              --data-urlencode 'audience=https://packages.fluxzero.io/publish/maven' \
+              --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -er '.value')
+            echo "::add-mask::$token"
+            export FLUXZERO_PACKAGES_TOKEN="$token"
+            ./gradlew "$publication_task" -PappVersion="${{ needs.version.outputs.version }}"
+          done
         env:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
