@@ -797,7 +797,7 @@ The release workflow publishes the existing Maven and Gradle publications (inclu
 `io.fluxzero.tools.gradle.plugin`'s marker) to `https://packages.fluxzero.io/publish/maven`
 with standard Gradle Maven Publish tasks, then verifies independent consumers using
 `https://packages.fluxzero.io/maven` before starting Maven Central publication.
-GitHub OIDC uses audience `https://packages.fluxzero.io/maven`; only the publishing job
+GitHub OIDC uses audience `https://packages.fluxzero.io/publish/maven`; only the publishing job
 has `id-token: write`. Existing GPG signing secrets and Central credentials are retained.
 
 A reserved version is never uploaded again on a workflow rerun. If either repository
