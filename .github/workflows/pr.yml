@@ -51,6 +51,9 @@ jobs:
           "cli/build/libs/fluxzero-cli-$CANDIDATE_VERSION.jar"
           "$RUNNER_TEMP/fluxzero-plugin-repository"
 
+      - name: Verify signed plugin publication and clean consumers
+        run: scripts/test-plugin-publication.sh
+
       - name: Test release versioning
         run: scripts/test-determine-release-version.sh
 

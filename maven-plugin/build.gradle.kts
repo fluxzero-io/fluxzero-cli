@@ -302,3 +302,23 @@ tasks.test {
         showStandardStreams = false
     }
 }
+
+// Use the same publication and signing as Central.
+publishing {
+    repositories {
+        maven {
+            name = "FluxzeroPackages"
+            url = uri(providers.gradleProperty("fluxzeroPackagesUrl")
+                .getOrElse("https://packages.fluxzero.io/publish/maven"))
+            if (url.scheme != "file") {
+                credentials {
+                    username = "github-actions"
+                    password = providers.environmentVariable("FLUXZERO_PACKAGES_TOKEN").orNull
+                }
+                authentication {
+                    create<org.gradle.authentication.http.BasicAuthentication>("basic")
+                }
+            }
+        }
+    }
+}

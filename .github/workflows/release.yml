@@ -115,6 +115,9 @@ jobs:
   publish-plugins:
     runs-on: ubuntu-latest
     needs: [version, build-and-test, native-build-macos, native-build-cli, reserve-version]
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -124,6 +127,37 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+
+      - name: Prepare signed plugin publications
+        if: needs.reserve-version.outputs.created == 'true'
+        run: >-
+          ./gradlew :maven-plugin:publishToMavenLocal :gradle-plugin:publishToMavenLocal
+          -PappVersion="${{ needs.version.outputs.version }}"
+          -Dmaven.repo.local="$RUNNER_TEMP/signed-plugin-repository"
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
+
+      - name: Publish plugins to Fluxzero Packages
+        if: needs.reserve-version.outputs.created == 'true'
+        shell: bash
+        run: |
+          set +x
+          token=$(curl --fail --silent --show-error --get \
+            --data-urlencode 'audience=https://packages.fluxzero.io/publish/maven' \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -er '.value')
+          echo "::add-mask::$token"
+          export FLUXZERO_PACKAGES_TOKEN="$token"
+          ./gradlew :maven-plugin:publishAllPublicationsToFluxzeroPackagesRepository \
+                    :gradle-plugin:publishAllPublicationsToFluxzeroPackagesRepository \
+                    -PappVersion="${{ needs.version.outputs.version }}"
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
+
+      - name: Verify Packages plugins from clean clients
+        run: scripts/verify-published-plugins.sh "${{ needs.version.outputs.version }}" https://packages.fluxzero.io/maven
 
       - name: Publish to Maven Central
         id: publish
@@ -188,13 +222,7 @@ jobs:
             sleep 20
           done
 
-          mkdir -p build/plugin-smoke/maven build/plugin-smoke/gradle
-          printf '<project><modelVersion>4.0.0</modelVersion><groupId>test</groupId><artifactId>smoke</artifactId><version>1</version></project>\n' > build/plugin-smoke/maven/pom.xml
-          mvn -q -Dmaven.repo.local="$RUNNER_TEMP/maven-smoke" \
-            -f build/plugin-smoke/maven/pom.xml help:describe \
-            -Dplugin="io.fluxzero.tools:fluxzero-maven-plugin:$version" -Ddetail
-          printf 'plugins { id("io.fluxzero.tools.gradle.plugin") version "%s" }\n' "$version" > build/plugin-smoke/gradle/build.gradle.kts
-          ./gradlew -g "$RUNNER_TEMP/gradle-smoke" -p build/plugin-smoke/gradle help --refresh-dependencies
+          scripts/verify-published-plugins.sh "$version" https://repo.maven.apache.org/maven2
 
   native-build-macos:
     needs: [version, build-and-test]
