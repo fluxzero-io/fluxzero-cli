@@ -137,7 +137,8 @@ fz upgrade
 
 ### Local development
 
-`fz dev` (or `fluxzero dev`) starts the newest compatible stable Fluxzero dev server. It supervises the local runtime,
+`fz dev` (or `fluxzero dev`) starts the newest compatible stable Fluxzero dev server from
+[Fluxzero Packages](https://packages.fluxzero.io/). It supervises the local runtime,
 proxy, IDP, application reloads, background tests, optional frontend process, diagnostics, and MCP endpoint. Ports and
 credentials are allocated and discovered automatically through `.fluxzero/dev/session.json`.
 
@@ -636,6 +637,8 @@ fluxzero {
 ```kotlin
 pluginManagement {
     repositories {
+        maven { url = uri("https://packages.fluxzero.io/maven") }
+        gradlePluginPortal()
         mavenCentral()
     }
 }
@@ -650,6 +653,18 @@ pluginManagement {
 ```
 
 ### Maven Plugin
+
+Add the plugin repository to `pom.xml` (or merge it with the existing section):
+
+```xml
+<pluginRepositories>
+    <pluginRepository>
+        <id>fluxzero-plugins</id>
+        <url>https://packages.fluxzero.io/maven</url>
+        <snapshots><enabled>false</enabled></snapshots>
+    </pluginRepository>
+</pluginRepositories>
+```
 
 **pom.xml**
 ```xml

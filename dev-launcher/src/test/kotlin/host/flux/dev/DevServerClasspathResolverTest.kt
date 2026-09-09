@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class DevServerClasspathResolverTest {
     @TempDir
@@ -54,6 +55,20 @@ class DevServerClasspathResolverTest {
         assertEquals(classpath, resolver.resolve(projectDirectory, "1.2.3"))
         assertEquals(4, downloads.size, "a corrupt managed artifact should be downloaded and verified again")
         assertEquals("standalone dev server", Files.readString(Path.of(classpath)))
+    }
+
+    @Test
+    fun `checksum failure cannot be bypassed by a build tool fallback`() {
+        Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
+        val artifacts = DevServerArtifactCache(projectDirectory.resolve("global-cache"), { uri ->
+            if (uri.toString().endsWith(".sha256")) "0".repeat(64).encodeToByteArray()
+            else "corrupt".encodeToByteArray()
+        }, { }) { }
+        val resolver = DevServerClasspathResolver(
+            CommandExecutor { _, _, _ -> error("must not retry an integrity failure with Maven") }, artifacts
+        ) { }
+
+        assertFailsWith<ArtifactChecksumException> { resolver.resolve(projectDirectory, "1.2.3") }
     }
 
     @Test

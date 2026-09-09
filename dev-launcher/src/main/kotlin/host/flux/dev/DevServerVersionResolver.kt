@@ -17,6 +17,7 @@ import org.xml.sax.InputSource
 internal const val DEV_SERVER_GROUP_ID = "io.fluxzero.tools"
 internal const val DEV_SERVER_ARTIFACT_ID = "fluxzero-dev-server"
 internal const val SUPPORTED_DEV_SERVER_MAJOR = 1
+internal const val FLUXZERO_PACKAGES_REPOSITORY = "https://packages.fluxzero.io/maven"
 
 class DevServerVersionResolver(
     private val metadataLoader: () -> String = { downloadMetadata() },
@@ -36,7 +37,7 @@ class DevServerVersionResolver(
         } catch (e: Exception) {
             cachedVersion(cache)?.also { version ->
                 messageSink(
-                    "Could not check Maven Central for Fluxzero dev server updates; using cached version $version."
+                    "Could not check Fluxzero Packages for dev server updates; using cached version $version."
                 )
             } ?: throw IllegalStateException(
                 "Could not determine the latest compatible Fluxzero dev server " +
@@ -65,7 +66,7 @@ class DevServerVersionResolver(
 
     companion object {
         private const val METADATA_URL =
-            "https://repo.maven.apache.org/maven2/io/fluxzero/tools/fluxzero-dev-server/maven-metadata.xml"
+            "$FLUXZERO_PACKAGES_REPOSITORY/io/fluxzero/tools/fluxzero-dev-server/maven-metadata.xml"
 
         internal fun latestCompatible(metadata: String, supportedMajor: Int): String {
             val factory = DocumentBuilderFactory.newInstance().apply {
@@ -100,7 +101,7 @@ class DevServerVersionResolver(
                 .build()
             val response = client.send(request, HttpResponse.BodyHandlers.ofString())
             check(response.statusCode() in 200..299) {
-                "Maven Central metadata request failed with HTTP ${response.statusCode()}"
+                "Fluxzero Packages metadata request failed with HTTP ${response.statusCode()}"
             }
             return response.body()
         }

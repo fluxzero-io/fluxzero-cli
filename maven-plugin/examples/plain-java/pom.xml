@@ -14,6 +14,21 @@
     <fluxzero.maven.plugin.version>dev</fluxzero.maven.plugin.version>
   </properties>
 
+  <repositories>
+    <repository>
+      <id>fluxzero</id>
+      <url>https://packages.fluxzero.io/maven</url>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>fluxzero-plugins</id>
+      <url>https://packages.fluxzero.io/maven</url>
+      <snapshots><enabled>false</enabled></snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.commons</groupId>

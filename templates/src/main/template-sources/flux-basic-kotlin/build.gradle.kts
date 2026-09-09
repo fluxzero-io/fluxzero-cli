@@ -35,6 +35,7 @@ val fluxzeroVersion = "@fluxzeroSdkVersion@"
 val fluxzeroIdpVersion = "@fluxzeroIdpVersion@"
 
 repositories {
+    maven { url = uri("https://packages.fluxzero.io/maven") }
     mavenCentral()
     mavenLocal()
 }

@@ -28,6 +28,7 @@ class DevServerArtifactCacheTest {
         val bytes = "verified standalone jar".encodeToByteArray()
         var downloads = 0
         val cache = DevServerArtifactCache(cacheDirectory, { uri ->
+            assertTrue(uri.toString().startsWith("https://packages.fluxzero.io/maven/io/fluxzero/tools/fluxzero-dev-server/1.2.3/"))
             downloads++
             if (uri.toString().endsWith(".sha256")) sha256(bytes).encodeToByteArray() else bytes
         }) { }
@@ -38,6 +39,57 @@ class DevServerArtifactCacheTest {
         assertEquals(first, second)
         assertEquals(2, downloads)
         assertEquals(bytes.toList(), Files.readAllBytes(first).toList())
+    }
+
+    @Test
+    fun `verifies Maven SHA-1 when SHA-256 is absent and keeps a SHA-256 cache`() {
+        val bytes = "Maven deployed standalone jar".encodeToByteArray()
+        val requests = mutableListOf<String>()
+        val cache = DevServerArtifactCache(cacheDirectory, { uri ->
+            requests += uri.toString()
+            when {
+                uri.toString().endsWith(".sha256") -> throw ArtifactNotFoundException(uri)
+                uri.toString().endsWith(".sha1") -> MessageDigest.getInstance("SHA-1").digest(bytes)
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }.encodeToByteArray()
+                else -> bytes
+            }
+        }, { error("missing checksums should not be retried") }) { }
+
+        val artifact = cache.resolve("1.2.3")
+        assertEquals(3, requests.size)
+        assertEquals(sha256(bytes), Files.readString(artifact.resolveSibling("${artifact.fileName}.sha256")).trim())
+        assertEquals(artifact, cache.resolve("1.2.3"))
+        assertEquals(3, requests.size, "a warm cache must not make repository requests")
+    }
+
+    @Test
+    fun `does not downgrade checksum on a server failure or malformed SHA-256`() {
+        for (malformed in listOf(false, true)) {
+            val requests = mutableListOf<String>()
+            val cache = DevServerArtifactCache(cacheDirectory, { uri ->
+                requests += uri.toString()
+                if (malformed) "invalid checksum".encodeToByteArray()
+                else error("HTTP 500")
+            }, { }) { }
+
+            assertFailsWith<IllegalStateException> { cache.resolve("1.2.3") }
+            assertEquals(if (malformed) 1 else 3, requests.size)
+            assertTrue(requests.all { it.endsWith(".sha256") })
+        }
+    }
+
+    @Test
+    fun `rejects a mismatch in Maven SHA-1 without caching artifact`() {
+        val cache = DevServerArtifactCache(cacheDirectory, { uri ->
+            when {
+                uri.toString().endsWith(".sha256") -> throw ArtifactNotFoundException(uri)
+                uri.toString().endsWith(".sha1") -> "0".repeat(40).encodeToByteArray()
+                else -> "corrupt".encodeToByteArray()
+            }
+        }, { }) { }
+
+        assertFailsWith<ArtifactChecksumException> { cache.resolve("1.2.3") }
+        assertFalse(Files.exists(cacheDirectory.resolve("1.2.3/fluxzero-dev-server-1.2.3-standalone.jar")))
     }
 
     @Test
