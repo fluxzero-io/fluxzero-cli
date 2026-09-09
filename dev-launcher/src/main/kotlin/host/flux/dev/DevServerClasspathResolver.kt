@@ -34,6 +34,8 @@ class DevServerClasspathResolver(
                 writeAtomically(classpathFile, artifact)
                 writeAtomically(versionFile, version)
                 return artifact
+            } catch (e: ArtifactChecksumException) {
+                throw e
             } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
                 throw e
@@ -180,6 +182,13 @@ class DevServerClasspathResolver(
           <groupId>io.fluxzero.dev</groupId>
           <artifactId>dev-server-launcher</artifactId>
           <version>1</version>
+          <repositories>
+            <repository>
+              <id>fluxzero</id>
+              <url>$FLUXZERO_PACKAGES_REPOSITORY</url>
+              <snapshots><enabled>false</enabled></snapshots>
+            </repository>
+          </repositories>
           <dependencies>
             <dependency>
               <groupId>$DEV_SERVER_GROUP_ID</groupId>
@@ -201,6 +210,7 @@ class DevServerClasspathResolver(
         """
         repositories {
             mavenLocal()
+            maven { url = uri('$FLUXZERO_PACKAGES_REPOSITORY') }
             mavenCentral()
         }
 

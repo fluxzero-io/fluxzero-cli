@@ -1,6 +1,7 @@
 pluginManagement {
     repositories {
         mavenLocal()
+        maven { url = uri("https://packages.fluxzero.io/maven") }
         mavenCentral()
         gradlePluginPortal()
     }

@@ -52,16 +52,21 @@ class DevServerArtifactCache(
     }
 
     private fun downloadVerified(version: String, artifact: Path, checksum: Path) {
-        val base = "$CENTRAL_REPOSITORY/${DEV_SERVER_GROUP_ID.replace('.', '/')}/$DEV_SERVER_ARTIFACT_ID/$version"
+        val base = "$FLUXZERO_PACKAGES_REPOSITORY/${DEV_SERVER_GROUP_ID.replace('.', '/')}/$DEV_SERVER_ARTIFACT_ID/$version"
         val artifactName = "$DEV_SERVER_ARTIFACT_ID-$version-standalone.jar"
-        val expected = parseChecksum(downloadWithRetry(version, URI.create("$base/$artifactName.sha256")).decodeToString())
+        val (algorithm, expected) = try {
+            "SHA-256" to parseChecksum(downloadWithRetry(version, URI.create("$base/$artifactName.sha256")).decodeToString())
+        } catch (_: ArtifactNotFoundException) {
+            // Maven 3 deploys SHA-1 by default; historical Central copies also carry SHA-256.
+            "SHA-1" to parseChecksum(downloadWithRetry(version, URI.create("$base/$artifactName.sha1")).decodeToString(), 40)
+        }
         val bytes = downloadWithRetry(version, URI.create("$base/$artifactName"))
-        val actual = sha256(bytes)
-        check(actual.equals(expected, ignoreCase = true)) {
-            "Checksum verification failed for Fluxzero dev server $version: expected $expected, got $actual."
+        val actual = digest(bytes, algorithm)
+        if (!actual.equals(expected, ignoreCase = true)) {
+            throw ArtifactChecksumException("Checksum verification failed for Fluxzero dev server $version: expected $expected, got $actual.")
         }
         writeAtomically(artifact, bytes)
-        writeAtomically(checksum, "$actual\n".encodeToByteArray())
+        writeAtomically(checksum, "${digest(bytes, "SHA-256")}\n".encodeToByteArray())
     }
 
     private fun downloadWithRetry(version: String, uri: URI): ByteArray {
@@ -69,6 +74,8 @@ class DevServerArtifactCache(
         repeat(DOWNLOAD_ATTEMPTS) { attempt ->
             try {
                 return downloader(uri)
+            } catch (e: ArtifactNotFoundException) {
+                throw e
             } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
                 throw e
@@ -99,10 +106,11 @@ class DevServerArtifactCache(
         "$DEV_SERVER_ARTIFACT_ID-$version-standalone.jar"
     )
 
-    private fun parseChecksum(value: String): String = CHECKSUM.find(value)?.value
-        ?: error("Maven Central returned an invalid SHA-256 checksum")
+    private fun parseChecksum(value: String, length: Int = 64): String = value.trim().substringBefore(' ')
+        .takeIf { it.length == length && it.all { digit -> digit in '0'..'9' || digit.lowercaseChar() in 'a'..'f' } }
+        ?: throw ArtifactChecksumException("Fluxzero Packages returned an invalid ${if (length == 64) "SHA-256" else "SHA-1"} checksum")
 
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+    private fun digest(bytes: ByteArray, algorithm: String): String = MessageDigest.getInstance(algorithm)
         .digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun sha256(path: Path): String {
@@ -129,10 +137,8 @@ class DevServerArtifactCache(
     }
 
     companion object {
-        private const val CENTRAL_REPOSITORY = "https://repo.maven.apache.org/maven2"
         private const val DOWNLOAD_ATTEMPTS = 3
         private val RETRY_DELAYS_MS = longArrayOf(250, 1_000)
-        private val CHECKSUM = Regex("(?i)[a-f0-9]{64}")
 
         private fun download(uri: URI): ByteArray {
             val client = HttpClient.newBuilder()
@@ -141,10 +147,14 @@ class DevServerArtifactCache(
                 .build()
             val request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30)).GET().build()
             val response = client.send(request, HttpResponse.BodyHandlers.ofByteArray())
+            if (response.statusCode() == 404) throw ArtifactNotFoundException(uri)
             check(response.statusCode() in 200..299) {
-                "Maven Central request for $uri failed with HTTP ${response.statusCode()}"
+                "Fluxzero Packages request for $uri failed with HTTP ${response.statusCode()}"
             }
             return response.body()
         }
     }
 }
+
+internal class ArtifactNotFoundException(uri: URI) : IllegalStateException("Artifact not found at $uri (HTTP 404)")
+internal class ArtifactChecksumException(message: String) : IllegalStateException(message)
