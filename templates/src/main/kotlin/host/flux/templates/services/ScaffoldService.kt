@@ -36,7 +36,7 @@ class ScaffoldService(
             }
             
             // Determine output directory
-            val baseDir = request.outputDir?.let { Paths.get(it) } ?: Paths.get("")
+            val baseDir = (request.outputDir?.let { Paths.get(it) } ?: Paths.get("")).toAbsolutePath().normalize()
             val outputDir = if (request.inPlace) baseDir else baseDir.resolve(normalizedName)
 
             val targetLock = if (request.inPlace) InPlaceScaffoldPublisher.acquireTargetLock(outputDir) else null
