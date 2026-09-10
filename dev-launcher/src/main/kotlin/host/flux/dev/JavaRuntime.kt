@@ -53,6 +53,9 @@ class JavaRuntimeDiscovery(
 
     private fun inspect(candidate: Path): JavaRuntime? {
         val executable = runCatching { candidate.toRealPath() }.getOrElse { candidate.toAbsolutePath().normalize() }
+        // Apple's launcher delegates to a registered JDK. Treating it as /usr/bin/java
+        // would incorrectly set JAVA_HOME=/usr for every child. Resolve the real JDK below.
+        if (macOs() && executable == Path.of("/usr/bin/java")) return null
         if (!Files.isRegularFile(executable)) return null
         val home = executable.parent?.parent ?: return null
         val javac = executable.parent.resolve(if (windows()) "javac.exe" else "javac")

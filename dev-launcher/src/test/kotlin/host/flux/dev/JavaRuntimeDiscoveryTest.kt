@@ -8,9 +8,32 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 
 class JavaRuntimeDiscoveryTest {
     private val root = createTempDirectory("java-runtime-discovery")
+
+    @Test
+    @EnabledOnOs(OS.MAC)
+    fun `does not mistake Apple launchers for a JDK rooted in usr`() {
+        val actualHome = javaHome("registered-jdk")
+        val discovery = JavaRuntimeDiscovery(
+            environment = mapOf("JAVA_HOME" to "/usr", "PATH" to "/usr/bin:/bin"),
+            javaHome = null,
+            osName = "Mac OS X",
+            commandRunner = RuntimeCommandRunner { command ->
+                when (command.first()) {
+                    "/usr/libexec/java_home" -> RuntimeCommandResult(0, actualHome.toString())
+                    // The Apple launcher can report a valid version, but /usr is not its JDK home.
+                    else -> RuntimeCommandResult(0, "openjdk version \"25.0.2\"")
+                }
+            }
+        )
+
+        assertEquals(actualHome.toRealPath(), discovery.resolve().home)
+        assertEquals(actualHome.resolve("bin/java").toRealPath(), discovery.resolve().executable)
+    }
 
     @Test
     fun `uses compatible java home without querying fallback installations`() {
