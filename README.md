@@ -314,6 +314,15 @@ use `--ensure-dev` to start exactly one background environment when needed; an a
 fz mcp --ensure-dev --project-dir /path/to/project
 ```
 
+For distributions containing `DevServerBootstrapMain`, the dev-server distribution owns coordinated
+start/reuse, preflight, readiness and process lifetime. The CLI and Maven/Gradle launchers select Java and
+the artifact, then delegate to that entrypoint. Older distributions continue through the existing launcher
+path. Both paths use `.fluxzero/dev/ensure.lock` to coordinate with older CLI releases;
+new distributions acquire that lock themselves, so the CLI must not hold it while delegating.
+The stdio `start_dev` tool uses the same bootstrap directly without invoking the CLI.
+A project pinned to an older distribution retains that distribution's tool surface; upgrade the
+dev-server distribution to use `start_dev` and standalone docs.
+
 Once connected, the dev environment owns source watching, compilation, application replacement, configured startup commands, and
 background test execution. Coding agents should consume its structured MCP feedback rather than start duplicate builds, tests,
 applications, watchers, or unbounded log followers.

@@ -16,14 +16,9 @@ import host.flux.dev.DevServerLauncher
 import host.flux.dev.DevStartupReadiness
 import host.flux.dev.InheritedIoCommandExecutor
 import host.flux.dev.OutputMode
-import java.nio.channels.FileChannel
-import java.nio.channels.FileLockInterruptionException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
 
 private const val DEV_SERVER_PREFLIGHT_MAIN = "io.fluxzero.devserver.DevServerPreflightMain"
 private const val DEV_MCP_READINESS_ATTEMPTS = 10
@@ -34,7 +29,6 @@ private val MCP_STATE = Regex("\"mcp\"\\s*:\\s*\\{[^}]*\"state\"\\s*:\\s*\"([^\"
 
 class Mcp(
     launcher: DevLauncher? = null,
-    private val coordinateStart: (Path, () -> Int) -> Int = WorkspaceDevStartCoordinator::start,
     private val readinessAttempts: Int = DEV_MCP_READINESS_ATTEMPTS,
     private val readinessPause: () -> Unit = { Thread.sleep(DEV_MCP_READINESS_RETRY_MILLIS) },
     private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
@@ -68,18 +62,16 @@ class Mcp(
         val root = projectDirectory.toAbsolutePath().normalize()
         if (ensureDev) {
             val startExitCode = try {
-                coordinateStart(root) {
-                    launchInterruptibly(
-                        DevLaunchRequest(
-                            root,
-                            devServerVersion,
-                            DevLaunchTarget.SERVER,
-                            detached = true,
-                            startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
-                        ),
-                        "Interrupted while starting the Fluxzero dev environment."
-                    )
-                }
+                launchInterruptibly(
+                    DevLaunchRequest(
+                        root,
+                        devServerVersion,
+                        DevLaunchTarget.SERVER,
+                        detached = true,
+                        startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
+                    ),
+                    "Interrupted while starting the Fluxzero dev environment."
+                )
             } catch (_: InterruptedException) {
                 interrupted("Interrupted while waiting to start the Fluxzero dev environment.")
             }
@@ -208,34 +200,10 @@ internal class McpCommandExecutor(
         if (outputMode != OutputMode.INHERIT) return outputMode
         val controlMain = command.indexOf(DevLaunchTarget.CONTROL.mainClass)
         val controlAction = if (controlMain >= 0) command.getOrNull(controlMain + 1) else null
-        return if (DEV_SERVER_PREFLIGHT_MAIN in command || controlAction in setOf("wait", "stop")) {
+        return if (DEV_SERVER_PREFLIGHT_MAIN in command || "io.fluxzero.devserver.DevServerBootstrapMain" in command || controlAction in setOf("wait", "stop")) {
             OutputMode.STDOUT_TO_STDERR
         } else {
             outputMode
-        }
-    }
-}
-
-internal object WorkspaceDevStartCoordinator {
-    private val processLocks = ConcurrentHashMap<Path, ReentrantLock>()
-
-    fun start(root: Path, action: () -> Int): Int {
-        val lockFile = root.toAbsolutePath().normalize().resolve(".fluxzero/dev/ensure.lock")
-        Files.createDirectories(lockFile.parent)
-        val processLock = processLocks.computeIfAbsent(lockFile) { ReentrantLock() }
-        processLock.lockInterruptibly()
-        try {
-            FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
-                try {
-                    channel.lock().use { return action() }
-                } catch (e: FileLockInterruptionException) {
-                    throw InterruptedException("Interrupted while acquiring the Fluxzero dev start lock").apply {
-                        initCause(e)
-                    }
-                }
-            }
-        } finally {
-            processLock.unlock()
         }
     }
 }

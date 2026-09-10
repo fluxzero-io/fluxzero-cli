@@ -16,10 +16,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -132,46 +129,7 @@ class DevTest {
             ),
             requests
         )
-        assertTrue(Files.isRegularFile(projectDirectory.resolve(".fluxzero/dev/ensure.lock")))
-    }
-
-    @Test
-    fun `workspace start coordinator serializes concurrent clients`() {
-        val active = AtomicInteger()
-        val maximumActive = AtomicInteger()
-        val firstEntered = CountDownLatch(1)
-        val releaseFirst = CountDownLatch(1)
-        val secondEntered = CountDownLatch(1)
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val first = executor.submit<Int> {
-                WorkspaceDevStartCoordinator.start(projectDirectory) {
-                    maximumActive.accumulateAndGet(active.incrementAndGet(), ::maxOf)
-                    firstEntered.countDown()
-                    releaseFirst.await(5, TimeUnit.SECONDS)
-                    active.decrementAndGet()
-                    1
-                }
-            }
-            assertTrue(firstEntered.await(5, TimeUnit.SECONDS))
-            val second = executor.submit<Int> {
-                WorkspaceDevStartCoordinator.start(projectDirectory) {
-                    maximumActive.accumulateAndGet(active.incrementAndGet(), ::maxOf)
-                    secondEntered.countDown()
-                    active.decrementAndGet()
-                    2
-                }
-            }
-
-            assertTrue(!secondEntered.await(150, TimeUnit.MILLISECONDS))
-            releaseFirst.countDown()
-            assertEquals(1, first.get(5, TimeUnit.SECONDS))
-            assertEquals(2, second.get(5, TimeUnit.SECONDS))
-            assertEquals(1, maximumActive.get())
-        } finally {
-            releaseFirst.countDown()
-            executor.shutdownNow()
-        }
+        // Locking belongs to the selected launcher, not this command.
     }
 
     @Test
@@ -405,6 +363,15 @@ class DevTest {
         assertTrue(result.output.contains("fz dev status"))
         assertEquals(1, requests.count { it.target == DevLaunchTarget.MCP_STDIO })
         assertEquals(1, pauses)
+    }
+
+    @Test
+    fun `shared bootstrap output cannot corrupt the MCP protocol`() {
+        var routed: OutputMode? = null
+        val executor = McpCommandExecutor(CommandExecutor { _, _, output -> routed = output; 0 })
+        executor.execute(listOf("java", "-cp", "dev.jar", "io.fluxzero.devserver.DevServerBootstrapMain"),
+                         projectDirectory, OutputMode.INHERIT)
+        assertEquals(OutputMode.STDOUT_TO_STDERR, routed)
     }
 
     @Test
