@@ -615,7 +615,9 @@ class DevTest {
             assertTrue(Files.isRegularFile(projectDirectory.resolve(expectedBuildFile)), initOutput)
 
             var latestStatus = initialStatus
-            val compileDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2)
+            // A release runner may resolve the entire freshly published SDK into an empty Maven cache.
+            // This is a correctness smoke, not a warm-cache compilation performance bound.
+            val compileDeadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(5)
             var requestId = 4
             while (System.nanoTime() < compileDeadline && compileState(latestStatus) != "succeeded") {
                 writer.write(

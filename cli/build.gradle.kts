@@ -114,6 +114,9 @@ val greenfieldMcpE2e by tasks.registering(Test::class) {
         includeTags("greenfield-mcp-release-e2e", "greenfield-mcp-concurrency-e2e")
     }
     outputs.upToDateWhen { false }
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
     shouldRunAfter(tasks.test)
 }
 
@@ -126,6 +129,9 @@ val greenfieldMcpConcurrencyE2e by tasks.registering(Test::class) {
         includeTags("greenfield-mcp-concurrency-e2e")
     }
     outputs.upToDateWhen { false }
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
     shouldRunAfter(tasks.test)
 }
 
