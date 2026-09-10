@@ -8,6 +8,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+private const val BOOTSTRAP_MAIN_CLASS = "io.fluxzero.devserver.DevServerBootstrapMain"
+private const val BOOTSTRAP_CLASS_RESOURCE = "io/fluxzero/devserver/DevServerBootstrapMain.class"
 private const val PREFLIGHT_MAIN_CLASS = "io.fluxzero.devserver.DevServerPreflightMain"
 private const val USE_DYNAMIC_PORT_EXIT_CODE = 75
 private const val CANCEL_STARTUP_EXIT_CODE = 76
@@ -69,15 +71,31 @@ class DevServerLauncher(
                 )
                 var command = command(classpath, request, javaRuntime)
                 if (request.target == DevLaunchTarget.SERVER) {
-                    var active = likelyActive && probe(command, projectDirectory)
-                    if (likelyActive && !active) {
-                        classpath = classpathResolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
-                        command = command(classpath, request, javaRuntime)
-                        active = false
+                    if (supportsBootstrap(classpath)) {
+                        val mainIndex = command.indexOf(DevLaunchTarget.SERVER.mainClass)
+                        val bootstrapCommand = command.take(mainIndex) + BOOTSTRAP_MAIN_CLASS + buildList {
+                            if (request.detached) add("--bootstrap-background")
+                            if (request.startupReadiness == DevStartupReadiness.AGENT_CONTROL_PLANE) add("--bootstrap-agent-ready")
+                            addAll(request.arguments)
+                            if ("--project-dir" !in request.arguments) addAll(listOf("--project-dir", projectDirectory.toString()))
+                        }
+                        return@supervise executor.execute(bootstrapCommand, projectDirectory, OutputMode.INHERIT)
                     }
-                    launchServer(
-                        command, projectDirectory, request.detached, shutdown, active, request.startupReadiness
-                    )
+                    // Older CLI releases use this same lock around --ensure-dev. Re-read the session after
+                    // acquiring it because another bridge/launcher may have finished a cold start meanwhile.
+                    val launchLegacy = {
+                        var active = activeSession(projectDirectory)?.active == true && probe(command, projectDirectory)
+                        if (likelyActive && !active) {
+                            classpath = classpathResolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
+                            command = command(classpath, request, javaRuntime)
+                            active = false
+                        }
+                        launchServer(
+                            command, projectDirectory, request.detached, shutdown, active, request.startupReadiness
+                        )
+                    }
+                    if (request.detached) WorkspaceDevStartCoordinator.start(projectDirectory, launchLegacy)
+                    else launchLegacy()
                 } else {
                     if (request.arguments.firstOrNull() == "attach") {
                         shutdown.expectStopped {
@@ -107,6 +125,13 @@ class DevServerLauncher(
                 e.exitCode
             }
         }
+    }
+
+    private fun supportsBootstrap(classpath: String): Boolean = classpath.split(java.io.File.pathSeparator).any { entry ->
+        val path = Path.of(entry)
+        if (Files.isDirectory(path)) Files.isRegularFile(path.resolve(BOOTSTRAP_CLASS_RESOURCE))
+        else runCatching { java.util.zip.ZipFile(path.toFile()).use { it.getEntry(BOOTSTRAP_CLASS_RESOURCE) != null } }
+            .getOrDefault(false)
     }
 
     private fun command(

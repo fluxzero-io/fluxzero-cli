@@ -14,6 +14,42 @@ class DevServerLauncherTest {
     lateinit var projectDirectory: Path
 
     @Test
+    fun `new distributions own server bootstrap for attached and background launches`() {
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val dependency = projectDirectory.resolve("dev-server.jar")
+        java.util.zip.ZipOutputStream(Files.newOutputStream(dependency)).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("io/fluxzero/devserver/DevServerBootstrapMain.class"))
+            zip.write(byteArrayOf(1))
+            zip.closeEntry()
+        }
+        Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
+        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        val commands = mutableListOf<List<String>>()
+        val executor = object : CommandExecutor {
+            override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode): Int {
+                commands += command
+                return 0
+            }
+            override fun startDetached(command: List<String>, workingDirectory: Path, outputFile: Path): Long =
+                error("New distributions must own detachment")
+        }
+        for (background in listOf(false, true)) {
+            commands.clear()
+            assertEquals(0, launcher(executor).launch(DevLaunchRequest(
+                projectDirectory, "1.2.3", DevLaunchTarget.SERVER, listOf("--no-tests"),
+                detached = background, startupReadiness = DevStartupReadiness.AGENT_CONTROL_PLANE
+            )))
+            assertEquals(1, commands.size)
+            val command = commands.single()
+            assertTrue("io.fluxzero.devserver.DevServerBootstrapMain" in command)
+            assertEquals(background, "--bootstrap-background" in command)
+            assertTrue("--bootstrap-agent-ready" in command)
+            assertTrue("--no-tests" in command)
+            assertEquals(projectDirectory.toString(), command[command.indexOf("--project-dir") + 1])
+        }
+    }
+
+    @Test
     fun `resolves with project wrapper and forwards main class and arguments`() {
         Files.writeString(projectDirectory.resolve("pom.xml"), "<project/>")
         Files.writeString(projectDirectory.resolve("mvnw"), "wrapper")
