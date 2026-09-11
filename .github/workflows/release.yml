@@ -164,7 +164,24 @@ jobs:
       - name: Verify Packages plugins from clean clients
         run: scripts/verify-published-plugins.sh "${{ needs.version.outputs.version }}" https://packages.fluxzero.io/maven
 
+      - name: Determine Maven Central publication window
+        id: central_window
+        shell: bash
+        run: |
+          release_date="$(TZ=Europe/Amsterdam date +%F)"
+          if [[ "$release_date" < "2026-10-01" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Maven Central publication"
+              echo
+              echo "Skipped: releases started on or after 1 October 2026 are published only to https://packages.fluxzero.io/maven."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Publish to Maven Central
+        if: steps.central_window.outputs.publish == 'true'
         id: publish
         shell: bash
         run: |
@@ -208,6 +225,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
 
       - name: Verify published plugins from clean clients
+        if: steps.central_window.outputs.publish == 'true'
         shell: bash
         run: |
           version="${{ needs.version.outputs.version }}"
