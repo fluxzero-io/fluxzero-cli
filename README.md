@@ -4,7 +4,7 @@
 
 Command-line tools for creating, developing, and deploying [Fluxzero](https://fluxzero.io) applications.
 
-[Get started](https://fluxzero.io/get-started) · [How it works](https://fluxzero.io/how-it-works) · [Docs](https://fluxzero.io/docs)
+[How it works](https://fluxzero.io/how-it-works) · [Docs](https://fluxzero.io/docs)
 
 ## Installation
 
