@@ -128,8 +128,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      # Failed-job reruns reuse the original reservation output; never upload the version twice.
       - name: Prepare signed plugin publications
-        if: needs.reserve-version.outputs.created == 'true'
+        if: needs.reserve-version.outputs.created == 'true' && github.run_attempt == 1
         run: >-
           ./gradlew :maven-plugin:publishToMavenLocal :gradle-plugin:publishToMavenLocal
           -PappVersion="${{ needs.version.outputs.version }}"
@@ -139,7 +140,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
 
       - name: Publish plugins to Fluxzero Packages
-        if: needs.reserve-version.outputs.created == 'true'
+        if: needs.reserve-version.outputs.created == 'true' && github.run_attempt == 1
         shell: bash
         run: |
           set +x
@@ -163,89 +164,6 @@ jobs:
 
       - name: Verify Packages plugins from clean clients
         run: scripts/verify-published-plugins.sh "${{ needs.version.outputs.version }}" https://packages.fluxzero.io/maven
-
-      - name: Determine Maven Central publication window
-        id: central_window
-        shell: bash
-        run: |
-          release_date="$(TZ=Europe/Amsterdam date +%F)"
-          if [[ "$release_date" < "2026-10-01" ]]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            {
-              echo "### Maven Central publication"
-              echo
-              echo "Skipped: releases started on or after 1 October 2026 are published only to https://packages.fluxzero.io/maven."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Publish to Maven Central
-        if: steps.central_window.outputs.publish == 'true'
-        id: publish
-        shell: bash
-        run: |
-          version="${{ needs.version.outputs.version }}"
-          base="https://repo.maven.apache.org/maven2/io/fluxzero/tools"
-          maven_pom="$base/fluxzero-maven-plugin/$version/fluxzero-maven-plugin-$version.pom"
-          gradle_pom="$base/fluxzero-gradle-plugin/$version/fluxzero-gradle-plugin-$version.pom"
-          marker_pom="$base/gradle/plugin/io.fluxzero.tools.gradle.plugin.gradle.plugin/$version/io.fluxzero.tools.gradle.plugin.gradle.plugin-$version.pom"
-          existing=0
-          curl -fsS "$maven_pom" >/dev/null && existing=$((existing + 1)) || true
-          curl -fsS "$gradle_pom" >/dev/null && existing=$((existing + 1)) || true
-          curl -fsS "$marker_pom" >/dev/null && existing=$((existing + 1)) || true
-          decision="$(scripts/central-publish-decision.sh \
-            "$existing" \
-            "${{ needs.reserve-version.outputs.created }}")"
-          case "$decision" in
-            complete)
-              echo "Fluxzero plugins $version are already available from Maven Central."
-              echo "published=false" >> "$GITHUB_OUTPUT"
-              ;;
-            wait)
-              echo "Release $version was already reserved or this is a workflow rerun."
-              echo "Skipping a duplicate Central upload and waiting for the accepted deployment."
-              echo "published=false" >> "$GITHUB_OUTPUT"
-              ;;
-            publish)
-              ./gradlew :maven-plugin:publishAndReleaseToMavenCentral \
-                        :gradle-plugin:publishAndReleaseToMavenCentral \
-                        -PappVersion="$version"
-              echo "published=true" >> "$GITHUB_OUTPUT"
-              ;;
-            conflict)
-              echo "Fluxzero plugin release $version was reserved by this run but is already partially present in Maven Central." >&2
-              exit 1
-              ;;
-          esac
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.OSSRH_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.OSSRH_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.OSSRH_SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.OSSRH_SIGNING_PASSPHRASE }}
-
-      - name: Verify published plugins from clean clients
-        if: steps.central_window.outputs.publish == 'true'
-        shell: bash
-        run: |
-          version="${{ needs.version.outputs.version }}"
-          base="https://repo.maven.apache.org/maven2/io/fluxzero/tools"
-          for attempt in $(seq 1 60); do
-            if curl -fsS "$base/fluxzero-maven-plugin/$version/fluxzero-maven-plugin-$version.pom" >/dev/null \
-               && curl -fsS "$base/fluxzero-gradle-plugin/$version/fluxzero-gradle-plugin-$version.pom" >/dev/null \
-               && curl -fsS "$base/gradle/plugin/io.fluxzero.tools.gradle.plugin.gradle.plugin/$version/io.fluxzero.tools.gradle.plugin.gradle.plugin-$version.pom" >/dev/null; then
-              break
-            fi
-            if [[ "$attempt" == "60" ]]; then
-              echo "Plugins $version did not become available from Maven Central within 20 minutes." >&2
-              echo "The version remains reserved. Rerunning this workflow will wait without uploading it again." >&2
-              echo "If the Central deployment failed, start a new Release workflow to reserve the next version." >&2
-              exit 1
-            fi
-            sleep 20
-          done
-
-          scripts/verify-published-plugins.sh "$version" https://repo.maven.apache.org/maven2
 
   native-build-macos:
     needs: [version, build-and-test]
@@ -280,7 +198,7 @@ jobs:
         id: reserve
         shell: bash
         run: |
-          # The numeric tag is the durable release lock. Even if Central fails,
+          # The numeric tag is the durable release lock. Even if publication fails,
           # a later commit must use a new coordinate instead of uploading twice.
           version="${{ needs.version.outputs.version }}"
           git fetch --tags --force
