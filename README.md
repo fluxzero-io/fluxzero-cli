@@ -830,16 +830,18 @@ when its `workflow` scope is selected.
 The release workflow publishes the existing Maven and Gradle publications (including
 `io.fluxzero.tools.gradle.plugin`'s marker) to `https://packages.fluxzero.io/publish/maven`
 with standard Gradle Maven Publish tasks, then verifies independent consumers using
-`https://packages.fluxzero.io/maven`. New plugin releases are published only to Fluxzero
-Packages; existing Maven Central releases remain available. GitHub CLI releases and
-package-manager updates require successful Packages publication and verification,
-without a Maven Central upload or availability check.
+`https://packages.fluxzero.io/maven`. GitHub CLI releases and package-manager updates
+require successful Packages publication and verification. Until 1 October 2026, a
+separate, non-blocking job also publishes to Maven Central and verifies its artifacts.
+The CLI release does not wait for that job, and a Central failure does not fail the
+workflow. From that date, new plugin releases are available only from Fluxzero Packages;
+existing Central releases remain available.
 GitHub OIDC uses audience `https://packages.fluxzero.io/publish/maven`; only the publishing job
 has `id-token: write`. A fresh short-lived token is requested before each publication;
 the Gradle marker is uploaded after its implementation. Existing GPG signing secrets
 remain in use.
 
-A reserved version is never uploaded again on a workflow rerun. If Fluxzero Packages
+A reserved version is never uploaded again on a workflow rerun. If either repository
 contains an incomplete release, fix the cause and start a new Release workflow to
 reserve the next version. Do not rebuild or overwrite already published release bytes.
 
