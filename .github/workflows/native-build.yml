@@ -64,7 +64,9 @@ jobs:
             NATIVE_IMAGE="$JAVA_HOME/bin/native-image"
           fi
           mkdir -p "$OUTPUT_DIRECTORY"
+          # Match Gradle builds and support CPUs/VMs without x86-64-v3 features.
           "$NATIVE_IMAGE" \
+            -march=compatibility \
             --no-fallback \
             --install-exit-handlers \
             --enable-url-protocols=https \
@@ -80,6 +82,14 @@ jobs:
           else
             test -x "$OUTPUT_DIRECTORY/flux"
           fi
+
+      - name: Verify compatibility with older x86-64 CPUs
+        if: matrix.os == 'linux-amd64'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-user
+          scripts/test-native-cpu-compatibility.sh cli/build/native/nativeCompile/flux
 
       - name: Bundle Windows runtime
         if: runner.os == 'Windows'

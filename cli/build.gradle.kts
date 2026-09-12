@@ -30,6 +30,8 @@ graalvmNative {
             imageName.set("flux")
             mainClass.set("host.flux.cli.MainKt")
             buildArgs.addAll(
+                // Match release builds: support CPUs/VMs without the default x86-64-v3 features.
+                "-march=compatibility",
                 "--no-fallback",
                 "--install-exit-handlers",
                 "--enable-url-protocols=https",

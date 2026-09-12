@@ -754,6 +754,14 @@ For detailed documentation, troubleshooting, and advanced examples:
 
 Requires GraalVM with native-image support:
 
+Local and release builds use `-march=compatibility` so AMD64 executables do not require
+the default GraalVM x86-64-v3 instruction set (including AVX/AVX2). Keep this option in
+both `cli/build.gradle.kts` and `.github/workflows/native-build.yml`; avoid `-march=native`
+for distributed binaries. OS and native-library requirements still apply.
+Linux CI runs the built executable under QEMU's Nehalem CPU model to check startup and
+template access without AVX/AVX2. Windows compatibility must also be checked with the
+complete Windows package on a VM exposing the supported CPU baseline.
+
 ```bash
 # Switch to GraalVM (example using jenv)
 jenv local oracle64-21.0.1
