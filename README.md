@@ -1,6 +1,10 @@
-# fluxzero-cli 
+<a href="https://fluxzero.io"><img src="https://raw.githubusercontent.com/fluxzero-io/.github/main/assets/brand/2026-09/repository-header.svg" alt="Fluxzero — The European cloud for AI-built apps" width="1280"></a>
 
-A command-line interface for [Flux](https://fluxcapacitor.io/) that helps you scaffold new projects, perform dependency upgrades, generate example code, and manage Flux Cloud resources.
+# Fluxzero CLI
+
+The command-line companion for building and running products on [Fluxzero](https://fluxzero.io), the European cloud for AI-built apps. Scaffold a real application, develop it locally, and deploy it to the same cloud as it grows.
+
+[Get started](https://fluxzero.io/get-started) · [How it works](https://fluxzero.io/how-it-works) · [Docs](https://fluxzero.io/docs)
 
 ## Installation
 
