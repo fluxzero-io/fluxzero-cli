@@ -524,12 +524,30 @@ jobs:
           # Cleanup
           rm -rf "$TEST_HOME" "$TEST_HOME2"
 
+      - name: Collect exact Maven release assets from Packages
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        shell: bash
+        run: |
+          paths=()
+          for artifact in fluxzero-maven-plugin fluxzero-gradle-plugin; do
+            base="io/fluxzero/tools/$artifact/$RELEASE_VERSION/$artifact-$RELEASE_VERSION"
+            for suffix in .pom .jar -sources.jar -javadoc.jar .module; do
+              paths+=("$base$suffix")
+            done
+          done
+          marker=io.fluxzero.tools.gradle.plugin.gradle.plugin
+          paths+=("io/fluxzero/tools/gradle/plugin/$marker/$RELEASE_VERSION/$marker-$RELEASE_VERSION.pom")
+          python3 .github/scripts/collect-maven-assets.py --paths "${paths[@]}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.version }}
           name: Release ${{ needs.version.outputs.version }}
+          fail_on_unmatched_files: true
           files: |
+            maven-release-assets/*
             build/libs/fluxzero-cli.jar
             build/libs/flux-api.jar
             build/release-scripts/install.sh
