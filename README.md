@@ -2,7 +2,7 @@
 
 # Fluxzero CLI
 
-The command-line companion for building and running products on [Fluxzero](https://fluxzero.io), the European cloud for AI-built apps. Scaffold a real application, develop it locally, and deploy it to the same cloud as it grows.
+Command-line tools for creating, developing, and deploying [Fluxzero](https://fluxzero.io) applications.
 
 [Get started](https://fluxzero.io/get-started) · [How it works](https://fluxzero.io/how-it-works) · [Docs](https://fluxzero.io/docs)
 
