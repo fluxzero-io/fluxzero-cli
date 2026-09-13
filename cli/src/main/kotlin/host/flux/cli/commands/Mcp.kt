@@ -3,7 +3,6 @@ package host.flux.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.UsageError
-import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
@@ -32,7 +31,8 @@ class Mcp(
     private val readinessAttempts: Int = DEV_MCP_READINESS_ATTEMPTS,
     private val readinessPause: () -> Unit = { Thread.sleep(DEV_MCP_READINESS_RETRY_MILLIS) },
     private val readinessTimeoutMillis: Long = DEV_MCP_READINESS_TIMEOUT_MILLIS,
-    private val monotonicNanos: () -> Long = System::nanoTime
+    private val monotonicNanos: () -> Long = System::nanoTime,
+    private val workingDirectory: Path = Path.of("")
 ) : CliktCommand() {
     private val launcher = launcher ?: DevServerLauncher(
         McpCommandExecutor(), javaRuntimeProvider = JavaSetup.nonInteractive()
@@ -49,7 +49,6 @@ class Mcp(
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Fluxzero project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)
-        .default(Path.of(""))
     private val devServerVersion by option(
         "--dev-server-version",
         help = "Dev-server artifact version override. Defaults to the active project pin or latest stable 1.x release."
@@ -59,7 +58,12 @@ class Mcp(
         help = "Start one background dev environment when this project does not already have an active session."
     ).flag(default = false)
     override fun run() {
-        val root = projectDirectory.toAbsolutePath().normalize()
+        val root = try {
+            projectDirectory?.toAbsolutePath()?.normalize()
+                ?: DevProjectDirectoryResolver.resolveDefault(workingDirectory)
+        } catch (e: IllegalArgumentException) {
+            throw UsageError(e.message ?: "Could not select a Fluxzero project directory")
+        }
         if (ensureDev) {
             val startExitCode = try {
                 launchInterruptibly(
