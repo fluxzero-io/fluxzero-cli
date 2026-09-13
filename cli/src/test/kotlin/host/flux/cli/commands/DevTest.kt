@@ -101,6 +101,33 @@ class DevTest {
     }
 
     @Test
+    fun `mcp command selects the only child build project by default`() {
+        val app = Files.createDirectory(projectDirectory.resolve("app"))
+        Files.writeString(app.resolve("build.gradle.kts"), "implementation(\"io.fluxzero:sdk\")")
+        var request: DevLaunchRequest? = null
+
+        val result = Mcp(DevLauncher { captured -> request = captured; 0 }, workingDirectory = projectDirectory).test()
+
+        assertEquals(0, result.statusCode)
+        assertEquals(app.toAbsolutePath(), request?.projectDirectory)
+        assertEquals(listOf("--project-dir", app.toAbsolutePath().toString()), request?.arguments)
+    }
+
+    @Test
+    fun `mcp command preserves an explicit project directory`() {
+        val app = Files.createDirectory(projectDirectory.resolve("app"))
+        Files.writeString(app.resolve("build.gradle.kts"), "implementation(\"io.fluxzero:sdk\")")
+        var request: DevLaunchRequest? = null
+
+        val result = Mcp(DevLauncher { captured -> request = captured; 0 }, workingDirectory = projectDirectory).test(
+            listOf("--project-dir", projectDirectory.toString())
+        )
+
+        assertEquals(0, result.statusCode)
+        assertEquals(projectDirectory.toAbsolutePath(), request?.projectDirectory)
+    }
+
+    @Test
     fun `mcp command can ensure one background environment in an empty workspace before connecting`() {
         val requests = mutableListOf<DevLaunchRequest>()
         val launcher = DevLauncher { captured -> requests += captured; 0 }
@@ -768,6 +795,43 @@ class DevTest {
         assertTrue(!launched)
         assertTrue(result.output.contains("No project was created"))
         assertTrue(result.output.contains("fz init"))
+    }
+
+    @Test
+    fun `starts the only child build project instead of initializing the repository root`() {
+        val app = Files.createDirectory(projectDirectory.resolve("app"))
+        Files.writeString(app.resolve("settings.gradle.kts"), "rootProject.name = \"app\"")
+        var request: DevLaunchRequest? = null
+
+        val result = Dev(
+            DevLauncher { captured -> request = captured; 0 },
+            DevProjectInitializer { error("initializer should not be called") },
+            projectDirectory
+        ).test()
+
+        assertEquals(0, result.statusCode)
+        assertEquals(app.toAbsolutePath(), request?.projectDirectory)
+        assertTrue(request!!.arguments.containsAll(listOf("--project-dir", app.toAbsolutePath().toString())))
+    }
+
+    @Test
+    fun `requires an explicit directory when multiple child projects are ambiguous`() {
+        Files.createDirectories(projectDirectory.resolve("app-one"))
+        Files.writeString(projectDirectory.resolve("app-one/pom.xml"), "<project/>")
+        Files.createDirectories(projectDirectory.resolve("app-two"))
+        Files.writeString(projectDirectory.resolve("app-two/build.gradle.kts"), "plugins { java }")
+        var launched = false
+
+        val result = Dev(
+            DevLauncher { launched = true; 0 },
+            DevProjectInitializer { error("initializer should not be called") },
+            projectDirectory
+        ).test()
+
+        assertEquals(1, result.statusCode)
+        assertTrue(!launched)
+        assertTrue(result.output.contains("Multiple project directories were found"))
+        assertTrue(result.output.contains("--project-dir"))
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.core.UsageError
-import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
@@ -17,12 +16,12 @@ import host.flux.dev.DevLaunchRequest
 import host.flux.dev.DevLaunchTarget
 import host.flux.dev.DevLauncher
 import host.flux.dev.DevServerLauncher
-import java.nio.file.Files
 import java.nio.file.Path
 
 class Dev(
     launcher: DevLauncher? = null,
-    private val projectInitializer: DevProjectInitializer = InteractiveDevProjectInitializer()
+    private val projectInitializer: DevProjectInitializer = InteractiveDevProjectInitializer(),
+    private val workingDirectory: Path = Path.of("")
 ) : CliktCommand() {
     private val launcher = launcher ?: DevServerLauncher(javaRuntimeProvider = JavaSetup())
 
@@ -37,7 +36,6 @@ class Dev(
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
         .path(mustExist = true, canBeFile = false, canBeDir = true)
-        .default(Path.of(""))
     private val devServerVersion by option(
         "--dev-server-version",
         help = "Dev-server artifact version override. Defaults to the active project pin or latest stable 1.x release."
@@ -120,7 +118,6 @@ class Dev(
     )
 
     override fun run() {
-        var root = projectDirectory.toAbsolutePath().normalize()
         val selectedAction = action ?: "start"
         if (selectedAction !in setOf("start", "restart", "config", "list", "attach", "status", "logs", "stop")) {
             throw UsageError(
@@ -131,7 +128,15 @@ class Dev(
         if (all && selectedAction != "stop") {
             throw UsageError("--all is only supported by fz dev stop")
         }
-        if (selectedAction in setOf("start", "restart") && !isBuildProject(root)) {
+        var root = (projectDirectory ?: workingDirectory).toAbsolutePath().normalize()
+        if (projectDirectory == null && selectedAction != "list" && !(selectedAction == "stop" && all)) {
+            root = try {
+                DevProjectDirectoryResolver.resolveDefault(root)
+            } catch (e: IllegalArgumentException) {
+                throw UsageError(e.message ?: "Could not select a Fluxzero project directory")
+            }
+        }
+        if (selectedAction in setOf("start", "restart") && !DevProjectDirectoryResolver.isBuildProject(root)) {
             root = try {
                 projectInitializer.initialize(root)
             } catch (e: Exception) {
@@ -229,11 +234,4 @@ class Dev(
         }
     }
 
-    private fun isBuildProject(directory: Path): Boolean = listOf(
-        "pom.xml",
-        "build.gradle",
-        "build.gradle.kts",
-        "settings.gradle",
-        "settings.gradle.kts"
-    ).any { Files.isRegularFile(directory.resolve(it)) }
 }
