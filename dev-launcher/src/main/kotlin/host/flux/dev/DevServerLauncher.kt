@@ -69,7 +69,21 @@ class DevServerLauncher(
                     reuseSnapshotCache = request.target != DevLaunchTarget.SERVER || likelyActive,
                     projectPin = projectPin
                 )
-                var command = command(classpath, request, javaRuntime)
+                val policyFile = projectDirectory.resolve(".fluxzero/dev/launcher/update-policy")
+                val reusedPin = pinnedVersion != null && (likelyActive || request.target in
+                    setOf(DevLaunchTarget.CONTROL, DevLaunchTarget.MCP_STDIO))
+                val updatePolicy = when {
+                    requestedVersion != null -> "pinned"
+                    reusedPin -> runCatching { Files.readString(policyFile).trim() }.getOrDefault("pinned")
+                    else -> "latest"
+                }
+                if (projectPin && !reusedPin) {
+                    Files.createDirectories(policyFile.parent)
+                    Files.writeString(policyFile, updatePolicy)
+                }
+                val launchRequest = request.copy(jvmOptions = request.jvmOptions +
+                    "-Dfluxzero.dev.updatePolicy=$updatePolicy")
+                var command = command(classpath, launchRequest, javaRuntime)
                 if (request.target == DevLaunchTarget.SERVER) {
                     if (supportsBootstrap(classpath)) {
                         val mainIndex = command.indexOf(DevLaunchTarget.SERVER.mainClass)
@@ -87,7 +101,7 @@ class DevServerLauncher(
                         var active = activeSession(projectDirectory)?.active == true && probe(command, projectDirectory)
                         if (likelyActive && !active) {
                             classpath = classpathResolver.resolve(projectDirectory, version, reuseSnapshotCache = false)
-                            command = command(classpath, request, javaRuntime)
+                            command = command(classpath, launchRequest, javaRuntime)
                             active = false
                         }
                         launchServer(
