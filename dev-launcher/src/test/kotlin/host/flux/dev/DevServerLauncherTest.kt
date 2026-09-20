@@ -44,6 +44,7 @@ class DevServerLauncherTest {
             assertTrue("io.fluxzero.devserver.DevServerBootstrapMain" in command)
             assertEquals(background, "--bootstrap-background" in command)
             assertTrue("--bootstrap-agent-ready" in command)
+            assertTrue("-Dfluxzero.dev.updatePolicy=pinned" in command)
             assertTrue("--no-tests" in command)
             assertEquals(projectDirectory.toString(), command[command.indexOf("--project-dir") + 1])
         }
@@ -118,7 +119,8 @@ class DevServerLauncherTest {
 
     @Test
     fun `new session resolves the latest compatible stable release`() {
-        val executor = CommandExecutor { _, _, _ -> 0 }
+        val commands = mutableListOf<List<String>>()
+        val executor = CommandExecutor { command, _, _ -> commands += command; 0 }
         val resolver = DevServerVersionResolver({
             "<metadata><versioning><versions><version>1.6.2</version></versions></versioning></metadata>"
         }, projectDirectory.resolve("metadata-cache")) { }
@@ -134,6 +136,12 @@ class DevServerLauncherTest {
 
         assertEquals("1.6.2", Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/version")))
         assertEquals("1.6.2", classpathResolver.resolvedVersion(projectDirectory))
+        assertEquals("latest", Files.readString(projectDirectory.resolve(".fluxzero/dev/launcher/update-policy")))
+        assertTrue(commands.last().contains("-Dfluxzero.dev.updatePolicy=latest"))
+        launcher(executor, versionResolver = resolver, classpathResolver = classpathResolver).launch(
+            DevLaunchRequest(projectDirectory, target = DevLaunchTarget.MCP_STDIO)
+        )
+        assertTrue(commands.last().contains("-Dfluxzero.dev.updatePolicy=latest"))
     }
 
     @Test

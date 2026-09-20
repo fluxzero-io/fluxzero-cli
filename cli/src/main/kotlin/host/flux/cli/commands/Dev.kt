@@ -31,7 +31,7 @@ class Dev(
             "Run `fz dev config` to print the version-aligned configuration reference."
 
     private val action by argument(
-        help = "Action: start (default), restart, config, list, attach, status, logs, or stop."
+        help = "Action: start (default), restart, config, list, attach, status, logs, stop, check-update, or prepare-update."
     ).optional()
 
     private val projectDirectory by option("--project-dir", "--dir", help = "Maven or Gradle project directory.")
@@ -40,6 +40,7 @@ class Dev(
         "--dev-server-version",
         help = "Dev-server artifact version override. Defaults to the active project pin or latest stable 1.x release."
     )
+    private val currentVersion by option("--current-version", help = "Running dev-server version for update checks.")
     private val mainClass by option("--main-class", help = "Application main class override; auto-detected by default.")
     private val applicationName by option("--application-name", help = "Fluxzero application name.")
     private val applications by option(
@@ -119,10 +120,10 @@ class Dev(
 
     override fun run() {
         val selectedAction = action ?: "start"
-        if (selectedAction !in setOf("start", "restart", "config", "list", "attach", "status", "logs", "stop")) {
+        if (selectedAction !in setOf("start", "restart", "config", "list", "attach", "status", "logs", "stop", "check-update", "prepare-update")) {
             throw UsageError(
                 "Unknown dev action '$selectedAction'. Expected start, restart, config, list, attach, status, logs, " +
-                    "or stop."
+                    "stop, check-update, or prepare-update."
             )
         }
         if (all && selectedAction != "stop") {
@@ -135,6 +136,23 @@ class Dev(
             } catch (e: IllegalArgumentException) {
                 throw UsageError(e.message ?: "Could not select a Fluxzero project directory")
             }
+        }
+        if (selectedAction in setOf("check-update", "prepare-update")) {
+            val current = currentVersion ?: throw UsageError("--current-version is required")
+            val updates = host.flux.dev.DevServerUpdates()
+            val pinned = !System.getenv("FLUXZERO_DEV_SERVER_VERSION").isNullOrBlank()
+            val result = if (selectedAction == "prepare-update") updates.prepare(current,
+                devServerVersion ?: throw UsageError("--dev-server-version is required"), pinned)
+            else updates.check(current, pinned)
+            fun quote(value: String): String = "\"" + value.flatMap { character ->
+                when (character) {
+                    '\\' -> "\\\\".toList()
+                    '"' -> "\\\"".toList()
+                    else -> if (character.code < 32) "\\u%04x".format(character.code).toList() else listOf(character)
+                }
+            }.joinToString("") + "\""
+            echo(result.entries.joinToString(",", "{", "}") { quote(it.key) + ":" + quote(it.value) })
+            return
         }
         if (selectedAction in setOf("start", "restart") && !DevProjectDirectoryResolver.isBuildProject(root)) {
             root = try {

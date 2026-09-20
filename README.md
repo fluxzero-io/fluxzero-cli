@@ -880,3 +880,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
   <a href="https://fluxzero.io/about">About us</a> &nbsp;·&nbsp;
   <a href="https://fluxzero.io/contact">Contact us</a>
 </p>
+
+### Devboard update checks
+
+Unpinned launches pass the update policy to the dev server. An update-aware Devboard can periodically call
+`fz dev check-update --current-version <version> --project-dir <project> --json` and show a restart action.
+`fz dev prepare-update --current-version <version> --dev-server-version <candidate> --project-dir <project> --json`
+rechecks that candidate and downloads the standalone artifact through the existing verified cache. Both
+commands return JSON; preparation leaves running processes and project configuration untouched.
+
+Only newer stable releases in the supported dev-server major are offered. Explicit `--dev-server-version`
+and `FLUXZERO_DEV_SERVER_VERSION` selections disable automatic offers. The launch policy is retained beside
+the project's cached launcher so subsequent MCP/control launches preserve that choice. Old cached launchers
+without a policy are treated conservatively until a fresh CLI start. Devboard requires confirmation before
+replacing its process and resetting local application/monitoring data. Agent plugin updates remain managed
+by the host agent application.
