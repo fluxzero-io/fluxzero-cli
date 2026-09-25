@@ -22,9 +22,13 @@ data class Sender(
         }
     }
 
+    override fun id(): String {
+        return userId.functionalId
+    }
+
     @JsonIgnore
     override fun getName(): String {
-        return userId.functionalId
+        return id()
     }
 
     fun hasRole(role: Role): Boolean {

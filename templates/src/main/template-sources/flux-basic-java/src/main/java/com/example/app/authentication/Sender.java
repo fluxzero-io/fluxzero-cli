@@ -19,9 +19,14 @@ public record Sender(@NonNull UserId userId, Role userRole) implements User {
     }
 
     @Override
+    public String id() {
+        return userId.getFunctionalId();
+    }
+
+    @Override
     @JsonIgnore
     public String getName() {
-        return userId.getFunctionalId();
+        return id();
     }
 
     public boolean hasRole(Role role) {
