@@ -1,4 +1,10 @@
 operations:
+  # Freeze the generation date in application configuration.
+  - type: replace
+    files: ["src/main/resources/fluxzero.properties"]
+    find: "@fluxzeroDefaultsVersion@"
+    replace: "${defaultsVersion}"
+
   # Replace package names in Java files
   - type: replace
     files: ["**/*.java"]

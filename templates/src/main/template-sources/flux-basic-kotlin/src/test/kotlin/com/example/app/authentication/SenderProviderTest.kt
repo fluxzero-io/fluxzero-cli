@@ -5,7 +5,6 @@ import io.fluxzero.idp.client.FormCodec
 import io.fluxzero.idp.testsupport.localstub.FluxzeroIdpStub
 import io.fluxzero.sdk.configuration.DefaultFluxzero
 import io.fluxzero.sdk.test.TestFixture
-import io.fluxzero.sdk.tracking.handling.authentication.User
 import io.fluxzero.sdk.web.WebRequest
 import io.fluxzero.sdk.web.WebResponse
 import org.junit.jupiter.api.AfterEach
@@ -31,7 +30,7 @@ class SenderProviderTest {
     @Test
     fun localLoginCreatesApplicationSession() {
         val testFixture = TestFixture.create(
-            DefaultFluxzero.builder().registerUserProvider(BrowserSessionSenderProvider()),
+            DefaultFluxzero.builder().registerUserProvider(SenderProvider()),
             AppAuthEndpoint::class.java,
             FluxzeroIdpStub::class.java
         )
@@ -46,15 +45,16 @@ class SenderProviderTest {
         val returnTo = AtomicReference<String>()
 
         testFixture
-            .whenGet("/app/login?returnTo=/app/auth/session")
+            .whenGetByUser(null, "/app/login?returnTo=/app/auth/session")
             .expectWebResult(captureRedirect(authorizationUrl, "http://localhost:8080/oauth2/auth"))
 
             .andThen()
-            .whenGet(authorizationUrl.get())
+            .whenGetByUser(null, authorizationUrl.get())
             .expectWebResult(captureRedirect(loginPath, "/login?"))
 
             .andThen()
-            .whenWebRequest(
+            .whenWebRequestByUser(
+                null,
                 WebRequest.post(loginPath.get())
                     .contentType("application/x-www-form-urlencoded")
                     .payload(FormCodec.encode(mapOf("username" to username)))
@@ -63,11 +63,11 @@ class SenderProviderTest {
             .expectWebResult(captureRedirect(callbackUrl, "http://localhost:8080/app/callback"))
 
             .andThen()
-            .whenGet(pathAndQuery(callbackUrl.get()))
+            .whenGetByUser(null, pathAndQuery(callbackUrl.get()))
             .expectWebResult(captureRedirect(returnTo, "/app/auth/session"))
 
             .andThen()
-            .whenGet(returnTo.get())
+            .whenGetByUser(null, returnTo.get())
             .expectWebResult(authenticatedAs(username))
     }
 
@@ -98,9 +98,4 @@ class SenderProviderTest {
         }
     }
 
-    private class BrowserSessionSenderProvider : SenderProvider() {
-        override fun getSystemUser(): User? {
-            return null
-        }
-    }
 }

@@ -109,5 +109,8 @@ private fun expandVariables(template: String, variables: TemplateVariables): Str
     result = result.replace("\${description}", variables.finalDescription)
     result = result.replace("{{description}}", variables.finalDescription)
     
+    result = result.replace("\${defaultsVersion}", variables.defaultsVersion)
+    result = result.replace("{{defaultsVersion}}", variables.defaultsVersion)
+
     return result
 }

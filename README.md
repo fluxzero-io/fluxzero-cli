@@ -487,6 +487,10 @@ not contain local AI-agent manuals; current Fluxzero guidance is distributed by 
 Codex plugin and its MCP server. Existing projects may still opt into local instruction files through the supported
 Gradle plugin or Maven `sync-project-files` goal described below.
 
+New projects pin `fluxzero.defaults.version` in `src/main/resources/fluxzero.properties` to the local calendar date
+at generation time (`yyyy.MM.dd`). This is a literal project setting, not the CLI release date or a build-time value.
+Keep it unchanged during SDK upgrades; advance it only as an intentional defaults migration.
+
 ### Template Customization with `refactor.yaml`
 
 Templates can include a `refactor.yaml` file to customize the generated project. This file defines operations that are applied during project initialization.

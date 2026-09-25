@@ -7,11 +7,14 @@ import host.flux.templates.refactor.TemplateVariables
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.time.Clock
+import java.time.LocalDate
 import kotlin.io.path.absolute
 
 class ScaffoldService(
     private val templateService: TemplateService = ClasspathTemplateService(),
-    private val templateRefactor: TemplateRefactor = TemplateRefactor()
+    private val templateRefactor: TemplateRefactor = TemplateRefactor(),
+    private val clock: Clock = Clock.systemDefaultZone()
 ) {
     
     fun scaffoldProject(request: ScaffoldProject): ScaffoldResult {
@@ -75,7 +78,8 @@ class ScaffoldService(
                         artifactId = request.artifactId,
                         applicationId = request.applicationId,
                         description = request.description,
-                        buildSystem = request.buildSystem
+                        buildSystem = request.buildSystem,
+                        generationDate = LocalDate.now(clock)
                     )
                     val refactorResult = templateRefactor.refactorTemplate(
                         templateRoot = templateRoot,

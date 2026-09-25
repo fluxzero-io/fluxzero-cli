@@ -31,7 +31,7 @@ class SenderProviderTest {
     @Test
     void localLoginCreatesApplicationSession() {
         TestFixture testFixture = TestFixture.create(
-                DefaultFluxzero.builder().registerUserProvider(new BrowserSessionSenderProvider()),
+                DefaultFluxzero.builder().registerUserProvider(new SenderProvider()),
                 AppAuthEndpoint.class, FluxzeroIdpStub.class);
 
         loginAs(testFixture, "user");
@@ -44,26 +44,26 @@ class SenderProviderTest {
         AtomicReference<String> returnTo = new AtomicReference<>();
 
         testFixture
-                .whenGet("/app/login?returnTo=/app/auth/session")
+                .whenGetByUser(null, "/app/login?returnTo=/app/auth/session")
                 .expectWebResult(captureRedirect(authorizationUrl, "http://localhost:8080/oauth2/auth"))
 
                 .andThen()
-                .whenGet(authorizationUrl.get())
+                .whenGetByUser(null, authorizationUrl.get())
                 .expectWebResult(captureRedirect(loginPath, "/login?"))
 
                 .andThen()
-                .whenWebRequest(WebRequest.post(loginPath.get())
+                .whenWebRequestByUser(null, WebRequest.post(loginPath.get())
                         .contentType("application/x-www-form-urlencoded")
                         .payload(FormCodec.encode(Map.of("username", username)))
                         .build())
                 .expectWebResult(captureRedirect(callbackUrl, "http://localhost:8080/app/callback"))
 
                 .andThen()
-                .whenGet(pathAndQuery(callbackUrl.get()))
+                .whenGetByUser(null, pathAndQuery(callbackUrl.get()))
                 .expectWebResult(captureRedirect(returnTo, "/app/auth/session"))
 
                 .andThen()
-                .whenGet(returnTo.get())
+                .whenGetByUser(null, returnTo.get())
                 .expectWebResult(authenticatedAs(username));
     }
 
@@ -92,10 +92,4 @@ class SenderProviderTest {
         };
     }
 
-    static class BrowserSessionSenderProvider extends SenderProvider {
-        @Override
-        public Sender getSystemUser() {
-            return null;
-        }
-    }
 }

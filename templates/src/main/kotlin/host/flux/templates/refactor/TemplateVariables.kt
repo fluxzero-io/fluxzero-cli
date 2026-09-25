@@ -1,6 +1,8 @@
 package host.flux.templates.refactor
 
 import host.flux.templates.models.BuildSystem
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 data class TemplateVariables(
     val packageName: String,
@@ -9,8 +11,12 @@ data class TemplateVariables(
     val artifactId: String? = null,
     val applicationId: String? = null,
     val description: String? = null,
-    val buildSystem: BuildSystem? = null
+    val buildSystem: BuildSystem? = null,
+    val generationDate: LocalDate = LocalDate.now()
 ) {
+    // Evaluated once for project generation, never during a generated project build.
+    val defaultsVersion: String = generationDate.format(DateTimeFormatter.ofPattern("uuuu.MM.dd"))
+
     /**
      * Get the final group ID, using packageName as fallback if groupId is null
      */
