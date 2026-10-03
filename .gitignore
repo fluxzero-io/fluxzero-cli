@@ -1,6 +1,4 @@
 .gradle
-.build/
-.swiftpm/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
@@ -46,6 +44,5 @@ obj/
 ### Mac OS ###
 .DS_Storeapi/node_modules/
 maven-plugin/target/
-AppPackages/
 .local-registry/
 maven-plugin/examples/*/target/
