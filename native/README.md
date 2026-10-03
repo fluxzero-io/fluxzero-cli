@@ -1,9 +1,11 @@
 # Fluxzero Native Launchpad Apps
 
-This directory contains platform-native Fluxzero Launchpad implementations.
+This directory retains the macOS and Windows Fluxzero Launchpad source for local development.
+Graphical desktop apps are not built or published by CI. Install the supported CLI through
+[Homebrew, WinGet or the native downloads](../README.md#installation).
 
 - macOS: SwiftUI/AppKit, system materials, Liquid Glass where available, standard controls, native URL handling, and app-bundle packaging.
-- Windows: WinUI 3, Fluent controls, Mica as the foundation layer, notification-area operation, per-user protocol registration for unpackaged builds, and MSIX-ready metadata. This implementation is present in the repo but is not published by the release workflow yet.
+- Windows: WinUI 3, Fluent controls, Mica as the foundation layer, notification-area operation, per-user protocol registration for unpackaged builds, and MSIX-ready metadata. This implementation is available for local builds only.
 - Linux: planned, not implemented yet.
 
 ## Design Direction

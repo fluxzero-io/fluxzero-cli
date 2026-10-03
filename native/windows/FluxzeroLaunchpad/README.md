@@ -1,6 +1,8 @@
 # Fluxzero Launchpad for Windows
 
-This is the platform-native Windows shell for Fluxzero Launchpad.
+This is the platform-native Windows shell for Fluxzero Launchpad, retained for local development.
+It is not published as an installer or MSIX. The [Windows CLI](../../../README.md#installation)
+continues to be distributed through WinGet, PowerShell and native downloads.
 
 - UI stack: WinUI 3 through Windows App SDK.
 - Visual language: Fluent, Mica window backdrop, native controls.

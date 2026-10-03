@@ -221,13 +221,6 @@ jobs:
           echo "Reserved release version $version."
           echo "created=true" >> "$GITHUB_OUTPUT"
 
-  macos-launchpad-build:
-    needs: [version, native-build-macos, reserve-version]
-    uses: ./.github/workflows/macos-launchpad-build.yml
-    with:
-      version: ${{ needs.version.outputs.version }}
-    secrets: inherit
-
   release:
     runs-on: ubuntu-latest
     needs: [version, build-and-test, publish-plugins, native-build-macos, native-build-cli, reserve-version]

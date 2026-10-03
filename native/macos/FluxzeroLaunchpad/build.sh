@@ -24,8 +24,6 @@ FLUXZERO_CLI_UNIVERSAL="${FLUXZERO_CLI_UNIVERSAL:-}"
 FLUXZERO_CLI_ARM64="${FLUXZERO_CLI_ARM64:-}"
 FLUXZERO_CLI_AMD64="${FLUXZERO_CLI_AMD64:-${FLUXZERO_CLI_X86_64:-}}"
 REQUIRE_BUNDLED_CLI="${REQUIRE_BUNDLED_CLI:-0}"
-CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
-CODE_SIGN_ENTITLEMENTS="${CODE_SIGN_ENTITLEMENTS:-}"
 
 mkdir -p "$BUILD_DIR"
 
@@ -106,14 +104,8 @@ sign_target() {
         return 0
     fi
 
-    local args=(--force --sign "$CODE_SIGN_IDENTITY" --options runtime)
-    if [[ -n "$CODE_SIGN_ENTITLEMENTS" ]]; then
-        args+=(--entitlements "$CODE_SIGN_ENTITLEMENTS")
-    fi
-    if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
-        args+=(--timestamp)
-    fi
-    codesign "${args[@]}" "$target" >/dev/null
+    # Local app bundles use ad-hoc signing; desktop release signing is retired.
+    codesign --force --sign - --options runtime "$target" >/dev/null
 }
 
 if [[ ! -f "$ICON_SOURCE" ]]; then
