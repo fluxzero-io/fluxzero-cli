@@ -17,8 +17,9 @@ import host.flux.cli.commands.Mcp
 import host.flux.cli.commands.Upgrade
 import host.flux.cli.commands.Version
 import host.flux.cli.commands.templates.Templates
-import host.flux.cli.services.UpdateService
 import host.flux.cli.services.VersionService
+import host.flux.cli.update.CliAutoUpdates
+import host.flux.cli.update.UPDATE_WORKER
 
 /**
  * Checks for updates on startup and then launches the CLI.
@@ -51,16 +52,12 @@ class FluxCli : CliktCommand(name = "fz") {
 
 fun main(args: Array<String>) {
     try {
-        val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
-        if (shouldCheckForUpdates(args) && currentVersion != "dev" && !currentVersion.endsWith("SNAPSHOT")) {
-            val updateInfo = UpdateService.checkForUpdates(currentVersion)
-            if (updateInfo.hasUpdate) {
-                System.err.println(
-                    "A new version of the Fluxzero CLI is available: " +
-                        "${updateInfo.latestVersion} (current: $currentVersion)"
-                )
-            }
+        if (args.firstOrNull() == UPDATE_WORKER) {
+            if (args.size == 2) CliAutoUpdates().runWorker(args[1])
+            return
         }
+        val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
+        if (shouldCheckForUpdates(args)) CliAutoUpdates().schedule(currentVersion)
         FluxCli()
             .subcommands(
                 Init(),
@@ -77,7 +74,7 @@ fun main(args: Array<String>) {
     }
 }
 
-internal fun shouldCheckForUpdates(args: Array<String>): Boolean = args.firstOrNull() !in setOf(
+internal fun shouldCheckForUpdates(args: Array<String>): Boolean = args.none { it in setOf("--help", "-h") } && args.firstOrNull() !in setOf(
     "-V",
     "--version",
     "version",

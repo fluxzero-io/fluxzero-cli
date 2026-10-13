@@ -64,6 +64,8 @@ class MainTest {
         assertTrue(!shouldCheckForUpdates(arrayOf("-V")))
         assertTrue(!shouldCheckForUpdates(arrayOf("version")))
         assertTrue(!shouldCheckForUpdates(arrayOf("upgrade")))
+        assertTrue(!shouldCheckForUpdates(arrayOf("--help")))
+        assertTrue(!shouldCheckForUpdates(arrayOf("dev", "--help")))
         assertTrue(shouldCheckForUpdates(arrayOf("dev")))
     }
 }
