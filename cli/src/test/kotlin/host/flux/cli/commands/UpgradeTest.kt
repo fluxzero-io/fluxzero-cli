@@ -92,4 +92,16 @@ class UpgradeTest {
         assertTrue(result.stdout.contains("Checking Fluxzero CLI installation..."))
         assertTrue(result.statusCode != 0)
     }
+    @Test
+    fun `busy updater fails immediately with an actionable message`() {
+        val installer = mockk<InstallationService>()
+        CliUpdateSettings(directory).withInstallationLock {
+            val result = upgrade(installer).test(emptyList())
+            assertTrue(result.statusCode != 0)
+            assertTrue(result.output.contains("Another CLI update is in progress"), result.output)
+            assertTrue(result.output.contains("last-run.log"), result.output)
+        }
+        verify(exactly = 0) { installer.install() }
+    }
+
 }

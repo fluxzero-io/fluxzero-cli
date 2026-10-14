@@ -81,12 +81,21 @@ class CliUpdateInstallerTest {
     @Test fun `Homebrew checks pins and version before upgrading with metadata refresh disabled`() {
         val target = directory.resolve("Cellar/fluxzero/1.2.3/bin/fz")
         val calls = mutableListOf<List<String>>()
+        val formula = directory.resolve("fluxzero.rb")
+        Files.writeString(formula, brewInfo())
         val service = installer(target, command = { command, env ->
             calls += command
             assertEquals("1", env["HOMEBREW_NO_AUTO_UPDATE"])
             assertEquals("1", env["HOMEBREW_NO_INSTALL_CLEANUP"])
             when (command[1]) {
-                "info" -> brewInfo()
+                "info" -> if (command.last().endsWith(".rb")) Files.readString(Path.of(command.last())) else brewInfo()
+                "formula" -> formula.toString()
+                "upgrade" -> {
+                    // Change the live tap between validation and install: only the frozen file may be used.
+                    Files.writeString(formula, brewInfo("2.0.0"))
+                    assertEquals(brewInfo(), Files.readString(Path.of(command.last())))
+                    ""
+                }
                 "--prefix" -> directory.toString()
                 "--version" -> "1.2.4"
                 else -> ""
@@ -100,9 +109,11 @@ class CliUpdateInstallerTest {
     @Test fun `Homebrew pins and a formula moving to another major skip installation`() {
         for (info in listOf(brewInfo(pinned = true), brewInfo("2.0.0"))) {
             val target = directory.resolve("Cellar/fluxzero/1.2.3/bin/fz")
+            val source = directory.resolve("fluxzero.rb")
+            Files.writeString(source, info)
             installer(target, command = { command, _ ->
                 assertNotEquals("upgrade", command[1])
-                if (command[1] == "info") info else ""
+                when (command[1]) { "info" -> info; "formula" -> source.toString(); else -> "" }
             }).update("1.2.3")
         }
     }
@@ -139,4 +150,18 @@ class CliUpdateInstallerTest {
         assertEquals(directory.resolve("fz.exe"), extractWindowsPackage(zip, directory))
         assertContentEquals(bytes, Files.readAllBytes(directory.resolve("VCRUNTIME140.dll")))
     }
+    @Test fun `Windows runtime changes are rejected before touching executables`() {
+        val installed = Files.createDirectory(directory.resolve("installed"))
+        val stage = Files.createDirectory(directory.resolve("stage"))
+        Files.writeString(installed.resolve("fz.exe"), "original")
+        val dll = stage.resolve("runtime.dll")
+        Files.writeString(dll, "new runtime")
+        assertFails { requireUnchangedWindowsRuntime(stage, installed) }
+        Files.writeString(installed.resolve("runtime.dll"), "old runtime")
+        assertFails { requireUnchangedWindowsRuntime(stage, installed) }
+        assertEquals("original", Files.readString(installed.resolve("fz.exe")))
+        Files.copy(dll, installed.resolve("runtime.dll"), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        requireUnchangedWindowsRuntime(stage, installed)
+    }
+
 }

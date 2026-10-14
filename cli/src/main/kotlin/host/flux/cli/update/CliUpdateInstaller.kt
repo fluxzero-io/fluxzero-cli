@@ -22,13 +22,20 @@ internal class CliReleaseClient(
     private val client: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
         .followRedirects(HttpClient.Redirect.NORMAL).build(),
 ) {
-    fun latest(current: String): CliRelease? {
+    private fun releases(): String {
         val request = HttpRequest.newBuilder(URI.create("https://api.github.com/repos/fluxzero-io/fluxzero-cli/releases?per_page=100"))
             .timeout(Duration.ofSeconds(10)).header("Accept", "application/vnd.github+json").build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         check(response.statusCode() == 200) { "Release lookup returned HTTP ${response.statusCode()}" }
-        return selectRelease(response.body(), current)
+        return response.body()
     }
+
+    fun latest(current: String): CliRelease? = selectRelease(releases(), current)
+
+    fun newestVersion(): String? = ObjectMapper().readTree(releases())
+        .filter { !it.path("draft").asBoolean(true) && !it.path("prerelease").asBoolean(true) }
+        .mapNotNull { item -> item.path("tag_name").asText().let { tag -> CliVersion.parse(tag)?.let { it to tag } } }
+        .maxByOrNull { it.first }?.second
 
     fun download(asset: CliAsset, destination: Path) {
         require(asset.url.startsWith("https://github.com/fluxzero-io/fluxzero-cli/releases/download/")) { "Unexpected release asset URL" }
@@ -60,6 +67,9 @@ internal class CliUpdateInstaller(
     private val environment: Map<String, String> = System.getenv(),
     private val windows: Boolean = isWindows(),
     private val nativeAsset: String = nativeAssetName(),
+    private val homebrewFormula: String = "fluxzero-io/tap/fluxzero",
+    private val packageManager: ManagedPackageInstallation? = ManagedPackageInstallation.detect(installation.path),
+
 ) {
     fun update(current: String): String {
         val running = CliVersion.parse(current) ?: return "Development and prerelease versions are not updated automatically"
@@ -67,7 +77,7 @@ internal class CliUpdateInstaller(
         val target = CliVersion.parse(release.tag)
         check(target != null && target.major == running.major && target > running) { "Incompatible CLI update" }
         if (!allowed()) return "Automatic updates disabled"
-        when (ManagedPackageInstallation.detect(installation.path)) {
+        when (packageManager) {
             ManagedPackageInstallation.HOMEBREW -> return updateHomebrew(release, current)
             ManagedPackageInstallation.WINGET -> return updateWinget(release)
             null -> updateFiles(release)
@@ -81,28 +91,36 @@ internal class CliUpdateInstaller(
         }
         val env = mapOf("NONINTERACTIVE" to "1", "HOMEBREW_NO_AUTO_UPDATE" to "1", "HOMEBREW_NO_INSTALL_CLEANUP" to "1",
             "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK" to "1", "HOMEBREW_NO_ENV_HINTS" to "1")
-        val formula = "fluxzero-io/tap/fluxzero"
-        fun info(): JsonNode = ObjectMapper().readTree(command(listOf("brew", "info", "--json=v2", formula), env))
+        val formula = homebrewFormula
+        fun info(reference: String): JsonNode = ObjectMapper().readTree(command(listOf("brew", "info", "--json=v2", "--formula", reference), env))
             .path("formulae").single { it.path("full_name").asText() == formula }
-        var details = info()
-        if (details.path("pinned").asBoolean()) return "Homebrew pin preserved"
+        if (info(formula).path("pinned").asBoolean()) return "Homebrew pin preserved"
         command(listOf("brew", "update"), env)
-        details = info()
-        if (details.path("pinned").asBoolean()) return "Homebrew pin preserved"
-        // Homebrew has no exact-version upgrade flag. Freeze its metadata refresh between this check and upgrade.
-        if (CliVersion.parse(details.path("versions").path("stable").asText()) != CliVersion.parse(release.tag)) {
-            return "Homebrew does not currently offer the selected same-major release; update deferred"
+        val source = Path.of(command(listOf("brew", "formula", formula), env).trim()).toRealPath()
+        // Keep the copy inside the owning tap so Homebrew preserves the formula identity and receipt.
+        val snapshot = Files.createTempDirectory(source.parent, ".fz-update-")
+        try {
+            val frozen = snapshot.resolve(source.fileName)
+            Files.copy(source, frozen)
+            val details = info(frozen.toString())
+            if (details.path("pinned").asBoolean()) return "Homebrew pin preserved"
+            if (CliVersion.parse(details.path("versions").path("stable").asText()) != CliVersion.parse(release.tag)) {
+                return "Homebrew does not currently offer the selected same-major release; update deferred"
+            }
+            val installedVersions = details.path("installed").mapNotNull { CliVersion.parse(it.path("version").asText()) }
+            if (installedVersions.any { it >= CliVersion.parse(release.tag)!! }) return "Homebrew installation is already current"
+            check(installedVersions.contains(CliVersion.parse(current))) { "Homebrew installation changed; update deferred" }
+            if (!allowed()) return "Automatic updates disabled"
+            // Both validation and installation use the same private file, never the mutable tap name.
+            command(listOf("brew", "upgrade", "--formula", frozen.toString()), env)
+            val prefix = command(listOf("brew", "--prefix", formula), env).trim()
+            check(CliVersion.parse(command(listOf(Path.of(prefix, "bin", "fz").toString(), "--version"), env).trim()) == CliVersion.parse(release.tag)) {
+                "Homebrew update could not be verified"
+            }
+            return "Fluxzero CLI updated to ${release.tag} through Homebrew"
+        } finally {
+            Files.walk(snapshot).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }
         }
-        val installedVersions = details.path("installed").mapNotNull { CliVersion.parse(it.path("version").asText()) }
-        if (installedVersions.any { it >= CliVersion.parse(release.tag)!! }) return "Homebrew installation is already current"
-        check(installedVersions.contains(CliVersion.parse(current))) { "Homebrew installation changed; update deferred" }
-        if (!allowed()) return "Automatic updates disabled"
-        command(listOf("brew", "upgrade", "--formula", formula), env)
-        val prefix = command(listOf("brew", "--prefix", formula), env).trim()
-        check(CliVersion.parse(command(listOf(Path.of(prefix, "bin", "fz").toString(), "--version"), env).trim()) == CliVersion.parse(release.tag)) {
-            "Homebrew update could not be verified"
-        }
-        return "Fluxzero CLI updated to ${release.tag} through Homebrew"
     }
 
     private fun updateWinget(release: CliRelease): String {
@@ -151,9 +169,8 @@ internal class CliUpdateInstaller(
                     }
                 }
             }
-            if (windows && !installation.jar) Files.list(stage).use { paths ->
-                paths.filter { it.fileName.toString().endsWith(".dll", true) }.forEach { replacements[target.resolveSibling(it.fileName)] = it }
-            }
+            if (windows && !installation.jar) requireUnchangedWindowsRuntime(stage, target.parent)
+
             replaceInstallation(replacements)
         } finally {
             Files.walk(stage).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { runCatching { Files.deleteIfExists(it) } } }
@@ -174,6 +191,18 @@ private fun sha256(path: Path): String {
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
+/** Runtime changes require an installer transaction; never mix DLL generations in a background update. */
+internal fun requireUnchangedWindowsRuntime(stage: Path, installation: Path) {
+    Files.list(stage).use { paths ->
+        paths.filter { it.fileName.toString().endsWith(".dll", true) }.forEach { dll ->
+            val existing = installation.resolve(dll.fileName)
+            check(Files.isRegularFile(existing) && Files.mismatch(dll, existing) == -1L) {
+                "Windows runtime changes require a manual upgrade; automatic installation deferred"
+            }
+        }
+    }
+}
+
 internal fun extractWindowsPackage(archive: Path, stage: Path): Path {
     ZipInputStream(Files.newInputStream(archive)).use { zip ->
         while (true) {
@@ -192,7 +221,7 @@ internal fun extractWindowsPackage(archive: Path, stage: Path): Path {
 }
 
 /** Stage beside each destination, rename rather than truncate running executables, and roll back partial swaps. */
-internal fun replaceInstallation(replacements: Map<Path, Path>) {
+internal fun replaceInstallation(replacements: Map<Path, Path>, afterReplace: (Path) -> Unit = {}) {
     val staged = linkedMapOf<Path, Path>()
     val backups = linkedMapOf<Path, Path?>()
     try {
@@ -205,12 +234,12 @@ internal fun replaceInstallation(replacements: Map<Path, Path>) {
             val backup = if (Files.exists(target)) {
                 Files.createTempFile(target.parent, ".fz-old-", ".tmp").also {
                     Files.delete(it)
-                    if (isWindows()) Files.move(target, it, StandardCopyOption.ATOMIC_MOVE)
-                    else Files.copy(target, it, StandardCopyOption.COPY_ATTRIBUTES)
+                    Files.copy(target, it, StandardCopyOption.COPY_ATTRIBUTES)
                 }
             } else null
             backups[target] = backup
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            afterReplace(target)
         }
     } catch (failure: Exception) {
         backups.entries.reversed().forEach { (target, backup) ->

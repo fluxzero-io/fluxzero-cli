@@ -18,7 +18,7 @@ class CliAutoUpdatesTest {
     private val now = Instant.parse("2026-10-13T12:00:00Z")
 
     private fun service(time: Instant = now, env: Map<String, String> = emptyMap(), launch: (String) -> Unit = {}, update: () -> String = { "updated" }) =
-        CliAutoUpdates(CliUpdateSettings(directory), Clock.fixed(time, ZoneOffset.UTC), env, launch, update)
+        CliAutoUpdates(CliUpdateSettings(directory), Clock.fixed(time, ZoneOffset.UTC), env, launch, update, { "1.2.4" })
 
     @Test fun `onboarding enables only an unset preference and retains unrelated settings`() {
         val settings = CliUpdateSettings(directory)
@@ -32,19 +32,38 @@ class CliAutoUpdatesTest {
         assertEquals(true, settings.configure("enable"))
     }
 
-    @Test fun `unset disabled CI opt-out and development builds never launch`() {
+    @Test fun `disabled installation still checks and advertises updates without installing`() {
+        for (preference in listOf("status", "disable")) {
+            CliUpdateSettings(directory).configure(preference)
+            var token = ""
+            service(launch = { token = it }).schedule("1.2.3")
+            if (token.isEmpty()) token = readProperties(directory.resolve("state.properties")).getProperty("token", "")
+            if (token.isNotEmpty()) service(update = { fail("installation disabled") }).runWorker(token)
+        }
+        assertContains(service().notification("1.2.3")!!, "1.2.4")
+        assertNull(service().notification("1.2.3"))
+        assertNull(service().notification("1.2.4"))
+        assertNotNull(service(now.plusSeconds(UPDATE_INTERVAL.seconds)).notification("1.2.3"))
+    }
+
+    @Test fun `CI check opt-out and development builds never launch`() {
         val calls = AtomicInteger()
-        service(launch = { calls.incrementAndGet() }).schedule("1.2.3")
-        CliUpdateSettings(directory).configure("disable")
-        service(launch = { calls.incrementAndGet() }).schedule("1.2.3")
-        CliUpdateSettings(directory).configure("enable")
-        for (env in listOf(mapOf("CI" to "true"), mapOf("FLUXZERO_CLI_AUTO_UPDATE" to "false"))) {
+        for (env in listOf(mapOf("CI" to "true"), mapOf("FLUXZERO_CLI_UPDATE_CHECK" to "false"))) {
             service(env = env, launch = { calls.incrementAndGet() }).schedule("1.2.3")
         }
         for (version in listOf("dev", "1.2.3-SNAPSHOT", "1.2.3-RC1", "unknown", "999999999999.0.0")) {
             service(launch = { calls.incrementAndGet() }).schedule(version)
         }
         assertEquals(0, calls.get())
+    }
+
+    @Test fun `environment install opt-out still permits notification lookup`() {
+        CliUpdateSettings(directory).configure("enable")
+        var token = ""
+        val service = service(env = mapOf("FLUXZERO_CLI_AUTO_UPDATE" to "false"), launch = { token = it }, update = { fail("opt-out") })
+        service.schedule("1.2.3")
+        service.runWorker(token)
+        assertNotNull(service.notification("1.2.3"))
     }
 
     @Test fun `concurrent starts launch once and next attempt waits three days`() {
@@ -91,7 +110,7 @@ class CliAutoUpdatesTest {
         service(update = { fail("disabled") }).runWorker(token)
         CliUpdateSettings(directory).configure("enable")
         service(update = { fail("already consumed") }).runWorker(token)
-        assertEquals("Automatic updates disabled", readProperties(directory.resolve("state.properties")).getProperty("result"))
+        assertEquals("Automatic installation disabled; update availability checked", readProperties(directory.resolve("state.properties")).getProperty("result"))
     }
 
     @Test fun `a held worker lock cannot delay foreground scheduling`() {

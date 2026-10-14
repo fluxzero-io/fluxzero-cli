@@ -57,7 +57,11 @@ fun main(args: Array<String>) {
             return
         }
         val currentVersion = Version::class.java.`package`.implementationVersion ?: "dev"
-        if (shouldCheckForUpdates(args)) CliAutoUpdates().schedule(currentVersion)
+        if (shouldCheckForUpdates(args)) {
+            val updates = CliAutoUpdates()
+            updates.notification(currentVersion)?.let(System.err::println)
+            updates.schedule(currentVersion)
+        }
         FluxCli()
             .subcommands(
                 Init(),
