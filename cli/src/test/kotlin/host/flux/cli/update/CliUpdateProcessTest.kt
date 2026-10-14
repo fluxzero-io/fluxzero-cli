@@ -23,8 +23,16 @@ class CliUpdateProcessTest {
             assertContains(failure.message.orEmpty(), "Another CLI update is in progress")
             assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(2))
         } finally { worker.destroyForcibly(); assertTrue(worker.waitFor(10, TimeUnit.SECONDS)) }
-        CliUpdateSettings(directory).withInstallationLock { Files.writeString(directory.resolve("acquired"), "ok") }
-        assertTrue(Files.exists(directory.resolve("acquired")))
+        // Windows can signal process termination before the kernel has finished releasing its file locks.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        var released = false
+        while (!released && System.nanoTime() < deadline) {
+            released = runCatching {
+                CliUpdateSettings(directory).withInstallationLock { Files.writeString(directory.resolve("acquired"), "ok") }
+            }.isSuccess
+            if (!released) Thread.sleep(25)
+        }
+        assertTrue(released, "The terminated worker must release its installation lock")
     }
 
     @Test fun `abrupt updater death between executable swaps leaves every command present`() {

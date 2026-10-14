@@ -63,7 +63,13 @@ class WindowsNativeUpdateIntegrationTest {
             } finally { running.destroyForcibly(); assertTrue(running.waitFor(10, TimeUnit.SECONDS)) }
         }
         // Recreate the old installation to prove a complete successful replacement independently of contention.
-        Files.copy(old, target, REPLACE_EXISTING)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        var released = false
+        while (!released && System.nanoTime() < deadline) {
+            released = runCatching { Files.copy(old, target, REPLACE_EXISTING) }.isSuccess
+            if (!released) Thread.sleep(25)
+        }
+        assertTrue(released, "The terminated native process must release its executable")
         Files.copy(old, alias, REPLACE_EXISTING)
         assertContains(update(), "updated to 1.2.4")
         assertEquals("1.2.4", version(target))
