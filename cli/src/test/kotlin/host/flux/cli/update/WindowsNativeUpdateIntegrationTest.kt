@@ -49,17 +49,19 @@ class WindowsNativeUpdateIntegrationTest {
         val worker = copyWindowsWorker(CliInstallation(target, false), directory)
         assertEquals("1.2.3", version(worker.path))
         val log = directory.resolve("mcp.log")
-        val running = ProcessBuilder(target.toString(), "-Duser.home=$directory", "mcp")
-            .directory(directory.toFile()).redirectOutput(log.toFile()).redirectError(log.toFile())
-            .apply { environment()["CI"] = "true" }.start()
-        try {
-            Thread.sleep(700)
-            assertTrue(running.isAlive, Files.readString(log))
-            runCatching { update() }
-            assertTrue(running.isAlive)
-            assertTrue(version(target) in setOf("1.2.3", "1.2.4"))
-            assertTrue(version(alias) in setOf("1.2.3", "1.2.4"))
-        } finally { running.destroyForcibly(); assertTrue(running.waitFor(10, TimeUnit.SECONDS)) }
+        CliUpdateSettings(directory.resolve(".fluxzero/updates")).withInstallationLock {
+            // Hold the real native executable in its updater lock wait, without a dev server or network dependency.
+            val running = ProcessBuilder(target.toString(), "-Duser.home=$directory", UPDATE_WORKER, "held-by-test")
+                .directory(directory.toFile()).redirectOutput(log.toFile()).redirectError(log.toFile()).start()
+            try {
+                Thread.sleep(700)
+                assertTrue(running.isAlive, Files.readString(log))
+                runCatching { update() }
+                assertTrue(running.isAlive)
+                assertTrue(version(target) in setOf("1.2.3", "1.2.4"))
+                assertTrue(version(alias) in setOf("1.2.3", "1.2.4"))
+            } finally { running.destroyForcibly(); assertTrue(running.waitFor(10, TimeUnit.SECONDS)) }
+        }
         // Recreate the old installation to prove a complete successful replacement independently of contention.
         Files.copy(old, target, REPLACE_EXISTING)
         Files.copy(old, alias, REPLACE_EXISTING)
