@@ -1,5 +1,8 @@
 package host.flux.templates.services
 
+import host.flux.templates.models.BuildSystem
+import host.flux.templates.models.ScaffoldProject
+import java.nio.file.Path
 import java.nio.file.Files
 import kotlin.io.path.readText
 import kotlin.test.Test
@@ -44,6 +47,10 @@ class EmbeddedTemplatePackagingTest {
                     assertFalse(pom.contains(token), "$token was not resolved in ${template.name}/pom.xml")
                     assertFalse(gradleBuild.contains(token), "$token was not resolved in ${template.name}/build.gradle.kts")
                 }
+                assertContains(pom, "<artifactId>client-bff</artifactId>")
+                assertContains(gradleBuild, "io.fluxzero.idp:client-bff:")
+                assertEquals("com.example.app.authentication.AppOidcUserMapper", target.resolve(
+                    "src/main/resources/META-INF/services/io.fluxzero.idp.bff.OidcUserMapper").readText().trim())
                 assertTrue(Files.exists(target.resolve(".gitignore")))
                 assertTrue(Files.exists(target.resolve(".github/workflows/deploy-to-fluxzero-cloud.yml.maven")))
                 assertTrue(Files.exists(target.resolve(".github/workflows/deploy-to-fluxzero-cloud.yml.gradle")))
@@ -52,4 +59,28 @@ class EmbeddedTemplatePackagingTest {
             }
         }
     }
+    @Test
+    fun `scaffolding keeps mapper discovery aligned with the chosen package`() {
+        val workspace = Files.createTempDirectory("mapper-scaffold")
+        try {
+            listOf("java", "kotlin").forEach { language ->
+                BuildSystem.entries.forEach { build ->
+                    val result = ScaffoldService().scaffoldProject(ScaffoldProject(
+                        template = "flux-basic-$language", name = "$language-${build.name.lowercase()}",
+                        outputDir = workspace.toString(), packageName = "com.example.customer", buildSystem = build
+                    ))
+                    assertTrue(result.success, result.message)
+                    val root = Path.of(result.outputPath!!)
+                    assertEquals("com.example.customer.authentication.AppOidcUserMapper", root.resolve(
+                        "src/main/resources/META-INF/services/io.fluxzero.idp.bff.OidcUserMapper").readText().trim())
+                    val extension = if (language == "java") "java" else "kt"
+                    assertTrue(Files.exists(root.resolve(
+                        "src/main/$language/com/example/customer/authentication/AppOidcUserMapper.$extension")))
+                }
+            }
+        } finally {
+            workspace.toFile().deleteRecursively()
+        }
+    }
+
 }

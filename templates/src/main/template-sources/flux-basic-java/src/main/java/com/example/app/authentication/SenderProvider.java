@@ -23,7 +23,7 @@ import java.util.Optional;
  * This class deliberately lives in the generated application instead of the IDP client module.
  * Fluxzero can provide the OIDC protocol helpers, but deciding how a subject becomes a
  * {@link Sender}, which aggregate is loaded, and which role is assigned is domain-specific. Browser
- * requests normally authenticate through the BFF session cookie; bearer access tokens are still
+ * requests authenticate through the library BFF and AppOidcUserMapper; bearer access tokens are still
  * accepted for API-style calls and are validated through the same {@link TokenValidators} facade.
  */
 public class SenderProvider extends AbstractUserProvider implements RefreshingUserProvider<Sender> {
@@ -38,10 +38,6 @@ public class SenderProvider extends AbstractUserProvider implements RefreshingUs
             User explicitUser = super.fromMessage(message);
             if (explicitUser != null) {
                 return explicitUser;
-            }
-            Optional<Sender> sessionSender = AppSessionStore.sender(dm.getMetadata());
-            if (sessionSender.isPresent()) {
-                return refreshUser(sessionSender.get(), message);
             }
             return bearerToken(dm)
                     .flatMap(SenderProvider::senderFromBearerToken)

@@ -1,95 +1,100 @@
 package com.example.app.authentication;
 
-import io.fluxzero.common.ThrowingPredicate;
+import com.example.app.user.api.SetRole;
+import com.example.app.user.api.UserId;
+import com.example.app.user.api.model.UserProfile;
+import io.fluxzero.idp.bff.OidcIntegration;
+import io.fluxzero.idp.bff.FluxzeroOidcUser;
+import io.fluxzero.idp.bff.OidcUser;
+import io.fluxzero.idp.bff.OidcUserProvider;
 import io.fluxzero.idp.client.FormCodec;
+import io.fluxzero.idp.client.OidcApplicationRoutes;
 import io.fluxzero.idp.testsupport.localstub.FluxzeroIdpStub;
+import io.fluxzero.sdk.Fluxzero;
 import io.fluxzero.sdk.configuration.DefaultFluxzero;
+import io.fluxzero.sdk.configuration.client.Client;
 import io.fluxzero.sdk.test.TestFixture;
+import io.fluxzero.sdk.tracking.handling.LocalHandler;
 import io.fluxzero.sdk.web.WebRequest;
 import io.fluxzero.sdk.web.WebResponse;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-class SenderProviderTest {
-    @BeforeEach
-    void cleanBefore() {
-        reset();
-    }
+import static org.junit.jupiter.api.Assertions.*;
 
-    @AfterEach
-    void reset() {
-        AppSessionStore.clear();
+class SenderProviderTest {
+    @AfterEach void reset() {
         FluxzeroIdpStub.reset();
         TestFixture.shutDownActiveFixtures();
     }
 
-    @Test
-    void localLoginCreatesApplicationSession() {
-        TestFixture testFixture = TestFixture.create(
-                DefaultFluxzero.builder().registerUserProvider(new SenderProvider()),
-                AppAuthEndpoint.class, FluxzeroIdpStub.class);
-
-        loginAs(testFixture, "user");
-    }
-
-    private void loginAs(TestFixture testFixture, String username) {
-        AtomicReference<String> authorizationUrl = new AtomicReference<>();
-        AtomicReference<String> loginPath = new AtomicReference<>();
-        AtomicReference<String> callbackUrl = new AtomicReference<>();
-        AtomicReference<String> returnTo = new AtomicReference<>();
-
-        testFixture
-                .whenGetByUser(null, "/app/login?returnTo=/app/auth/session")
-                .expectWebResult(captureRedirect(authorizationUrl, "http://localhost:8080/oauth2/auth"))
-
-                .andThen()
-                .whenGetByUser(null, authorizationUrl.get())
-                .expectWebResult(captureRedirect(loginPath, "http://localhost:8080/login?"))
-
-                .andThen()
-                .whenWebRequestByUser(null, WebRequest.post(loginPath.get())
-                        .contentType("application/x-www-form-urlencoded")
-                        .payload(FormCodec.encode(Map.of("username", username)))
-                        .build())
-                .expectWebResult(captureRedirect(callbackUrl, "http://localhost:8080/app/callback"))
-
-                .andThen()
-                .whenGetByUser(null, pathAndQuery(callbackUrl.get()))
-                .expectWebResult(captureRedirect(returnTo, "/app/auth/session"))
-
-                .andThen()
-                .whenGetByUser(null, returnTo.get())
-                .expectWebResult(authenticatedAs(username));
-    }
-
-    private static ThrowingPredicate<WebResponse> captureRedirect(
-            AtomicReference<String> redirectLocation, String expectedPrefix) {
-        return response -> {
-            String location = response.getHeader("Location");
-            redirectLocation.set(location);
-            return response.getStatus() == 302 && location != null && location.startsWith(expectedPrefix);
-        };
-    }
-
-    private static String pathAndQuery(String location) {
-        URI uri = URI.create(location);
-        if (uri.getScheme() == null) {
-            return location;
+    @Test void serviceLoadedMapperUsesBffSessionsAndCurrentApplicationRoles() {
+        var provider = OidcUserProvider.fromServiceLoader();
+        var fixture = TestFixture.createAsync(new DefaultFluxzero.Builder() {
+            @Override public Fluxzero build(Client client) {
+                // Keep production authentication: no TestFixture system-user fallback for anonymous requests.
+                registerUserProvider(provider);
+                return super.build(client);
+            }
+        }, new AppAuthEndpoint(), new LocalIdp());
+        try (var oidc = OidcIntegration.register(fixture.getFluxzero())) {
+            var routes = fixture.getFluxzero().apply(f -> OidcApplicationRoutes.fromCurrentApplication());
+            var response = new AtomicReference<WebResponse>();
+            var loggedIn = fixture.whenWebRequest(get("/api/me")).expectWebResult(r -> r.getStatus() == 401)
+                    .andThen().whenWebRequest(get(routes.loginPath() + "?returnTo=/api/me"))
+                    .expectWebResult(r -> { response.set(r); return r.getStatus() == 302; })
+                    .andThen().whenWebRequest(get(response.get().getHeader("Location")))
+                    .expectWebResult(r -> { response.set(r); return r.getStatus() == 302; })
+                    .andThen().whenWebRequest(WebRequest.post(response.get().getHeader("Location"))
+                            .header("Host", "localhost:8080").contentType("application/x-www-form-urlencoded")
+                            .payload(FormCodec.encode(Map.of("username", "user"))).build())
+                    .expectWebResult(r -> { response.set(r); return r.getStatus() == 302; })
+                    .andThen().whenWebRequest(get(response.get().getHeader("Location")))
+                    .expectWebResult(r -> r.getStatus() == 302 && "/api/me".equals(r.getHeader("Location")))
+                    .andThen().whenWebRequest(get("/api/me"))
+                    .expectWebResult(r -> { response.set(r); return r.getStatus() == 200; }).andThen();
+            UserProfile profile = response.get().getPayloadAs(UserProfile.class);
+            UserId userId = profile.userId();
+            assertNull(profile.role(), "An IDP identity must not grant application roles");
+            loggedIn.givenAppliedEvents(userId, new SetRole(userId, Role.ADMIN))
+                    .whenWebRequest(get("/api/me"))
+                    .expectWebResult(r -> r.<UserProfile>getPayloadAs(UserProfile.class).role() == Role.ADMIN)
+                    .andThen().givenAppliedEvents(userId, new SetRole(userId, null))
+                    .whenWebRequest(get("/api/me"))
+                    .expectWebResult(r -> r.<UserProfile>getPayloadAs(UserProfile.class).role() == null)
+                    .andThen().whenWebRequest(get("/api/me").toBuilder().header("Authorization", "Bearer invalid").build())
+                    .expectWebResult(r -> r.getStatus() == 401);
         }
-        return uri.getRawQuery() == null ? uri.getRawPath() : uri.getRawPath() + "?" + uri.getRawQuery();
     }
 
-    private static ThrowingPredicate<WebResponse> authenticatedAs(String username) {
-        return response -> {
-            String payload = response.toString();
-            return payload.contains("\"authenticated\":true")
-                    && payload.contains("\"subject\":\"%s\"".formatted(username));
-        };
+    @Test void optionalProfileClaimsFallBackToEmailOrSubject() {
+        var fixture = TestFixture.create();
+        fixture.getFluxzero().apply(f -> {
+            var mapper = new AppOidcUserMapper();
+            var request = WebRequest.get("/api/me").build();
+            var withoutName = mapper.map(new FluxzeroOidcUser(new OidcUser("https://issuer.example", "email-user",
+                    Map.of("email", "user@example.com"))), request);
+            var withoutProfile = mapper.map(new FluxzeroOidcUser(new OidcUser("https://issuer.example", "subject-user",
+                    Map.of())), request);
+            var emailProfile = Fluxzero.loadAggregate(withoutName.userId(), UserProfile.class).get();
+            var subjectProfile = Fluxzero.loadAggregate(withoutProfile.userId(), UserProfile.class).get();
+            assertEquals("user@example.com", emailProfile.details().name());
+            assertEquals("subject-user", subjectProfile.details().name());
+            assertNull(subjectProfile.details().email());
+            assertNull(emailProfile.role());
+            return null;
+        });
     }
 
+    // The stub serves HTTP payloads locally; the application still consumes asynchronous web requests.
+    @LocalHandler @io.fluxzero.sdk.web.Path("/") static class LocalIdp extends FluxzeroIdpStub {}
+
+    private static WebRequest get(String url) {
+        var uri = java.net.URI.create(url);
+        String path = uri.getRawPath() + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery());
+        return WebRequest.get(path).header("Host", "localhost:8080").build();
+    }
 }
