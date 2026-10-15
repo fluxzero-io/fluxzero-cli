@@ -44,17 +44,15 @@ dependencies {
     implementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.21"))
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
-    developmentOnly(platform(SpringBootPlugin.BOM_COORDINATES))
     kapt(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     testImplementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.21"))
     testImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
 
     implementation("org.springframework.boot:spring-boot-starter")
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
 
     implementation("io.fluxzero:sdk")
-    implementation("io.fluxzero.idp:client:$fluxzeroIdpVersion")
+    implementation("io.fluxzero.idp:client-bff:$fluxzeroIdpVersion")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     kapt("io.fluxzero:common")
 

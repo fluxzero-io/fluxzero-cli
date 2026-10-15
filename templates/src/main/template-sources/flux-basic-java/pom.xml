@@ -80,7 +80,7 @@
 		</dependency>
 		<dependency>
 			<groupId>io.fluxzero.idp</groupId>
-			<artifactId>client</artifactId>
+			<artifactId>client-bff</artifactId>
 			<version>${fluxzero-idp.version}</version>
 		</dependency>
 		<dependency>

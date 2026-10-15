@@ -217,7 +217,7 @@
                 <div class="tenant" id="tenantLine">tenant</div>
             </div>
         </div>
-        <a id="logoutLink" class="button secondary hidden" href="/app/logout">Sign out</a>
+        <a id="logoutLink" class="button secondary hidden" href="#" data-logout>Sign out</a>
     </div>
 </header>
 
@@ -231,7 +231,7 @@
             <span class="status">no session</span>
         </div>
         <div class="body">
-            <a class="button" href="/app/login">Sign in</a>
+            <a class="button" href="#" id="loginLink">Sign in</a>
         </div>
     </section>
 
@@ -257,13 +257,13 @@
                 <dd id="issuerValue"></dd>
             </dl>
             <div class="actions">
-                <a class="button secondary" href="/app/logout">Sign out</a>
+                <a class="button secondary" href="#" data-logout>Sign out</a>
             </div>
         </div>
     </section>
 </main>
 
-<script>
+<script type="module">
     const signedOut = document.getElementById('signedOut');
     const sessionPanel = document.getElementById('sessionPanel');
     const logoutLink = document.getElementById('logoutLink');
@@ -276,20 +276,37 @@
     const issuerValue = document.getElementById('issuerValue');
 
     async function loadSession() {
-        const response = await fetch('/app/auth/session', { credentials: 'same-origin' });
-        if (!response.ok) {
+        const configuration = await fetch('/api/auth').then(response => {
+            if (!response.ok) throw new Error('Authentication configuration unavailable');
+            return response.json();
+        });
+        const {createOidcClient} = await import(configuration.clientUrl);
+        const auth = createOidcClient();
+        document.getElementById('loginLink').onclick = event => {
+            event.preventDefault();
+            auth.login({returnTo: '/'});
+        };
+        document.querySelectorAll('[data-logout]').forEach(link => link.onclick = async event => {
+            event.preventDefault();
+            try { location.assign(await auth.logout()); }
+            catch (error) { subjectLine.textContent = 'Sign out failed. Please try again.'; }
+        });
+        const session = await auth.session();
+        if (!session) {
             signedOut.classList.remove('hidden');
             sessionPanel.classList.add('hidden');
             logoutLink.classList.add('hidden');
             return;
         }
-        const session = await response.json();
-        tenantLine.textContent = `tenant ${session.tenantId || 'default'}`;
-        subjectLine.textContent = `Subject ${session.subject}`;
+        const response = await auth.fetch('/api/me');
+        if (!response.ok) throw new Error('Application profile unavailable');
+        const profile = await response.json();
+        tenantLine.textContent = 'Fluxzero IDP';
+        subjectLine.textContent = 'Authenticated through Fluxzero IDP.';
         subjectValue.textContent = session.subject || '-';
-        roleValue.textContent = session.role || '-';
-        nameValue.textContent = session.name || '-';
-        emailValue.textContent = session.email || '-';
+        roleValue.textContent = profile.role || '-';
+        nameValue.textContent = profile.details?.name || '-';
+        emailValue.textContent = profile.details?.email || '-';
         issuerValue.textContent = session.issuer || '-';
         logoutLink.classList.remove('hidden');
         signedOut.classList.add('hidden');
@@ -297,8 +314,8 @@
     }
 
     loadSession().catch(error => {
-        console.error(error);
-        signedOut.classList.remove('hidden');
+        subjectLine.textContent = 'Authentication is temporarily unavailable. Please reload to retry.';
+        sessionPanel.classList.remove('hidden');
     });
 </script>
 </body>
