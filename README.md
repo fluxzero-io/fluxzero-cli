@@ -93,7 +93,9 @@ Add `--force` (Unix) or `-Force` (Windows) to skip confirmation prompts.
 
 ## Project Versioning
 
-The fluxzero-cli uses per-project versioning rather than global installation. Each project determines which version of the CLI it uses in the `.flux/config.yaml` file.
+The installed `fz` executable has its own version. Projects retain their selected dev-server
+version under `.fluxzero/dev/launcher`; SDK versions belong to the Maven or Gradle build.
+Updating the CLI does not change either project selection or restart a running environment.
 
 ## Usage
 
@@ -427,6 +429,46 @@ fz version
 ```bash
 fz upgrade
 ```
+
+Agent-plugin onboarding enables background CLI updates unless a preference already exists:
+
+```bash
+fz upgrade --auto-update enable-if-unset
+fz upgrade --auto-update status
+```
+
+Use `fz upgrade --auto-update enable` or `disable` to change that preference explicitly.
+These options only configure updates; they do not install an update immediately. Without
+onboarding or explicit enablement, automatic installation remains off; update notifications still work.
+
+Ordinary CLI use starts a separate worker at most once every three days. Help, version and
+upgrade commands do not start it. Availability is cached and shown on a subsequent command,
+at most once every three days for the same available version, even when automatic installation
+is disabled. Notifications can also announce a new major; automatic installation selects
+only a newer stable release in the current major; development and prerelease builds are excluded. Network errors, unavailable
+packages and installation failures are recorded without delaying or failing the user's command.
+There is no scheduled job and no check while the CLI is unused.
+
+Homebrew and WinGet installations are updated through their package manager, preserving pins.
+Homebrew upgrades are deferred if its current formula differs from the selected release or
+if a Homebrew update opt-out is set. Validation and installation use one private formula
+copy inside the owning tap, so concurrent tap refreshes cannot change the chosen version.
+Old kegs are retained for running processes. WinGet uses
+the exact selected version without interactive prompts. Direct native and JAR installations
+require the release asset's SHA-256 digest and a successful version check before replacement.
+On Windows, the worker runs from a private executable copy. Existing executables are
+replaced atomically without first removing them; locked targets are deferred. Changes to
+bundled DLLs require a manual upgrade, preventing mixed runtime versions after interruption.
+Read-only installations are deferred. Running CLI/dev-server processes keep their version;
+SDK dependencies and project files are not upgraded.
+
+`FLUXZERO_CLI_AUTO_UPDATE=false` suppresses automatic installation while keeping update
+notifications. `FLUXZERO_CLI_UPDATE_CHECK=false` or `CI=true` suppresses both background
+checks and automatic installation.
+Preferences, the last attempt/result and its diagnostic log are stored in
+`~/.fluxzero/updates/settings.properties`, `state.properties` and `last-run.log` respectively.
+Manual `fz upgrade` remains available and is not restricted to the current major. If another
+updater holds the installation lock, it exits immediately with a retry instruction and log path.
 
 See `fz --help` or `fz <command> --help` for detailed help on any command.
 
@@ -780,7 +822,7 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 - **Multi-platform builds** via GitHub Actions for Linux, macOS, and Windows (ARM64/x86_64)
 - **Native image compilation** using GraalVM for optimal performance
 - **Automated installation** with platform detection and PATH integration
-- **Per-project versioning** via `.flux/config.yaml`
+- **Per-project dev-server selection** independent of CLI and SDK versions
 
 ## CI/CD
 

@@ -1,0 +1,74 @@
+name: CLI update regressions
+
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - '.github/workflows/cli-update-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Run update, process-interruption and command tests
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            export FLUXZERO_TEST_HOMEBREW="$(command -v brew)"
+          fi
+          ./gradlew :cli:test --tests 'host.flux.cli.update.*' --tests 'host.flux.cli.commands.UpgradeTest' --tests 'host.flux.cli.MainTest' --console=plain
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: update-tests-${{ matrix.os }}
+          path: cli/build/reports/tests/test/
+
+  windows-native:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build two stable native CLI fixtures
+        shell: pwsh
+        run: |
+          foreach ($version in @('1.2.3', '1.2.4')) {
+            ./gradlew.bat :cli:shadowJar "-PappVersion=$version" --console=plain
+            if ($LASTEXITCODE -ne 0) { throw 'JAR build failed' }
+            $output = "build/update-fixtures/$version"
+            New-Item -ItemType Directory -Force $output | Out-Null
+            & "$env:JAVA_HOME/bin/native-image.cmd" -march=compatibility --no-fallback --install-exit-handlers --enable-url-protocols=https --enable-native-access=ALL-UNNAMED --initialize-at-build-time=kotlin --initialize-at-run-time=org.jline -H:+AddAllCharsets -jar "cli/build/libs/fluxzero-cli-$version.jar" "$output/fz"
+            if ($LASTEXITCODE -ne 0) { throw 'Native build failed' }
+            ./scripts/collect-windows-runtime.ps1 -Executable "$output/fz.exe" -Destination $output
+          }
+      - name: Test running native executables and real replacement
+        shell: pwsh
+        run: |
+          $env:FLUXZERO_UPDATE_OLD_EXE = (Resolve-Path 'build/update-fixtures/1.2.3/fz.exe').Path
+          $env:FLUXZERO_UPDATE_NEW_EXE = (Resolve-Path 'build/update-fixtures/1.2.4/fz.exe').Path
+          ./gradlew.bat :cli:test --tests 'host.flux.cli.update.WindowsNativeUpdateIntegrationTest' --tests 'host.flux.cli.update.CliUpdateProcessTest' --console=plain
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: windows-native-update-tests
+          path: cli/build/reports/tests/test/
