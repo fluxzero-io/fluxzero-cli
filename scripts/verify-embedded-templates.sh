@@ -101,8 +101,8 @@ generate_and_build() {
     (
       cd "$project_dir"
       export MAVEN_OPTS="${MAVEN_OPTS:-} -Dmaven.repo.local=$PLUGIN_REPOSITORY"
-      ./mvnw -B -ntp package
-      ./mvnw -B -ntp -Dfluxzero.package.skip=true fluxzero:publish-package
+      ./mvnw -B -ntp -Dmaven.repo.local="$PLUGIN_REPOSITORY" package
+      ./mvnw -B -ntp -Dmaven.repo.local="$PLUGIN_REPOSITORY" -Dfluxzero.package.skip=true fluxzero:publish-package
     )
   else
     [[ -f "$project_dir/build.gradle.kts" ]] || { echo "Generated Gradle build file not found" >&2; exit 1; }

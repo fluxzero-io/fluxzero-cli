@@ -1,10 +1,10 @@
 import org.springframework.boot.gradle.plugin.SpringBootPlugin
 
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "2.4.10"
-    id("org.jetbrains.kotlin.plugin.spring") version "2.4.10"
-    id("org.jetbrains.kotlin.kapt") version "2.4.10"
-    id("org.springframework.boot") version "3.5.16"
+    id("org.jetbrains.kotlin.jvm") version "2.4.21"
+    id("org.jetbrains.kotlin.plugin.spring") version "2.4.21"
+    id("org.jetbrains.kotlin.kapt") version "2.4.21"
+    id("org.springframework.boot") version "4.1.1"
     id("io.fluxzero.tools.gradle.plugin") version "@fluxzeroPluginVersion@"
 }
 
@@ -42,12 +42,12 @@ repositories {
 
 dependencies {
     implementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.10"))
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.21"))
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
     developmentOnly(platform(SpringBootPlugin.BOM_COORDINATES))
     kapt(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     testImplementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
-    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.10"))
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.21"))
     testImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
 
     implementation("org.springframework.boot:spring-boot-starter")
@@ -58,7 +58,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     kapt("io.fluxzero:common")
 
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.14")
+    implementation("io.github.oshai:kotlin-logging-jvm:8.0.4")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
