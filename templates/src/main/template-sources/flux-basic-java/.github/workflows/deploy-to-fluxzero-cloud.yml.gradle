@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '25'
@@ -44,13 +44,13 @@ jobs:
 
       - name: Authenticate for deployment
         id: fluxzero-auth
-        uses: fluxzero-io/fluxzero-jwt-action@v2
+        uses: fluxzero-io/fluxzero-jwt-action@73840be3df06c4bcae88804d4789e637e69e1746 # v2.3.1
         with:
           mode: oidc
           image-name: ${{ env.FLUXZERO_PACKAGE_NAME }}
 
       - name: Deploy to Fluxzero Cloud
-        uses: fluxzero-io/fluxzero-deploy-action@v1
+        uses: fluxzero-io/fluxzero-deploy-action@dfa1f2ac2a0930ccfa4a32db3f546dc64e22dd45 # v1.1.2
         with:
           cluster-name: ${{ github.event.inputs.cluster-name }}
           application-name: ${{ github.event.inputs.application-name }}

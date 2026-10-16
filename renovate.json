@@ -150,6 +150,14 @@
       "allowedVersions": "/^24([.-]|$)/"
     },
     {
+      "description": "Keep Java 21 in the compatibility regression job; development and native builds use Java 25 separately",
+      "matchPackageNames": [
+        "java-jdk"
+      ],
+      "matchCurrentValue": "21",
+      "allowedVersions": "/^21([.+-]|$)/"
+    },
+    {
       "description": "The pinned published WinGetCreate release targets net9.0; revisit when upstream retargets",
       "matchPackageNames": [
         "dotnet-sdk"
@@ -174,5 +182,10 @@
   "automergeStrategy": "rebase",
   "vulnerabilityAlerts": {
     "enabled": true
+  },
+  "github-actions": {
+    "managerFilePatterns": [
+      "/(^|/)\\.github/workflows/[^/]+\\.ya?ml\\.(maven|gradle)$/"
+    ]
   }
 }

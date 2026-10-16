@@ -82,7 +82,7 @@ generate_and_build() {
   [[ ! -e "$workflow.maven" ]] || { echo "Maven workflow source was not renamed" >&2; exit 1; }
   [[ ! -e "$workflow.gradle" ]] || { echo "Gradle workflow source was not renamed" >&2; exit 1; }
   require_text "$workflow" "FLUXZERO_PACKAGE_NAME: $artifact_id"
-  require_text "$workflow" "uses: fluxzero-io/fluxzero-jwt-action@v2"
+  require_text "$workflow" "uses: fluxzero-io/fluxzero-jwt-action@"
   require_text "$workflow" "mode: oidc"
 
   if [[ "$build_system" == "maven" ]]; then
