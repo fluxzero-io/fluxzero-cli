@@ -791,8 +791,7 @@ template access without AVX/AVX2. Windows compatibility must also be checked wit
 complete Windows package on a VM exposing the supported CPU baseline.
 
 ```bash
-# Switch to GraalVM (example using jenv)
-jenv local oracle64-21.0.1
+# Select a GraalVM 25 JDK as JAVA_HOME, matching the configured native launcher.
 
 # Build native executable
 ./gradlew :cli:nativeCompile
@@ -814,6 +813,29 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 ```bash
 ./gradlew test
 ```
+
+## Dependency maintenance
+
+Renovate maintains the build modules, embedded starters, Actions and toolchains. Central starter pins live in
+`templates/template-versions.properties`; current Fluxzero releases are resolved from Fluxzero Packages.
+Minor and patch PRs use native rebase auto-merge behind **CLI required checks** and **CLI update required checks**.
+Major updates require separate assessment. The supported Gradle ceiling and other explicit compatibility boundaries
+are recorded in `renovate.json`.
+
+The CLI JVM artifact retains its Java 21 bytecode floor; native images use the separately configured GraalVM 25
+builder. The Maven plugin compiles against provided Maven 3.9.6 interfaces to preserve its consuming-runtime floor;
+those Maven classes are supplied by the host and are not shipped in the plugin. Build and test Maven can advance
+independently. Check the generated descriptor before changing that API dependency.
+
+GitHub alerts use Dependency Graph plus native automatic Gradle submission. This inventory and Renovate update
+jobs must both work. For build-plugin changes, use `scripts/test-plugin-publication.sh` and
+`scripts/verify-embedded-templates.sh` to qualify signed artifacts, independent consumers and all four starters.
+The native workflow also exercises the Unix terminal prompt through a real PTY.
+
+The pinned WinGetCreate release in `config/publishing-tools.properties` currently requires .NET 9;
+`scripts/prepare-winget-create.ps1` checks that it starts before publication. Its runtime major follows the
+published upstream target framework. The API Worker is bundled in PR CI without deployment credentials;
+container-image rollout and Cloudflare/Fly activation remain separate deployment operations.
 
 ## Architecture
 

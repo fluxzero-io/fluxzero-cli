@@ -22,7 +22,7 @@ fluxzero-cli is a Kotlin-based command-line tool for interacting with Flux and F
 
 ### Native Image Build
 - `./gradlew nativeCompile` - Builds native executable using GraalVM
-- Requires GraalVM with native-image tool installed (e.g., `jenv local oracle64-21.0.1`)
+- Use the native launcher configured in `cli/build.gradle.kts` and keep it aligned with `.github/workflows/native-build.yml`
 - Native executable provides ~5x faster startup time (~0.27s vs ~1.36s for JAR)
 - Self-contained binary (no JVM required), but larger file size (~42MB vs ~7.5MB JAR)
 
@@ -62,7 +62,7 @@ Templates are stored in `templates/src/main/template-sources/` and packaged as Z
 ### Build System
 
 Uses Gradle with Kotlin DSL:
-- Kotlin 2.1.20 with JVM target 21
+- Root `build.gradle.kts` owns Kotlin/plugin versions and the JVM compatibility floor
 - Shadow plugin for fat JAR creation
 - GraalVM Native Build Tools plugin for native image compilation
 - Custom `:templates:packageTemplates` task for deterministic, cross-platform template packaging
@@ -71,9 +71,9 @@ Uses Gradle with Kotlin DSL:
 ### CI/CD Workflows
 
 **Native Build Workflow** (`.github/workflows/native-build.yml`):
-- Builds native executables for Linux (x86_64, ARM64) and macOS (Intel, Apple Silicon)
-- Uses GitHub's native ARM64 runners and standard x86_64 runners
-- Triggered on pushes to main/feature branches and PRs
+- Reusable qualification for Linux x86_64, macOS Intel/Apple Silicon and Windows x86_64
+- Called by release and applicable PR jobs; inspect the caller's target matrix before assuming platform coverage
+- Exercises real executable startup, project generation, development lifecycle and installation
 
 **Release Workflow** (`.github/workflows/release.yml`):
 - Sequential pipeline: build-and-test → native-build → release
@@ -105,11 +105,11 @@ config/detekt/              - Code quality configuration
 
 ### Key Dependencies
 
-- **Clikt 5.0.3** - Command-line interface framework
-- **JLine 3.30.4** - Interactive console input
-- **MockK 1.14.2** - Mocking framework for tests
+- **Clikt** - Command-line interface framework
+- **JLine** - Interactive console input
+- **MockK** - Mocking framework for tests
 - **Detekt** - Static code analysis
-- **GraalVM Native Build Tools 0.10.6** - Native image compilation
+- **GraalVM Native Build Tools** - Native image compilation
 
 ## Development Notes
 
@@ -138,3 +138,12 @@ Native image build is configured with:
 - `--initialize-at-build-time=kotlin` - Kotlin classes initialized at build time
 - `--initialize-at-run-time=org.jline` - JLine initialized at runtime (terminal compatibility)
 - Resource autodetection enabled for templates and static resources
+
+## Dependency Maintenance Boundaries
+
+- `renovate.json` owns dependency discovery and supported-version boundaries. The injected starter versions are in `templates/template-versions.properties`; public Fluxzero lookups use Packages rather than Central alone.
+- GitHub dependency alerts and automatic Gradle dependency submission are separate from Renovate update generation. Inspect a real submitted graph and the hosted updater results; an empty alert list alone is insufficient.
+- Keep the provided Maven API floor in `maven-plugin/build.gradle.kts` and `maven-plugin/pom.xml` aligned. Those interfaces are supplied by the consuming Maven runtime. Updating them can silently raise the generated descriptor's minimum Maven version; current test/runtime tooling can advance separately.
+- Run the existing owning publication and embedded-template scripts when changing build plugins or injected versions. Preserve signed main, sources, Javadoc and Gradle marker artifacts and verify independent consumers.
+- The required PR gates include applicable native builds and actual executable-update regressions. Unix native qualification also exercises JLine through a real pseudo-terminal; a noninteractive version command does not cover that path.
+- WinGetCreate has a central source pin in `config/publishing-tools.properties`; its published target framework determines the CI runtime. Qualify the executable with `scripts/prepare-winget-create.ps1` before changing that runtime.
