@@ -2,53 +2,78 @@ name: CLI update regressions
 
 on:
   pull_request:
-    paths:
-      - 'cli/**'
-      - '.github/workflows/cli-update-tests.yml'
   workflow_dispatch:
+
+concurrency:
+  group: cli-update-regressions-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.paths.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$EVENT" == workflow_dispatch ]] || git diff --name-only "$BASE" HEAD | grep -Eq '^cli/|^dev-launcher/|^project-files/|^publishing/|(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^\.github/workflows/cli-update-tests\.yml$'; then
+            echo 'relevant=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'relevant=false' >> "$GITHUB_OUTPUT"
+          fi
+
   regression:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-14, windows-2022]
+        os: [ubuntu-latest, macos-15, windows-2022]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Run update, process-interruption and command tests
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            export FLUXZERO_TEST_HOMEBREW="$(command -v brew)"
+            FLUXZERO_TEST_HOMEBREW="$(command -v brew)"
+            export FLUXZERO_TEST_HOMEBREW
           fi
           ./gradlew :cli:test --tests 'host.flux.cli.update.*' --tests 'host.flux.cli.commands.UpgradeTest' --tests 'host.flux.cli.MainTest' --console=plain
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: update-tests-${{ matrix.os }}
           path: cli/build/reports/tests/test/
 
   windows-native:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
-      - uses: graalvm/setup-graalvm@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1.6.7
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: graalvm-community
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - name: Build two stable native CLI fixtures
         shell: pwsh
         run: |
@@ -67,8 +92,24 @@ jobs:
           $env:FLUXZERO_UPDATE_OLD_EXE = (Resolve-Path 'build/update-fixtures/1.2.3/fz.exe').Path
           $env:FLUXZERO_UPDATE_NEW_EXE = (Resolve-Path 'build/update-fixtures/1.2.4/fz.exe').Path
           ./gradlew.bat :cli:test --tests 'host.flux.cli.update.WindowsNativeUpdateIntegrationTest' --tests 'host.flux.cli.update.CliUpdateProcessTest' --console=plain
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: windows-native-update-tests
           path: cli/build/reports/tests/test/
+
+  gate:
+    name: CLI update required checks
+    if: always()
+    needs: [changes, regression, windows-native]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require platform and real executable update qualification
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          RELEVANT: ${{ needs.changes.outputs.relevant }}
+          JVM: ${{ needs.regression.result }}
+          NATIVE: ${{ needs.windows-native.result }}
+        run: |
+          test "$CHANGES" = success
+          case "$RELEVANT:$JVM:$NATIVE" in true:success:success|false:skipped:skipped) ;; *) exit 1 ;; esac

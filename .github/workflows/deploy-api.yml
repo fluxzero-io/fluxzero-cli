@@ -16,13 +16,13 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup tools from .tool-versions
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Get latest release version
         id: get_version
@@ -37,7 +37,7 @@ jobs:
               VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
             fi
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Deploying version: $VERSION"
 
       - name: Build API JAR
@@ -59,9 +59,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'api/package-lock.json'
 
@@ -71,7 +71,7 @@ jobs:
           # Copy the shaded JAR to the expected location for Docker build
           cp build/libs/flux-api-*.jar ./flux-api.jar
           # Install Node.js dependencies for Wrangler
-          npm install
+          npm ci
           
           # Deploy using Wrangler
           npx wrangler deploy --env production

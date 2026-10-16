@@ -4,37 +4,68 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     outputs:
-      windows-package-changed: ${{ steps.changes.outputs.windows-package }}
+      native-package: ${{ steps.changes.outputs.native-package }}
+      native-targets: ${{ steps.changes.outputs.native-targets }}
+      publishing-tools: ${{ steps.changes.outputs.publishing-tools }}
     env:
       CANDIDATE_VERSION: 0.0.0-pr-${{ github.run_id }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Detect Windows package changes
+      - name: Detect platform qualification inputs
         id: changes
         shell: bash
         run: |
-          if git diff --name-only \
-            "${{ github.event.pull_request.base.sha }}" \
-            "${{ github.sha }}" | grep -Eq \
-              '^(\.github/workflows/(native-build|release)\.yml|scripts/(collect-windows-runtime\.ps1|install\.ps1\.template))$'; then
-            echo "windows-package=true" >> "$GITHUB_OUTPUT"
+          changed="$(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.sha }}')"
+          if grep -Eq '(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^\.github/workflows/(native-build|release)\.yml$' <<< "$changed"; then
+            echo 'native-package=true' >> "$GITHUB_OUTPUT"
+            echo 'native-targets={"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}' >> "$GITHUB_OUTPUT"
+          elif grep -Eq '^scripts/(collect-windows-runtime\.ps1|install\.ps1\.template)$' <<< "$changed"; then
+            echo 'native-package=true' >> "$GITHUB_OUTPUT"
+            echo 'native-targets={"include":[{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}' >> "$GITHUB_OUTPUT"
           else
-            echo "windows-package=false" >> "$GITHUB_OUTPUT"
+            echo 'native-package=false' >> "$GITHUB_OUTPUT"
+          fi
+          if grep -Eq '^config/publishing-tools\.properties$|^scripts/prepare-winget-create\.ps1$|^\.github/workflows/publish-package-managers\.yml$' <<< "$changed"; then
+            echo 'publishing-tools=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'publishing-tools=false' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup tools from .tool-versions
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          dependency-graph: generate
+
+      - name: Setup Node for the API Worker
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Qualify the API Worker without deployment credentials
+        run: |
+          npm --prefix api ci
+          npm --prefix api audit
+          api/node_modules/.bin/wrangler deploy --config api/wrangler.toml --dry-run --containers-rollout=none
 
       - name: Build and test
         run: ./gradlew build :cli:shadowJar :cli:generateScripts -PappVersion="$CANDIDATE_VERSION"
@@ -67,7 +98,7 @@ jobs:
         run: scripts/test-verify-winget-runtime-dependency.sh
 
       - name: Prepare candidate native-build artifact
-        if: steps.changes.outputs.windows-package == 'true'
+        if: steps.changes.outputs.native-package == 'true'
         shell: bash
         run: |
           artifact_root="build/pr-native-artifact/cli/build"
@@ -76,17 +107,47 @@ jobs:
           cp cli/build/release-scripts/* "$artifact_root/release-scripts/"
 
       - name: Upload candidate JAR and install scripts
-        if: steps.changes.outputs.windows-package == 'true'
-        uses: actions/upload-artifact@v6
+        if: steps.changes.outputs.native-package == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jar-artifact
           path: build/pr-native-artifact/
 
-  windows-package:
+  native-package:
     needs: build-and-test
-    if: needs.build-and-test.outputs.windows-package-changed == 'true'
+    if: needs.build-and-test.outputs.native-package == 'true'
     uses: ./.github/workflows/native-build.yml
     with:
       jar-name: fluxzero-cli-0.0.0-pr-${{ github.run_id }}.jar
-      targets-json: >-
-        {"include":[{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
+      targets-json: ${{ needs.build-and-test.outputs.native-targets }}
+
+  publishing-tools:
+    needs: build-and-test
+    if: needs.build-and-test.outputs.publishing-tools == 'true'
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 9.0.x
+      - name: Start the pinned WinGetCreate with its supported runtime
+        shell: pwsh
+        run: ./scripts/prepare-winget-create.ps1
+
+  gate:
+    name: CLI required checks
+    if: always()
+    needs: [build-and-test, native-package, publishing-tools]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require each applicable qualification
+        env:
+          BUILD: ${{ needs.build-and-test.result }}
+          NATIVE_REQUIRED: ${{ needs.build-and-test.outputs.native-package }}
+          NATIVE_RESULT: ${{ needs.native-package.result }}
+          TOOLS_REQUIRED: ${{ needs.build-and-test.outputs.publishing-tools }}
+          TOOLS_RESULT: ${{ needs.publishing-tools.result }}
+        run: |
+          test "$BUILD" = success
+          case "$NATIVE_REQUIRED:$NATIVE_RESULT" in true:success|false:skipped) ;; *) exit 1 ;; esac
+          case "$TOOLS_REQUIRED:$TOOLS_RESULT" in true:success|false:skipped) ;; *) exit 1 ;; esac

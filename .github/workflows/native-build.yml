@@ -13,7 +13,7 @@ on:
         required: false
         type: string
         default: >-
-          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
+          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 jobs:
   native-build:
     name: Build Native Image - ${{ matrix.os }}
@@ -25,21 +25,20 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download JAR artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: jar-artifact
           path: build/
 
       - name: Set up GraalVM
-        uses: graalvm/setup-graalvm@v1
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1.6.7
         with:
-          # Use Java 21 LTS for native builds: JLine's native terminal code
-          # segfaults under GraalVM + Java 25 due to restricted method enforcement.
-          # Development can use Java 25 via .tool-versions; only native images need 21.
-          java-version: '21'
+          # JLine 4 and the current GraalVM 25 are qualified together, including
+          # an actual PTY prompt on Unix to guard the former terminal crash.
+          java-version: '25'
           distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -113,7 +112,7 @@ jobs:
             -Force
 
       - name: Set up dev server Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '25'
@@ -155,6 +154,11 @@ jobs:
             esac
           fi
           echo "Native image verification successful!"
+
+      - name: Test the native terminal prompt
+        if: runner.os != 'Windows'
+        shell: bash
+        run: python3 scripts/test-native-terminal.py cli/build/native/nativeCompile/flux
 
       - name: Integration test - Generate example project
         shell: bash
@@ -436,7 +440,7 @@ jobs:
 
       - name: Upload native executable
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact-name }}
           path: ./cli/build/native/nativeCompile/flux
@@ -444,7 +448,7 @@ jobs:
 
       - name: Upload Windows executable and runtime
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact-name }}
           path: |
