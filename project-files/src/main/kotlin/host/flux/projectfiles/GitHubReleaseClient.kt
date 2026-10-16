@@ -3,7 +3,7 @@ package host.flux.projectfiles
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpClient

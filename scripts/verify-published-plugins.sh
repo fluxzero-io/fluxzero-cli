@@ -19,7 +19,12 @@ mvn -B -ntp -Dmaven.repo.local="$work/maven-cache" -f "$work/maven/pom.xml" \
   -Dfluxzero.projectFiles.enabled=false
 for extension in pom jar; do
   provenance="$work/maven-cache/io/fluxzero/tools/fluxzero-maven-plugin/$version/_remote.repositories"
-  grep -F "fluxzero-maven-plugin-$version.$extension>qualified-repository=" "$provenance"
+  # Maven 3.10 appends the repository URL digest to its tracking key.
+  # Accept only our declared repository id, with its optional exact SHA-1 suffix.
+  awk -F '>' -v artifact="fluxzero-maven-plugin-$version.$extension" '
+    $1 == artifact && $2 ~ /^qualified-repository(-[0-9a-f]{40})?=$/ { found = 1; print }
+    END { exit !found }
+  ' "$provenance"
 done
 cat > "$work/gradle/settings.gradle.kts" <<SETTINGS
 pluginManagement {

@@ -18,14 +18,14 @@ services:
       '
 
   zot:
-    image: ghcr.io/project-zot/zot:v2.1.17
+    image: ghcr.io/project-zot/zot:v2.1.22
     ports:
       - "127.0.0.1:5100:5000"
     volumes:
       - zot-data:/var/lib/registry
 
   registry-proxy:
-    image: node:22-alpine
+    image: node:24-alpine
     working_dir: /app
     command: ["node", "/app/local-registry-proxy.js"]
     depends_on:

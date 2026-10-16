@@ -1,6 +1,6 @@
 package host.flux.projectfiles
 
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException

@@ -1,8 +1,8 @@
 plugins {
     kotlin("jvm")
-    kotlin("plugin.serialization") version "2.1.20"
+    kotlin("plugin.serialization")
     application
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.6.1"
     id("org.graalvm.buildtools.native")
 }
 
@@ -10,20 +10,20 @@ dependencies {
     implementation(project(":templates"))
     
     // Ktor server dependencies
-    implementation("io.ktor:ktor-server-core:2.3.12")
-    implementation("io.ktor:ktor-server-cio:2.3.12")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-    implementation("io.ktor:ktor-server-cors:2.3.12")
-    implementation("io.ktor:ktor-server-status-pages:2.3.12")
+    implementation("io.ktor:ktor-server-core:3.6.0")
+    implementation("io.ktor:ktor-server-cio:3.6.0")
+    implementation("io.ktor:ktor-server-content-negotiation:3.6.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
+    implementation("io.ktor:ktor-server-cors:3.6.0")
+    implementation("io.ktor:ktor-server-status-pages:3.6.0")
     
     // Logging implementation
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("ch.qos.logback:logback-classic:1.6.5")
     implementation("org.apache.commons:commons-compress:1.28.0")
     
     // Testing dependencies
-    testImplementation("io.ktor:ktor-server-test-host:2.3.12")
-    testImplementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    testImplementation("io.ktor:ktor-server-test-host:3.6.0")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.6.0")
 }
 
 application {
@@ -31,6 +31,11 @@ application {
 }
 
 tasks.shadowJar {
+    // Keep all service and Kotlin metadata inputs available to their transformers.
+    filesMatching(listOf("META-INF/services/**", "META-INF/*.kotlin_module")) {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    failOnDuplicateEntries = true
     mergeServiceFiles()
     archiveClassifier.set("")
     archiveBaseName.set("flux-api")
@@ -57,6 +62,10 @@ graalvmNative {
     toolchainDetection.set(true)
     binaries {
         named("main") {
+            javaLauncher.set(javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(25))
+                vendor.set(JvmVendorSpec.GRAAL_VM)
+            })
             imageName.set("flux-api")
             mainClass.set("host.flux.api.ApplicationKt")
             buildArgs.addAll(
