@@ -818,6 +818,8 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 
 Renovate maintains the build modules, embedded starters, Actions and toolchains. Central starter pins live in
 `templates/template-versions.properties`; current Fluxzero releases are resolved from Fluxzero Packages.
+The plugin version there is a development fallback: candidate and release builds inject their own version.
+Renovate deliberately skips that self-reference to prevent a release from triggering another release indefinitely.
 Minor and patch PRs use native rebase auto-merge behind **CLI required checks** and **CLI update required checks**.
 Major updates require separate assessment. The supported Gradle ceiling and other explicit compatibility boundaries
 are recorded in `renovate.json`.

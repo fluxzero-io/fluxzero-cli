@@ -113,6 +113,16 @@
       "matchCurrentVersion": "3.9.6"
     },
     {
+      "description": "Release and candidate builds inject their own plugin version; updating this development fallback would create an endless release/update loop",
+      "matchFileNames": [
+        "templates/template-versions.properties"
+      ],
+      "matchPackageNames": [
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Consumer fixtures use the locally built plugin, not an unrelated published release",
       "matchFileNames": [
         "maven-plugin/examples/**"
