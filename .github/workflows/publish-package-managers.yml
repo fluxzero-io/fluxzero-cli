@@ -133,7 +133,7 @@ jobs:
 
   winget:
     name: Submit WinGet manifest
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 10
     steps:
       - name: Check out CLI

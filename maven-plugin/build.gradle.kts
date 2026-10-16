@@ -137,7 +137,7 @@ dependencies {
     // Keep the provided API floor without resolving its vulnerable old utilities.
     // Revisit these constraints when the supported Maven API floor advances.
     constraints {
-        compileOnly("org.codehaus.plexus:plexus-utils:3.6.2")
+        compileOnly("org.codehaus.plexus:plexus-utils:4.1.0")
         compileOnly("org.apache.commons:commons-lang3:3.21.0")
     }
 

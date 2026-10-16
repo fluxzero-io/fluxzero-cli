@@ -9,7 +9,7 @@ on:
 jobs:
   deploy-fly:
     name: Deploy API to Fly.io
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     env:
       FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'fluxzero-cli-api' }}
