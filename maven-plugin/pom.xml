@@ -21,6 +21,22 @@
         <maven.plugin.tools.version>3.16.0</maven.plugin.tools.version>
     </properties>
 
+    <!-- Match the safe compile-only resolution without raising the provided Maven API floor. -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.codehaus.plexus</groupId>
+                <artifactId>plexus-utils</artifactId>
+                <version>3.6.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.21.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- Only needed for plugin:descriptor to resolve annotations -->
         <dependency>
