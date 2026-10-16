@@ -17,7 +17,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -38,13 +38,13 @@ jobs:
       jar-name: fluxzero-cli-${{ needs.version.outputs.version }}.jar
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup tools from .tool-versions
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Build and test
         run: ./gradlew build :cli:shadowJar :cli:generateScripts -PappVersion=${{ needs.version.outputs.version }}
@@ -104,7 +104,7 @@ jobs:
         run: scripts/test-verify-winget-runtime-dependency.sh
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jar-artifact
           path: |
@@ -120,13 +120,13 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup tools from .tool-versions
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       # Failed-job reruns reuse the original reservation output; never upload the version twice.
       - name: Prepare signed plugin publications
@@ -171,7 +171,7 @@ jobs:
     with:
       jar-name: ${{ needs.build-and-test.outputs.jar-name }}
       targets-json: >-
-        {"include":[{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-14","artifact-name":"flux-macos-arm64"}]}
+        {"include":[{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"}]}
 
   native-build-cli:
     needs: [version, build-and-test]
@@ -190,7 +190,7 @@ jobs:
       created: ${{ steps.reserve.outputs.created }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -229,13 +229,13 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup tools from .tool-versions
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
 
       - name: Download JAR artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: jar-artifact
           path: build/
@@ -259,7 +259,7 @@ jobs:
           echo "JAR verification successful!"
 
       - name: Download native artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: flux-*
           path: native-artifacts
@@ -436,7 +436,7 @@ jobs:
           rm -rf "$TEST_HOME" "$TEST_HOME2"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.version.outputs.version }}
           name: Release ${{ needs.version.outputs.version }}

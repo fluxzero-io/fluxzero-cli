@@ -1,9 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
   ],
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "prHourlyLimit": 5,
   "prConcurrentLimit": 10,
   "ignorePaths": [
@@ -13,17 +16,28 @@
   "packageRules": [
     {
       "description": "Group all minor and patch updates into a single PR",
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "all minor and patch dependencies"
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all minor and patch dependencies",
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
     },
     {
       "description": "Group all major updates into a single PR",
-      "matchUpdateTypes": ["major"],
-      "groupName": "all major dependencies"
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all major dependencies",
+      "automerge": false
     },
     {
       "description": "Keep all embedded customer templates on one Fluxzero dependency set",
-      "matchManagers": ["custom.regex"],
+      "matchManagers": [
+        "custom.regex"
+      ],
       "matchDepNames": [
         "io.fluxzero:fluxzero-bom",
         "io.fluxzero.idp:client",
@@ -34,43 +48,131 @@
     },
     {
       "description": "Merge verified non-breaking customer template updates",
-      "matchManagers": ["custom.regex"],
+      "matchManagers": [
+        "custom.regex"
+      ],
       "matchDepNames": [
         "io.fluxzero:fluxzero-bom",
         "io.fluxzero.idp:client",
         "io.fluxzero.tools:fluxzero-maven-plugin"
       ],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
-      "platformAutomerge": false
+      "platformAutomerge": true
     },
     {
       "description": "Require review for major customer template updates",
-      "matchManagers": ["custom.regex"],
+      "matchManagers": [
+        "custom.regex"
+      ],
       "matchDepNames": [
         "io.fluxzero:fluxzero-bom",
         "io.fluxzero.idp:client",
         "io.fluxzero.tools:fluxzero-maven-plugin"
       ],
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false
+    },
+    {
+      "description": "Use the canonical public source for current Fluxzero artifacts",
+      "matchDatasources": [
+        "maven"
+      ],
+      "matchPackageNames": [
+        "io.fluxzero:fluxzero-bom",
+        "io.fluxzero.idp:client",
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "registryUrls": [
+        "https://packages.fluxzero.io/maven"
+      ]
+    },
+    {
+      "description": "Kotlin Gradle plugin 2.4.21 is fully supported through Gradle 9.7; revisit with its compatibility matrix",
+      "matchDatasources": [
+        "gradle-version"
+      ],
+      "matchPackageNames": [
+        "gradle"
+      ],
+      "allowedVersions": "<9.8"
+    },
+    {
+      "description": "Preserve the published Maven API floor; these interfaces are provided by the host and are not shipped",
+      "matchPackageNames": [
+        "org.apache.maven:maven-plugin-api",
+        "org.apache.maven:maven-core"
+      ],
+      "allowedVersions": "3.9.6",
+      "matchCurrentVersion": "3.9.6"
+    },
+    {
+      "description": "Consumer fixtures use the locally built plugin, not an unrelated published release",
+      "matchFileNames": [
+        "maven-plugin/examples/**"
+      ],
+      "matchPackageNames": [
+        "io.fluxzero.tools:fluxzero-maven-plugin"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Retain a maintained Boot 3 consumer fixture while shipped starters qualify Boot 4",
+      "matchFileNames": [
+        "maven-plugin/examples/spring-boot/**"
+      ],
+      "matchPackageNames": [
+        "org.springframework.boot:spring-boot-starter-parent"
+      ],
+      "allowedVersions": "<4"
+    },
+    {
+      "description": "Qualify the JVM-21 compatibility floor separately from Java-25 development and native builders",
+      "matchFileNames": [
+        "api/Dockerfile"
+      ],
+      "matchPackageNames": [
+        "eclipse-temurin"
+      ],
+      "allowedVersions": "/^21-/"
+    },
+    {
+      "description": "Use the supported Node 24 LTS line for deployment and registry tooling",
+      "matchPackageNames": [
+        "node"
+      ],
+      "allowedVersions": "/^24([.-]|$)/"
+    },
+    {
+      "description": "The pinned published WinGetCreate release targets net9.0; revisit when upstream retargets",
+      "matchPackageNames": [
+        "dotnet-sdk"
+      ],
+      "allowedVersions": "<10"
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update centrally injected Fluxzero customer template versions",
-      "fileMatch": ["/^templates\\/template-versions\\.properties$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:\\w+)=(?<currentValue>\\S+)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:\\w+)(?:=|:|\\s)\\s*(?<currentValue>\\S+)"
+      ],
+      "managerFilePatterns": [
+        "/^templates\\/template-versions\\.properties$/",
+        "/^config\\/publishing-tools\\.properties$/",
+        "/^\\.tool-versions$/"
       ]
     }
   ],
-  "gradle": {
-    "fileMatch": [
-      "(^|/)build\\.gradle\\.kts$",
-      "(^|/)settings\\.gradle\\.kts$"
-    ]
+  "automergeStrategy": "rebase",
+  "vulnerabilityAlerts": {
+    "enabled": true
   }
 }
