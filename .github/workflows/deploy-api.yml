@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     name: Deploy API to Cloudflare
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Only deploy if the release workflow completed successfully
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
