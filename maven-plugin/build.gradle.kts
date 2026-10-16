@@ -1,6 +1,6 @@
 import com.vanniktech.maven.publish.JavaLibrary
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -13,7 +13,7 @@ import javax.xml.transform.stream.StreamResult
 plugins {
     kotlin("jvm")
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "io.fluxzero.tools"
@@ -128,18 +128,19 @@ dependencies {
     shade(project(":dev-launcher"))
     compileOnly(project(":dev-launcher"))
 
-    // Maven Plugin API (compile only - provided at runtime by Maven)
+    // Compile against our supported Maven API floor; the host provides these classes.
+    // Test runtime dependencies below track the current Maven release.
     compileOnly("org.apache.maven:maven-plugin-api:3.9.6")
     compileOnly("org.apache.maven:maven-core:3.9.6")
-    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.1")
+    compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.16.0")
 
     // Test dependencies
     testImplementation(project(":publishing"))
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.3.0")
-    testImplementation("org.apache.maven:maven-core:3.9.6")
-    testImplementation("org.apache.maven:maven-compat:3.9.6")
+    testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.5.1")
+    testImplementation("org.apache.maven:maven-core:3.10.0")
+    testImplementation("org.apache.maven:maven-compat:3.10.0")
 }
 
 // Copy compiled classes to Maven's expected location (target/classes)
@@ -204,6 +205,12 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
 
 // Configure shadow JAR to include all dependencies
 tasks.shadowJar {
+    // Keep all service and Kotlin metadata inputs available to their transformers.
+    filesMatching(listOf("META-INF/services/**", "META-INF/*.kotlin_module")) {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    failOnDuplicateEntries = true
+    mergeServiceFiles()
     dependsOn(generatePluginDescriptor)
 
     // Include shade configuration so project-files gets bundled into the fat JAR
@@ -222,7 +229,7 @@ tasks.shadowJar {
 
     // Relocate dependencies to avoid classpath conflicts with project dependencies
     relocate("kotlinx.serialization", "host.flux.maven.shadow.kotlinx.serialization")
-    relocate("io.github.microutils", "host.flux.maven.shadow.io.github.microutils")
+    relocate("io.github.oshai.kotlinlogging", "host.flux.maven.shadow.io.github.oshai.kotlinlogging")
 }
 
 // Disable the regular JAR task since we're using shadow
@@ -236,7 +243,7 @@ tasks.assemble {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -244,7 +251,7 @@ mavenPublishing {
     }
 
     // Use shadow component for publishing the fat JAR
-    configure(JavaLibrary(JavadocJar.Empty(), false))
+    configure(JavaLibrary(JavadocJar.Empty(), SourcesJar.Sources()))
 
     coordinates("io.fluxzero.tools", "fluxzero-maven-plugin", version.toString())
 

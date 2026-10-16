@@ -7,7 +7,7 @@ import java.util.jar.JarFile
 plugins {
     kotlin("jvm")
     application
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.6.1"
     id("org.graalvm.buildtools.native")
 }
 
@@ -15,9 +15,9 @@ dependencies {
     implementation(project(":templates"))
     implementation(project(":publishing"))
     implementation(project(":dev-launcher"))
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
-    implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation("org.jline:jline:3.30.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.3")
+    implementation("com.github.ajalt.clikt:clikt:5.1.0")
+    implementation("org.jline:jline:4.4.8")
 }
 
 application {
@@ -28,6 +28,10 @@ graalvmNative {
     toolchainDetection.set(true)
     binaries {
         named("main") {
+            javaLauncher.set(javaToolchains.launcherFor {
+                languageVersion.set(JavaLanguageVersion.of(25))
+                vendor.set(JvmVendorSpec.GRAAL_VM)
+            })
             imageName.set("flux")
             mainClass.set("host.flux.cli.MainKt")
             buildArgs.addAll(
@@ -50,6 +54,11 @@ graalvmNative {
 }
 
 tasks.shadowJar {
+    // Keep all service and Kotlin metadata inputs available to their transformers.
+    filesMatching(listOf("META-INF/services/**", "META-INF/*.kotlin_module")) {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    failOnDuplicateEntries = true
     mergeServiceFiles()
     archiveClassifier.set("")
     archiveBaseName.set("fluxzero-cli")

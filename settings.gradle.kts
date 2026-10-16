@@ -1,7 +1,7 @@
 import org.apache.tools.ant.DirectoryScanner
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 // Gradle inherits Ant's default exclusion of .gitignore files. These are project

@@ -727,10 +727,10 @@ class DevServerLauncherTest {
 
     @Test
     fun `global stop releases all detached operating system registrations`() {
-        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/launcher"))
+        val launcherDirectory = Files.createDirectories(projectDirectory.resolve(".fluxzero/dev/config-launcher"))
         val dependency = Files.createFile(projectDirectory.resolve("dev-server.jar"))
         Files.writeString(launcherDirectory.resolve("classpath.txt"), dependency.toString())
-        Files.writeString(launcherDirectory.resolve("version"), "1.2.3")
+        Files.writeString(launcherDirectory.resolve("version"), "0-SNAPSHOT")
         var releasedAll = false
         val executor = object : CommandExecutor {
             override fun execute(command: List<String>, workingDirectory: Path, outputMode: OutputMode) = 0
@@ -740,7 +740,7 @@ class DevServerLauncherTest {
         }
 
         val exitCode = launcher(executor).launch(
-            DevLaunchRequest(projectDirectory, "1.2.3", DevLaunchTarget.CONTROL, listOf("stop", "--all"))
+            DevLaunchRequest(projectDirectory, "0-SNAPSHOT", DevLaunchTarget.CONTROL, listOf("stop", "--all"))
         )
 
         assertEquals(0, exitCode)

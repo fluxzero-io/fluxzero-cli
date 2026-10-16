@@ -1,12 +1,12 @@
 import com.vanniktech.maven.publish.GradlePlugin
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SonatypeHost
+import com.vanniktech.maven.publish.SourcesJar
 
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
     id("com.vanniktech.maven.publish")
-    id("com.gradleup.shadow") version "9.0.0"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 // Configuration for dependencies that should be embedded into the shadow JAR
@@ -27,8 +27,8 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
-    testImplementation("io.mockk:mockk:1.14.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
+    testImplementation("io.mockk:mockk:1.14.11")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // Functional testing
@@ -41,10 +41,16 @@ group = "io.fluxzero.tools"
 
 // Shadow JAR: embed project-files and its dependencies into the plugin JAR
 tasks.shadowJar {
+    // Keep all service and Kotlin metadata inputs available to their transformers.
+    filesMatching(listOf("META-INF/services/**", "META-INF/*.kotlin_module")) {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    failOnDuplicateEntries = true
+    mergeServiceFiles()
     archiveClassifier.set("")
     configurations = listOf(shade)
     relocate("kotlinx.serialization", "host.flux.gradle.shadow.kotlinx.serialization")
-    relocate("io.github.microutils", "host.flux.gradle.shadow.io.github.microutils")
+    relocate("io.github.oshai.kotlinlogging", "host.flux.gradle.shadow.io.github.oshai.kotlinlogging")
 }
 
 tasks.jar {
@@ -68,7 +74,7 @@ gradlePlugin {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    publishToMavenCentral()
 
     // Only sign if GPG key is available (CI has it, local dev may not)
     if (project.findProperty("signingInMemoryKey") != null) {
@@ -76,7 +82,7 @@ mavenPublishing {
     }
 
     // Publish as Gradle plugin using shadow JAR (embeds project-files and its dependencies)
-    configure(GradlePlugin(JavadocJar.Empty(), sourcesJar = true))
+    configure(GradlePlugin(JavadocJar.Empty(), SourcesJar.Sources()))
 
     coordinates("io.fluxzero.tools", "fluxzero-gradle-plugin", version.toString())
 
