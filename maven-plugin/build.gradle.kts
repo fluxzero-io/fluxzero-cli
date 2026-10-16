@@ -134,6 +134,13 @@ dependencies {
     compileOnly("org.apache.maven:maven-core:3.9.6")
     compileOnly("org.apache.maven.plugin-tools:maven-plugin-annotations:3.16.0")
 
+    // Keep the provided API floor without resolving its vulnerable old utilities.
+    // Revisit these constraints when the supported Maven API floor advances.
+    constraints {
+        compileOnly("org.codehaus.plexus:plexus-utils:3.6.2")
+        compileOnly("org.apache.commons:commons-lang3:3.21.0")
+    }
+
     // Test dependencies
     testImplementation(project(":publishing"))
     testImplementation(kotlin("test"))
@@ -163,6 +170,7 @@ val generatePluginDescriptor by tasks.registering(Exec::class) {
     commandLine("mvn", "plugin:descriptor", "-Drevision=${project.version}", "-q")
 
     inputs.dir(file("target/classes"))
+    inputs.file("pom.xml")
     inputs.property("version", project.version)
     outputs.dir(file("target/classes/META-INF/maven"))
 
