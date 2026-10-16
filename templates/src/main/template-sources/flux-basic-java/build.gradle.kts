@@ -2,7 +2,7 @@ import org.springframework.boot.gradle.plugin.SpringBootPlugin
 
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.1.1"
     id("io.fluxzero.tools.gradle.plugin") version "@fluxzeroPluginVersion@"
 }
 
@@ -31,8 +31,8 @@ fluxzero {
 
 val fluxzeroVersion = "@fluxzeroSdkVersion@"
 val fluxzeroIdpVersion = "@fluxzeroIdpVersion@"
-val jettyVersion = "12.1.11"
-val lombokVersion = "1.18.46"
+val jettyVersion = "12.1.14"
+val lombokVersion = "1.18.48"
 
 java {
     toolchain {
@@ -72,7 +72,7 @@ dependencies {
         }
     }
     testImplementation("io.fluxzero.idp:test-support:$fluxzeroIdpVersion")
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.5.38")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.6.5")
 
     testCompileOnly("org.projectlombok:lombok:$lombokVersion")
     testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")

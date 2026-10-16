@@ -49,7 +49,7 @@ class SenderProviderTest {
 
                 .andThen()
                 .whenGetByUser(null, authorizationUrl.get())
-                .expectWebResult(captureRedirect(loginPath, "/login?"))
+                .expectWebResult(captureRedirect(loginPath, "http://localhost:8080/login?"))
 
                 .andThen()
                 .whenWebRequestByUser(null, WebRequest.post(loginPath.get())
