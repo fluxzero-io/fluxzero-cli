@@ -8,8 +8,8 @@ plugins {
 
 dependencies {
     // YAML parsing for refactor.yaml files
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.3")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.3")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.4")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.22.4")
 
     // Testing
     testImplementation(kotlin("test"))
