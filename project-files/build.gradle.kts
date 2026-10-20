@@ -7,7 +7,7 @@ group = "io.fluxzero.tools"
 
 dependencies {
     // JSON serialization (for GitHub API responses)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:8.0.4")
