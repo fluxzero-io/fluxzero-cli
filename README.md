@@ -1,4 +1,4 @@
-<a href="https://fluxzero.io"><img src="https://raw.githubusercontent.com/fluxzero-io/.github/882a9ef9a4f770161a085e1986752f706ed181a4/assets/brand/2026-10/repository-header.svg" alt="Fluxzero — The cloud that works for your agent." width="1280"></a>
+<a href="https://fluxzero.io"><img src="https://raw.githubusercontent.com/fluxzero-io/.github/2011d00db17eabbe1ee390f62cb2c6c777970760/assets/brand/2026-10/profile/hero.png" alt="Fluxzero — The cloud that works for your agent." width="1280"></a>
 
 # Fluxzero CLI
 
