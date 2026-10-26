@@ -18,7 +18,7 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages:3.6.0")
     
     // Logging implementation
-    implementation("ch.qos.logback:logback-classic:1.6.5")
+    implementation("ch.qos.logback:logback-classic:1.6.6")
     implementation("org.apache.commons:commons-compress:1.28.0")
     
     // Testing dependencies
