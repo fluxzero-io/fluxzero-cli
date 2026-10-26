@@ -3,4 +3,4 @@ maven 3.10.0
 # renovate: datasource=gradle-version depName=gradle
 gradle 9.7.1
 # renovate: datasource=npm depName=wrangler
-wrangler 4.152.0
+wrangler 4.153.0
