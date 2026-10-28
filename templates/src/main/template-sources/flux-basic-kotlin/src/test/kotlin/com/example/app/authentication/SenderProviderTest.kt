@@ -1,8 +1,10 @@
 package com.example.app.authentication
 
 import io.fluxzero.common.ThrowingPredicate
+import io.fluxzero.common.serialization.JsonUtils
 import io.fluxzero.idp.client.FormCodec
 import io.fluxzero.idp.testsupport.localstub.FluxzeroIdpStub
+import io.fluxzero.sdk.common.serialization.jackson.JacksonSerializer
 import io.fluxzero.sdk.configuration.DefaultFluxzero
 import io.fluxzero.sdk.test.TestFixture
 import io.fluxzero.sdk.web.WebRequest
@@ -12,6 +14,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SenderProviderTest {
 
@@ -36,6 +42,17 @@ class SenderProviderTest {
         )
 
         loginAs(testFixture, "user")
+    }
+
+    @Test
+    fun missingSessionReturnsUnauthenticatedObject() {
+        TestFixture.create(
+            DefaultFluxzero.builder().registerUserProvider(SenderProvider()),
+            AppAuthEndpoint::class.java,
+            FluxzeroIdpStub::class.java
+        )
+            .whenGetByUser(null, "/app/auth/session")
+            .expectWebResult(sessionResponse(401, false, null))
     }
 
     private fun loginAs(testFixture: TestFixture, username: String) {
@@ -68,7 +85,7 @@ class SenderProviderTest {
 
             .andThen()
             .whenGetByUser(null, returnTo.get())
-            .expectWebResult(authenticatedAs(username))
+            .expectWebResult(sessionResponse(200, true, username))
     }
 
     private fun captureRedirect(
@@ -90,11 +107,26 @@ class SenderProviderTest {
         return if (uri.rawQuery == null) uri.rawPath else "${uri.rawPath}?${uri.rawQuery}"
     }
 
-    private fun authenticatedAs(username: String): ThrowingPredicate<WebResponse> {
+    private fun sessionResponse(status: Int, authenticated: Boolean, subject: String?): ThrowingPredicate<WebResponse> {
         return ThrowingPredicate { response ->
-            val payload = response.toString()
-            payload.contains("\"authenticated\":true") &&
-                payload.contains("\"subject\":\"$username\"")
+            assertEquals(status, response.status)
+            assertEquals("application/json", response.contentType)
+            assertEquals("no-store", response.getHeader("Cache-Control"))
+            val payload = assertIs<Map<*, *>>(response.getPayload<Any>())
+            assertEquals(authenticated, payload["authenticated"])
+            assertEquals(subject, payload["subject"])
+
+            // Parse the SDK's HTTP body bytes once, just like response.json() in the browser.
+            val json = JsonUtils.readTree(response.serialize(JacksonSerializer()).data.value)
+            assertTrue(json.isObject, "The HTTP body must be a JSON object, not a JSON-encoded string")
+            assertTrue(json.path("authenticated").isBoolean)
+            assertEquals(authenticated, json.path("authenticated").booleanValue())
+            if (subject == null) {
+                assertFalse(json.has("subject"))
+            } else {
+                assertEquals(subject, json.path("subject").textValue())
+            }
+            true
         }
     }
 

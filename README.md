@@ -814,6 +814,11 @@ java -jar cli/build/libs/fluxzero-cli-dev.jar version
 ./gradlew test
 ```
 
+For the starter authentication HTTP regression, generate both Java and Kotlin starters from the candidate templates
+and start each with `fz dev`. Pass their local gateway origins to
+`python3 scripts/verify-starter-session.py JAVA_ORIGIN KOTLIN_ORIGIN`. The check uses the managed local IDP to log in
+and verifies that both anonymous (401) and authenticated (200) session bodies are JSON objects after one parse.
+
 ## Dependency maintenance
 
 Renovate maintains the build modules, embedded starters, Actions and toolchains. Central starter pins live in

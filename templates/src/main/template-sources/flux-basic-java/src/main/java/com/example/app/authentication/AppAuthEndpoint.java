@@ -1,6 +1,5 @@
 package com.example.app.authentication;
 
-import io.fluxzero.common.serialization.JsonUtils;
 import io.fluxzero.idp.client.JwtClaims;
 import io.fluxzero.idp.client.OidcClient;
 import io.fluxzero.idp.client.OidcLoginState;
@@ -134,7 +133,7 @@ public class AppAuthEndpoint {
     static WebResponse jsonResponse(int status, Object payload) {
         return WebResponse.builder()
                 .status(status)
-                .payload(JsonUtils.asJson(payload))
+                .payload(payload)
                 .contentType("application/json")
                 .header("Cache-Control", "no-store")
                 .build();
