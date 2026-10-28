@@ -1,8 +1,11 @@
 package com.example.app.authentication;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.fluxzero.common.ThrowingPredicate;
+import io.fluxzero.common.serialization.JsonUtils;
 import io.fluxzero.idp.client.FormCodec;
 import io.fluxzero.idp.testsupport.localstub.FluxzeroIdpStub;
+import io.fluxzero.sdk.common.serialization.jackson.JacksonSerializer;
 import io.fluxzero.sdk.configuration.DefaultFluxzero;
 import io.fluxzero.sdk.test.TestFixture;
 import io.fluxzero.sdk.web.WebRequest;
@@ -14,6 +17,11 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SenderProviderTest {
     @BeforeEach
@@ -35,6 +43,14 @@ class SenderProviderTest {
                 AppAuthEndpoint.class, FluxzeroIdpStub.class);
 
         loginAs(testFixture, "user");
+    }
+
+    @Test
+    void missingSessionReturnsUnauthenticatedObject() {
+        TestFixture.create(DefaultFluxzero.builder().registerUserProvider(new SenderProvider()),
+                        AppAuthEndpoint.class, FluxzeroIdpStub.class)
+                .whenGetByUser(null, "/app/auth/session")
+                .expectWebResult(sessionResponse(401, false, null));
     }
 
     private void loginAs(TestFixture testFixture, String username) {
@@ -64,7 +80,7 @@ class SenderProviderTest {
 
                 .andThen()
                 .whenGetByUser(null, returnTo.get())
-                .expectWebResult(authenticatedAs(username));
+                .expectWebResult(sessionResponse(200, true, username));
     }
 
     private static ThrowingPredicate<WebResponse> captureRedirect(
@@ -84,11 +100,26 @@ class SenderProviderTest {
         return uri.getRawQuery() == null ? uri.getRawPath() : uri.getRawPath() + "?" + uri.getRawQuery();
     }
 
-    private static ThrowingPredicate<WebResponse> authenticatedAs(String username) {
+    private static ThrowingPredicate<WebResponse> sessionResponse(int status, boolean authenticated, String subject) {
         return response -> {
-            String payload = response.toString();
-            return payload.contains("\"authenticated\":true")
-                    && payload.contains("\"subject\":\"%s\"".formatted(username));
+            assertEquals(status, response.getStatus());
+            assertEquals("application/json", response.getContentType());
+            assertEquals("no-store", response.getHeader("Cache-Control"));
+            Map<?, ?> payload = assertInstanceOf(Map.class, response.getPayload());
+            assertEquals(authenticated, payload.get("authenticated"));
+            assertEquals(subject, payload.get("subject"));
+
+            // Parse the SDK's HTTP body bytes once, just like response.json() in the browser.
+            JsonNode json = JsonUtils.readTree(response.serialize(new JacksonSerializer()).getData().getValue());
+            assertTrue(json.isObject(), "The HTTP body must be a JSON object, not a JSON-encoded string");
+            assertTrue(json.path("authenticated").isBoolean());
+            assertEquals(authenticated, json.path("authenticated").booleanValue());
+            if (subject == null) {
+                assertFalse(json.has("subject"));
+            } else {
+                assertEquals(subject, json.path("subject").textValue());
+            }
+            return true;
         };
     }
 
