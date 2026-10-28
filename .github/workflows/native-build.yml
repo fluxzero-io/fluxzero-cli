@@ -8,12 +8,13 @@ on:
         required: false
         type: string
         default: 'fluxzero-cli-dev.jar'
+      # Keep Linux native builds on the qualified baseline; newer runner images can ship amd64v3 libraries.
       targets-json:
         description: 'JSON matrix for native build targets'
         required: false
         type: string
         default: >-
-          {"include":[{"os":"linux-amd64","runner":"ubuntu-latest","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
+          {"include":[{"os":"linux-amd64","runner":"ubuntu-24.04","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}
 jobs:
   native-build:
     name: Build Native Image - ${{ matrix.os }}
