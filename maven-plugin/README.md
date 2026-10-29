@@ -115,6 +115,17 @@ mvn fluxzero:sync-project-files
 mvn -B package fluxzero:publish-package
 ```
 
+The build and publication may also run in separate Maven invocations, as in the generated deployment workflow:
+
+```bash
+mvn -B package
+mvn -B fluxzero:publish-package
+```
+
+Without an explicit `mainClass`, publication reads the built artifact's `Start-Class` (Spring Boot) or `Main-Class`.
+If Maven has no artifact file assigned in the current invocation, it uses the configured build directory, final name,
+and artifact extension. Run `package` again after changing the application; publication does not rebuild it.
+
 Generated Fluxzero projects put stable package and registry settings in the POM. Use Maven interpolation for values that
 come from CI or the local environment.
 

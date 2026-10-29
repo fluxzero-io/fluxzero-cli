@@ -83,7 +83,8 @@ class PublishPackageMojo : AbstractMojo() {
     private var applicationId: String? = null
 
     /**
-     * Application main class. When omitted, the plugin reads Start-Class or Main-Class from the project artifact.
+     * Application main class. When omitted, reads Start-Class or Main-Class from the project artifact,
+     * including a package produced by an earlier Maven invocation.
      */
     @Parameter(property = "fluxzero.package.mainClass")
     private var mainClass: String? = null
@@ -182,7 +183,7 @@ class PublishPackageMojo : AbstractMojo() {
         }
 
         val resolvedMainClass = configured("fluxzero.package.mainClass", "FLUXZERO_MAIN_CLASS", mainClass)
-            ?: mainClassFromManifest(project.artifact?.file)
+            ?: mainClassFromProjectArtifact(project)
             ?: throw MojoFailureException("Missing application main class. Set -Dfluxzero.package.mainClass.")
         val configuredBaseImage = configured("fluxzero.package.baseImage", "FLUXZERO_BASE_IMAGE", baseImage)
         val resolvedBaseImage = configuredBaseImage ?: JavaPackagePublishSpec.DEFAULT_BASE_IMAGE
@@ -252,7 +253,13 @@ class PublishPackageMojo : AbstractMojo() {
             throw MojoFailureException(e.message)
         }
 
-    private fun mainClassFromManifest(jarFile: File?): String? {
+    internal fun mainClassFromProjectArtifact(project: MavenProject): String? {
+        // A standalone goal starts a fresh MavenProject whose artifact file has not been assigned by package.
+        val extension = project.artifact?.artifactHandler?.extension ?: project.packaging
+        val jarFile = project.artifact?.file ?: project.build?.let { build ->
+            if (build.directory.isNullOrBlank() || build.finalName.isNullOrBlank()) null
+            else File(build.directory, "${build.finalName}.$extension")
+        }
         if (jarFile == null || !jarFile.isFile) {
             return null
         }
