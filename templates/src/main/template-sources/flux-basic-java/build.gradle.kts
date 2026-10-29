@@ -50,17 +50,15 @@ dependencies {
     implementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     implementation(platform("org.eclipse.jetty:jetty-bom:$jettyVersion"))
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
-    developmentOnly(platform(SpringBootPlugin.BOM_COORDINATES))
     annotationProcessor(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     testImplementation(platform("io.fluxzero:fluxzero-bom:$fluxzeroVersion"))
     testImplementation(platform("org.eclipse.jetty:jetty-bom:$jettyVersion"))
     testImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
 
     implementation("org.springframework.boot:spring-boot-starter")
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
 
     implementation("io.fluxzero:sdk")
-    implementation("io.fluxzero.idp:client:$fluxzeroIdpVersion")
+    implementation("io.fluxzero.idp:client-bff:$fluxzeroIdpVersion")
     compileOnly("org.projectlombok:lombok:$lombokVersion")
     annotationProcessor("org.projectlombok:lombok:$lombokVersion")
     annotationProcessor("io.fluxzero:sdk")

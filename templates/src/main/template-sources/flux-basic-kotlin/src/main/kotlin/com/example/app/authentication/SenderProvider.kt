@@ -30,10 +30,6 @@ open class SenderProvider : AbstractUserProvider(Sender::class.java), Refreshing
             if (explicitUser != null) {
                 return explicitUser
             }
-            val sessionSender = AppSessionStore.sender(message.metadata)
-            if (sessionSender != null) {
-                return refreshUser(sessionSender, message)
-            }
             return bearerToken(message)
                 ?.let { senderFromBearerToken(it) }
                 ?.let { refreshUser(it, message) }

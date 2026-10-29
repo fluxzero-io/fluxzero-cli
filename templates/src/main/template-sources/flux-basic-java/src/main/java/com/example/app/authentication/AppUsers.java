@@ -13,12 +13,17 @@ final class AppUsers {
     }
 
     static Sender ensureAppUser(JwtClaims claims) {
-        UserId userId = new UserId(claims.subject());
+        return ensureAppUser(claims.issuer(), claims.subject(), claims.json().path("name").asText(null),
+                claims.json().path("email").asText(null));
+    }
+
+    static Sender ensureAppUser(String issuer, String subject, String name, String email) {
+        UserId userId = new UserId(Fluxzero.idForName(issuer + "\n" + subject));
         UserProfile userProfile = Fluxzero.loadAggregate(userId, UserProfile.class).get();
         if (userProfile == null) {
             Fluxzero.sendCommandAndWait(Message.asMessage(new CreateUser(
                     userId,
-                    new UserDetails(displayName(claims), claims.email()),
+                    new UserDetails(displayName(subject, name, email), email),
                     null)).addUser(Sender.system));
             userProfile = Fluxzero.loadAggregate(userId, UserProfile.class).get();
         }
@@ -28,13 +33,8 @@ final class AppUsers {
                 .build();
     }
 
-    private static String displayName(JwtClaims claims) {
-        if (claims.name() != null && !claims.name().isBlank()) {
-            return claims.name();
-        }
-        if (claims.email() != null && !claims.email().isBlank()) {
-            return claims.email();
-        }
-        return claims.subject();
+    private static String displayName(String subject, String name, String email) {
+        if (name != null && !name.isBlank()) return name;
+        return email == null || email.isBlank() ? subject : email;
     }
 }

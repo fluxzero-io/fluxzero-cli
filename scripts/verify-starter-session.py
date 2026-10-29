@@ -41,9 +41,10 @@ def check_session(response, status, subject=None):
         # Exactly one parse, equivalent to the frontend's response.json().
         payload = json.load(response)
     assert isinstance(payload, dict), f"Expected a JSON object, got {type(payload).__name__}"
-    assert payload.get("authenticated") is (subject is not None)
+    assert bool(payload.get("authenticated")) is (subject is not None)
     if subject is None:
         assert "subject" not in payload
+        assert payload.get("error") == "login_required"
     else:
         assert payload.get("subject") == subject
 
@@ -56,10 +57,13 @@ def verify(origin):
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
         LocalRedirects(),
     )
-    session_url = origin + "/app/auth/session"
+    with request(browser, origin + "/api/auth") as configuration:
+        client_url = json.load(configuration)["clientUrl"]
+    auth_base = urllib.parse.urljoin(origin + "/", client_url).rsplit("/", 1)[0]
+    session_url = auth_base + "/session"
     check_session(request(browser, session_url), 401)
 
-    with request(browser, origin + "/app/login?returnTo=/app/auth/session") as login:
+    with request(browser, auth_base + "/login?returnTo=" + urllib.parse.quote(urllib.parse.urlsplit(session_url).path)) as login:
         assert login.status == 200, "Local login page was not served"
         login_url = login.url
         assert urllib.parse.urlsplit(login_url).path.endswith("/login"), "Expected local IDP login"

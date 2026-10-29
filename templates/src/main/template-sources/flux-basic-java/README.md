@@ -26,11 +26,17 @@ This starts:
 - the Spring Boot application, with rolling replacement after source changes
 - affected tests in the background
 
-The main application code reads a normal Fluxzero IDP tenant from the `fluxzero.auth.*` properties.
-For deployed environments, provide those values through environment variables, system properties or
-`src/main/resources/application.properties`. The dev server supplies the local runtime, proxy, and identity provider;
-the application does not bootstrap those services from its test classpath. The `io.fluxzero.idp:test-support`
-dependency remains available for focused authentication tests.
+Fluxzero Cloud and the dev server supply the issuer, application identity and key material.
+The BFF library owns login, encrypted shared sessions, refresh, CSRF and logout.
+`AppOidcUserMapper` implements `FluxzeroOidcUserMapper` and maps the verified `FluxzeroOidcUser` to the
+application's `Sender` using typed name and email accessors. It is discovered through
+`META-INF/services/io.fluxzero.idp.bff.OidcUserMapper`. The template ignores the request parameter;
+applications may use it for policies such as explicitly authorized impersonation. Current roles come
+from the application profile. `SenderProvider` continues to handle internal messages and explicit bearer tokens.
+The `io.fluxzero.idp:test-support` dependency supplies the issuer for focused authentication tests.
+
+Set `fluxzero.auth.oidc.disabled=true` to opt out. A custom callback path via
+`fluxzero.auth.oidc.redirect-uri` requires an application handler calling `OidcIntegration.callback`.
 
 Coding agents should use the installed Fluxzero plugin's `fluxzero-dev` MCP server. It starts or reuses this
 environment and exposes cursored build, reload, problem, log, and test feedback. While it is active, do not run a
@@ -38,9 +44,11 @@ second wrapper build, test process, application, watcher, or continuous log comm
 
 ## API Endpoints
 
-- **GET** `/app/login` - Start browser login
-- **GET** `/app/callback` - OIDC callback
-- **GET** `/app/auth/session` - Current BFF session
+- **GET** `/api/auth` - Discover the application-specific browser helper
+- **GET** `/auth/<applicationId>/login` - Start browser login and receive its callback
+- **GET** `/auth/<applicationId>/session` - Current BFF session and CSRF token
+- **POST** `/auth/<applicationId>/logout` - End the session, with origin and CSRF validation
+- **GET** `/api/me` - Current application profile
 - **GET** `/api/users` - List all users
 - **POST** `/api/users` - Create new user
 
