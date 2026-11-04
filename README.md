@@ -15,7 +15,7 @@ brew install fluxzero-io/tap/fluxzero
 
 **Windows with WinGet:**
 ```powershell
-winget install --exact --id Fluxzero.FluxzeroCLI
+winget install --source winget --exact --id Fluxzero.FluxzeroCLI
 ```
 
 Package-manager installations receive normal `brew upgrade` and `winget upgrade` support.
@@ -132,7 +132,7 @@ The application main class is detected from compiled Java or Kotlin classes. Use
 contains multiple executable entrypoints and the intended one is ambiguous.
 
 Fluxzero uses Java 25 for local development. When it is not available, interactive use offers to install it through
-Homebrew or WinGet. Agent-driven use reports the same requirement without opening a prompt, so the agent can ask for
+Homebrew or the WinGet community source (without querying Microsoft Store). Agent-driven use reports the same requirement without opening a prompt, so the agent can ask for
 permission, perform the installation, and retry the original command.
 
 ```bash
