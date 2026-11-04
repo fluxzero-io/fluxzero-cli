@@ -110,7 +110,7 @@ class JavaSetupTest {
     }
 
     @Test
-    fun `uses WinGet on Windows`() {
+    fun `uses only the WinGet source on Windows`() {
         val commands = mutableListOf<List<String>>()
         val installer = SystemJavaInstaller(
             osName = "Windows 11",
@@ -121,7 +121,7 @@ class JavaSetupTest {
         assertTrue(installer?.install() == true)
         assertEquals(
             listOf(
-                "winget", "install", "--exact", "--id", "EclipseAdoptium.Temurin.25.JDK",
+                "winget", "install", "--source", "winget", "--exact", "--id", "EclipseAdoptium.Temurin.25.JDK",
                 "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"
             ),
             commands.single()

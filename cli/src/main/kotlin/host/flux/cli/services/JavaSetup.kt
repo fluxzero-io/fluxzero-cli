@@ -23,7 +23,7 @@ internal class SystemJavaInstaller(
         val command = when {
             osName.lowercase(Locale.ROOT).contains("windows") &&
                 commandAvailable(listOf("winget", "--version")) -> listOf(
-                    "winget", "install", "--exact", "--id",
+                    "winget", "install", "--source", "winget", "--exact", "--id",
                     "EclipseAdoptium.Temurin.$REQUIRED_JAVA_FEATURE.JDK",
                     "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"
                 )
