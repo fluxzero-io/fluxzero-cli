@@ -18,7 +18,7 @@ services:
       '
 
   zot:
-    image: ghcr.io/project-zot/zot:v2.1.22
+    image: ghcr.io/project-zot/zot:v2.1.23
     ports:
       - "127.0.0.1:5100:5000"
     volumes:

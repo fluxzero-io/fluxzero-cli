@@ -28,7 +28,7 @@ dependencies {
     // Testing
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-    testImplementation("io.mockk:mockk:1.14.11")
+    testImplementation("io.mockk:mockk:1.14.12")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // Functional testing
