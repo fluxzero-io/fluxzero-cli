@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.21" apply false
     kotlin("plugin.serialization") version "2.4.21" apply false
-    id("org.graalvm.buildtools.native") version "1.1.17" apply false
+    id("org.graalvm.buildtools.native") version "1.1.18" apply false
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
 }
 
@@ -31,6 +31,6 @@ subprojects {
 
     dependencies {
         "testImplementation"(kotlin("test"))
-        "testImplementation"("io.mockk:mockk:1.14.11")
+        "testImplementation"("io.mockk:mockk:1.14.12")
     }
 }

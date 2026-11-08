@@ -10,20 +10,20 @@ dependencies {
     implementation(project(":templates"))
     
     // Ktor server dependencies
-    implementation("io.ktor:ktor-server-core:3.6.0")
-    implementation("io.ktor:ktor-server-cio:3.6.0")
-    implementation("io.ktor:ktor-server-content-negotiation:3.6.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
-    implementation("io.ktor:ktor-server-cors:3.6.0")
-    implementation("io.ktor:ktor-server-status-pages:3.6.0")
+    implementation("io.ktor:ktor-server-core:3.6.1")
+    implementation("io.ktor:ktor-server-cio:3.6.1")
+    implementation("io.ktor:ktor-server-content-negotiation:3.6.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.1")
+    implementation("io.ktor:ktor-server-cors:3.6.1")
+    implementation("io.ktor:ktor-server-status-pages:3.6.1")
     
     // Logging implementation
     implementation("ch.qos.logback:logback-classic:1.6.6")
     implementation("org.apache.commons:commons-compress:1.28.0")
     
     // Testing dependencies
-    testImplementation("io.ktor:ktor-server-test-host:3.6.0")
-    testImplementation("io.ktor:ktor-client-content-negotiation:3.6.0")
+    testImplementation("io.ktor:ktor-server-test-host:3.6.1")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.6.1")
 }
 
 application {
