@@ -9,7 +9,7 @@
 	<description>Demo project for Spring Boot</description>
 	<properties>
 		<spring-boot.version>4.1.2</spring-boot.version>
-		<jetty.version>12.1.14</jetty.version>
+		<jetty.version>12.1.15</jetty.version>
 		<fluxzero.version>@fluxzeroSdkVersion@</fluxzero.version>
 		<fluxzero-idp.version>@fluxzeroIdpVersion@</fluxzero-idp.version>
 		<java.version>25</java.version>

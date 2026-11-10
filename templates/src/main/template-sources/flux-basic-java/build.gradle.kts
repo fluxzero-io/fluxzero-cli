@@ -31,7 +31,7 @@ fluxzero {
 
 val fluxzeroVersion = "@fluxzeroSdkVersion@"
 val fluxzeroIdpVersion = "@fluxzeroIdpVersion@"
-val jettyVersion = "12.1.14"
+val jettyVersion = "12.1.15"
 val lombokVersion = "1.18.48"
 
 java {
