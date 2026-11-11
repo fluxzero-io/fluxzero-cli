@@ -138,7 +138,7 @@ dependencies {
     // Revisit these constraints when the supported Maven API floor advances.
     constraints {
         compileOnly("org.codehaus.plexus:plexus-utils:4.1.0")
-        compileOnly("org.apache.commons:commons-lang3:3.21.0")
+        compileOnly("org.apache.commons:commons-lang3:3.22.0")
     }
 
     // Test dependencies
