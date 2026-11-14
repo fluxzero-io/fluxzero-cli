@@ -70,7 +70,7 @@ dependencies {
         }
     }
     testImplementation("io.fluxzero.idp:test-support:$fluxzeroIdpVersion")
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.6.6")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.6.7")
 
     testCompileOnly("org.projectlombok:lombok:$lombokVersion")
     testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")
