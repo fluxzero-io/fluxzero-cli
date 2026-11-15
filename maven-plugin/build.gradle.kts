@@ -137,7 +137,7 @@ dependencies {
     // Keep the provided API floor without resolving its vulnerable old utilities.
     // Revisit these constraints when the supported Maven API floor advances.
     constraints {
-        compileOnly("org.codehaus.plexus:plexus-utils:4.1.0")
+        compileOnly("org.codehaus.plexus:plexus-utils:4.2.0")
         compileOnly("org.apache.commons:commons-lang3:3.22.0")
     }
 
@@ -146,8 +146,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.5.1")
-    testImplementation("org.apache.maven:maven-core:3.10.0")
-    testImplementation("org.apache.maven:maven-compat:3.10.0")
+    testImplementation("org.apache.maven:maven-core:3.10.1")
+    testImplementation("org.apache.maven:maven-compat:3.10.1")
 }
 
 // Copy compiled classes to Maven's expected location (target/classes)
