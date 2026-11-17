@@ -5,6 +5,7 @@ import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.ByteByReference;
 import com.sun.jna.ptr.PointerByReference;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.Optional;
 /** Security.framework integration. Secrets cross the native boundary in memory, never in process arguments. */
 final class MacKeychainStore implements SecureCredentialStore {
     private static final String SERVICE = "io.fluxzero.local-account.v1";
+    private static final Object INTERACTION_LOCK = new Object();
     // Lazy loading keeps credential access and native library initialization out of local startup/status.
     private static final class Api {
         static final Security SECURITY = Native.load("Security", Security.class);
@@ -26,6 +28,8 @@ final class MacKeychainStore implements SecureCredentialStore {
         int SecItemAdd(Pointer attributes, PointerByReference result);
         int SecItemUpdate(Pointer query, Pointer attributes);
         int SecItemDelete(Pointer query);
+        int SecKeychainGetUserInteractionAllowed(ByteByReference state);
+        int SecKeychainSetUserInteractionAllowed(byte state);
     }
     interface CoreFoundation extends Library {
         Pointer CFStringCreateWithCString(Pointer allocator, String value, int encoding);
@@ -38,40 +42,58 @@ final class MacKeychainStore implements SecureCredentialStore {
     }
 
     public Optional<byte[]> read(String key, boolean interactive) {
-        try (Query query = new Query(key, interactive)) {
-            query.put("kSecReturnData", Api.CF_LIBRARY.getGlobalVariableAddress("kCFBooleanTrue").getPointer(0));
-            var result = new PointerByReference();
-            int status = Api.SECURITY.SecItemCopyMatching(query.dictionary, result);
-            if (status == -25300) return Optional.empty();
-            check(status);
-            Pointer data = result.getValue();
-            try {
-                long length = Api.CF.CFDataGetLength(data).longValue();
-                if (length < 0 || length > 65536) throw unavailable();
-                return Optional.of(Api.CF.CFDataGetBytePtr(data).getByteArray(0, (int) length));
-            } finally { Api.CF.CFRelease(data); }
-        } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        synchronized (INTERACTION_LOCK) {
+            try (Interaction ignored = new Interaction(interactive); Query query = new Query(key, interactive)) {
+                query.put("kSecReturnData", Api.CF_LIBRARY.getGlobalVariableAddress("kCFBooleanTrue").getPointer(0));
+                var result = new PointerByReference();
+                int status = Api.SECURITY.SecItemCopyMatching(query.dictionary, result);
+                if (status == -25300) return Optional.empty();
+                check(status);
+                Pointer data = result.getValue();
+                try {
+                    long length = Api.CF.CFDataGetLength(data).longValue();
+                    if (length < 0 || length > 65536) throw unavailable();
+                    return Optional.of(Api.CF.CFDataGetBytePtr(data).getByteArray(0, (int) length));
+                } finally { Api.CF.CFRelease(data); }
+            } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        }
     }
 
     public void write(String key, byte[] value, boolean interactive) {
         if (value.length > 65536) throw unavailable();
-        try (Query query = new Query(key, interactive); Query attributes = new Query()) {
-            attributes.put("kSecValueData", attributes.owned(Api.CF.CFDataCreate(null, value, new NativeLong(value.length))));
-            int status = Api.SECURITY.SecItemUpdate(query.dictionary, attributes.dictionary);
-            if (status == -25300) {
-                query.put("kSecValueData", attributes.values.getLast());
-                query.put("kSecAttrAccessible", constant("kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly"));
-                status = Api.SECURITY.SecItemAdd(query.dictionary, null);
-            }
-            check(status);
-        } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        synchronized (INTERACTION_LOCK) {
+            try (Interaction ignored = new Interaction(interactive); Query query = new Query(key, interactive); Query attributes = new Query()) {
+                attributes.put("kSecValueData", attributes.owned(Api.CF.CFDataCreate(null, value, new NativeLong(value.length))));
+                int status = Api.SECURITY.SecItemUpdate(query.dictionary, attributes.dictionary);
+                if (status == -25300) {
+                    query.put("kSecValueData", attributes.values.getLast());
+                    query.put("kSecAttrAccessible", constant("kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly"));
+                    status = Api.SECURITY.SecItemAdd(query.dictionary, null);
+                }
+                check(status);
+            } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        }
     }
 
     public void delete(String key, boolean interactive) {
-        try (Query query = new Query(key, interactive)) {
-            int status = Api.SECURITY.SecItemDelete(query.dictionary);
-            if (status != -25300) check(status);
-        } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        synchronized (INTERACTION_LOCK) {
+            try (Interaction ignored = new Interaction(interactive); Query query = new Query(key, interactive)) {
+                int status = Api.SECURITY.SecItemDelete(query.dictionary);
+                if (status != -25300) check(status);
+            } catch (UnsatisfiedLinkError | NoClassDefFoundError e) { throw unavailable(); }
+        }
+    }
+
+    /** The login keychain's application ACL prompts also require the process-wide interaction policy. */
+    private static final class Interaction implements AutoCloseable {
+        private final byte previous;
+        Interaction(boolean interactive) {
+            var state = new ByteByReference();
+            check(Api.SECURITY.SecKeychainGetUserInteractionAllowed(state));
+            previous = state.getValue();
+            check(Api.SECURITY.SecKeychainSetUserInteractionAllowed((byte) (interactive ? 1 : 0)));
+        }
+        @Override public void close() {check(Api.SECURITY.SecKeychainSetUserInteractionAllowed(previous));}
     }
 
     private static Pointer constant(String name) { return Api.SECURITY_LIBRARY.getGlobalVariableAddress(name).getPointer(0); }

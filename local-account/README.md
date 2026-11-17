@@ -49,6 +49,10 @@ The macOS adapter calls Security.framework directly. Tokens and the private DPoP
 subprocess arguments, project files, browser storage or diagnostics. The first explicit access from a different
 executable can require macOS approval. There is no plaintext fallback. Other platforms currently return a scoped
 storage-unavailable result when credentials are needed; ordinary local development and cached status remain usable.
+For the macOS login keychain, the adapter also scopes the process interaction policy around each serialized
+operation and restores its previous value. This covers application access prompts in addition to authentication
+prompts. Background operations fail with a recoverable storage issue; Devboard offers an explicit Unlock secure
+storage action rather than opening an unsolicited dialog or keeping a sign-out spinner waiting for OS approval.
 
 All configuration is user/process-level. Never derive an issuer or account resource from an untrusted project.
 System properties use `fluxzero.account.<name>`; environment equivalents are:

@@ -16,7 +16,11 @@ import java.util.function.Function;
 /** Non-secret account projection and bounded cross-process coordination, independent from project state. */
 final class AccountRepository {
     record State(int version, long generation, String credentialKey, String subject, String name, String email,
-                 long expiresAt, boolean renewable, String operationId, long loginDeadline, String message) {
+                 long expiresAt, boolean renewable, String operationId, long loginDeadline, String message, String issue) {
+        State(int version, long generation, String credentialKey, String subject, String name, String email,
+              long expiresAt, boolean renewable, String operationId, long loginDeadline, String message) {
+            this(version,generation,credentialKey,subject,name,email,expiresAt,renewable,operationId,loginDeadline,message,null);
+        }
         static State empty() { return new State(1, 0, null, null, null, null, 0, false, null, 0, null); }
         State signedOut(String message) { return new State(1, generation + 1, null, null, null, null, 0, false, null, 0, message); }
     }
@@ -74,7 +78,7 @@ final class AccountRepository {
                 configuration.environment(), state.expiresAt, state.renewable,
                 "signing_in".equals(status) ? state.operationId : null, state.message,
                 configuration.dashboardUrl().toString(), configuration.sessionsUrl().toString(),
-                browserAction(state) == null ? null : "sign_out_everywhere");
+                browserAction(state) == null ? null : "sign_out_everywhere",state.issue());
     }
 
     <T> T locked(String name, Function<State, T> action) {

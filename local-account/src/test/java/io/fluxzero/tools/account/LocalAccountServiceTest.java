@@ -140,6 +140,24 @@ class LocalAccountServiceTest {
             assertNull(other.status().message());
         }
     }
+
+    @Test void lockedBackgroundStorageEndsProgressAndOffersExplicitRecoveryWithoutRemovingCredentials() throws Exception {
+        start(true);login();
+        var opened = new java.util.concurrent.LinkedBlockingQueue<URI>();
+        try (var other = new LocalAccountService(configuration,store,opened::add)) {
+            other.startLogoutEverywhere();
+            var parameters=query(opened.poll(5,TimeUnit.SECONDS).getRawQuery());
+            store.readLocked=true;sessionRevoked.set(true);
+            completeSignOut(parameters,"completed");
+            awaitNoBrowserAction(other);
+            assertEquals("signed_in",other.status().state());
+            assertEquals("storage_locked",other.status().issue());
+            assertEquals(1,store.values.size());
+            store.readLocked=false;
+            assertEquals("signed_out",other.checkSession(true).state());
+            assertNull(other.status().issue());
+        }
+    }
     private static void awaitNoBrowserAction(LocalAccountService account) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
         while (account.status().pendingAction() != null && System.nanoTime() < deadline) Thread.sleep(10);
@@ -460,8 +478,12 @@ class LocalAccountServiceTest {
     private static final class MemoryStore implements SecureCredentialStore {
         final Map<String, byte[]> values = new ConcurrentHashMap<>();
         final AtomicInteger reads = new AtomicInteger(), writes = new AtomicInteger();
-        boolean locked, failAfterWrite;
-        public Optional<byte[]> read(String key, boolean interactive) { reads.incrementAndGet(); return Optional.ofNullable(values.get(key)).map(byte[]::clone); }
+        boolean locked, failAfterWrite, readLocked;
+        public Optional<byte[]> read(String key, boolean interactive) {
+            reads.incrementAndGet();
+            if(readLocked) throw new AccountException("storage_locked","Unlock secure storage to continue.");
+            return Optional.ofNullable(values.get(key)).map(byte[]::clone);
+        }
         public void write(String key, byte[] value, boolean interactive) {
             writes.incrementAndGet();
             if (locked) throw new AccountException("storage_locked", "Allow access to your secure account storage to continue signing in.");

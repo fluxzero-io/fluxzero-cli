@@ -293,6 +293,7 @@ public final class LocalAccountService implements AutoCloseable {
 
     private void performLogoutEverywhere(AccountRepository.BrowserAction action) {
         String message = "Sign-out wasn't completed. Please try again.";
+        String issue = null;
         try (var callback = new AccountLogoutCallback(action.id())) {
             String query = AccountHttp.form(Map.of("action", "sign-out-everywhere", "completion_uri", callback.uri().toString(), "state", action.id()));
             browser.open(URI.create(configuration.sessionsUrl() + (configuration.sessionsUrl().getQuery() == null ? "?" : "&") + query));
@@ -321,18 +322,22 @@ public final class LocalAccountService implements AutoCloseable {
                 break;
             }
         } catch (InterruptedException ignored) {Thread.currentThread().interrupt();}
-        catch (AccountException failure) {repository.recordFailure(failure.code());message = failure.getMessage();}
+        catch (AccountException failure) {
+            repository.recordFailure(failure.code());issue = failure.code();
+            message = "storage_locked".equals(issue) ? "Unlock secure storage to finish signing out." : failure.getMessage();
+        }
         catch (Exception ignored) { /* Keep the recoverable account message scoped to this explicit operation. */ }
         finally {
             if (!closed) {
                 String notice = message;
+                String recovery = issue;
                 repository.locked("state", state -> {
                     var pending = repository.browserAction(state);
                     if (pending != null && action.id().equals(pending.id()) || pending == null
                             && state.generation() == action.generation() && java.util.Objects.equals(state.credentialKey(), action.credentialKey())
                             && Instant.now().getEpochSecond() >= action.expiresAt()) {
                         repository.write(new AccountRepository.State(1, state.generation(), state.credentialKey(), state.subject(),
-                                state.name(), state.email(), state.expiresAt(), state.renewable(), state.operationId(), state.loginDeadline(), notice));
+                                state.name(), state.email(), state.expiresAt(), state.renewable(), state.operationId(), state.loginDeadline(), notice, recovery));
                         repository.writeBrowserAction(null);
                     }
                     return null;
