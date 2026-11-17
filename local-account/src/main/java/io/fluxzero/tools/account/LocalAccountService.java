@@ -260,7 +260,7 @@ public final class LocalAccountService implements AutoCloseable {
                 } catch (AccountException e) {
                     if ("sign_in_required".equals(e.code())) repository.locked("state", current -> {
                         if (current.generation() == state.generation() && java.util.Objects.equals(current.credentialKey(), state.credentialKey())) {
-                            repository.write(current.signedOut(e.getMessage())); discard(current.credentialKey());
+                            repository.write(current.signedOut(repository.browserAction(current) == null ? e.getMessage() : null)); discard(current.credentialKey());
                         }
                         return null;
                     });
@@ -271,25 +271,84 @@ public final class LocalAccountService implements AutoCloseable {
         } catch (AccountException e) { throw e; }
     }
 
-    /** Opens existing IDP session management; global confirmation stays in the authenticated browser. */
-    public AccountStatus startLogoutEverywhere() {
-        var expected = repository.locked("state", state -> {
+    /** Opens a focused confirmation backed by the IDP's existing browser-authenticated logout-all action. */
+    public synchronized AccountStatus startLogoutEverywhere() {
+        if (closed) throw new AccountException("account_closed", "This account connection has closed. Try again from an active Devboard or CLI.");
+        repository.locked("state", state -> {
             if (state.credentialKey() == null || state.operationId() != null && state.loginDeadline() > Instant.now().getEpochSecond())
                 throw new AccountException("sign_in_required", "Sign in before managing your signed-in devices.");
-            repository.writeBrowserAction(new AccountRepository.BrowserAction(1, UUID.randomUUID().toString(),
+            var pending = repository.browserAction(state);
+            if (pending != null) return pending;
+            var action = new AccountRepository.BrowserAction(1, UUID.randomUUID().toString(),
                     "sign_out_everywhere", state.generation(), state.credentialKey(),
-                    Instant.now().plus(configuration.loginTimeout()).getEpochSecond()));
-            return state;
+                    Instant.now().plus(configuration.loginTimeout()).getEpochSecond());
+            repository.write(new AccountRepository.State(1, state.generation(), state.credentialKey(), state.subject(),
+                    state.name(), state.email(), state.expiresAt(), state.renewable(), null, 0, null));
+            repository.writeBrowserAction(action);
+            worker.execute(() -> performLogoutEverywhere(action));
+            return action;
         });
-        try { browser.open(configuration.sessionsUrl()); }
-        catch (RuntimeException failure) {
-            repository.locked("state", current -> {
-                if (current.generation() == expected.generation()) repository.writeBrowserAction(null);
-                return null;
-            });
-            throw failure;
-        }
         return status();
+    }
+
+    private void performLogoutEverywhere(AccountRepository.BrowserAction action) {
+        String message = "Sign-out wasn't completed. Please try again.";
+        try (var callback = new AccountLogoutCallback(action.id())) {
+            String query = AccountHttp.form(Map.of("action", "sign-out-everywhere", "completion_uri", callback.uri().toString(), "state", action.id()));
+            browser.open(URI.create(configuration.sessionsUrl() + (configuration.sessionsUrl().getQuery() == null ? "?" : "&") + query));
+            long nextCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+            while (!closed && Instant.now().getEpochSecond() < action.expiresAt()) {
+                var current = repository.browserAction(repository.read());
+                if (current == null || !action.id().equals(current.id())) return;
+                String outcome = callback.await();
+                if (outcome == null) {
+                    // Also finish if the browser was closed after confirmation or followed an upstream logout.
+                    if (System.nanoTime() >= nextCheck) {
+                        try {if (confirmNativeSignOut(action)) return;}
+                        catch (AccountException ignored) { /* Preserve access while waiting for the user's browser. */ }
+                        nextCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+                    }
+                    continue;
+                }
+                if ("cancelled".equals(outcome)) {message = "Sign-out cancelled.";break;}
+                // The browser supplies only a hint. Verify this native account, including asynchronous revocation.
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                do {
+                    if (confirmNativeSignOut(action)) return;
+                    Thread.sleep(250);
+                } while (!closed && System.nanoTime() < deadline);
+                message = "Sign-out could not be confirmed for this account. Please try again.";
+                break;
+            }
+        } catch (InterruptedException ignored) {Thread.currentThread().interrupt();}
+        catch (AccountException failure) {repository.recordFailure(failure.code());message = failure.getMessage();}
+        catch (Exception ignored) { /* Keep the recoverable account message scoped to this explicit operation. */ }
+        finally {
+            if (!closed) {
+                String notice = message;
+                repository.locked("state", state -> {
+                    var pending = repository.browserAction(state);
+                    if (pending != null && action.id().equals(pending.id()) || pending == null
+                            && state.generation() == action.generation() && java.util.Objects.equals(state.credentialKey(), action.credentialKey())
+                            && Instant.now().getEpochSecond() >= action.expiresAt()) {
+                        repository.write(new AccountRepository.State(1, state.generation(), state.credentialKey(), state.subject(),
+                                state.name(), state.email(), state.expiresAt(), state.renewable(), state.operationId(), state.loginDeadline(), notice));
+                        repository.writeBrowserAction(null);
+                    }
+                    return null;
+                });
+            }
+        }
+    }
+
+    private boolean confirmNativeSignOut(AccountRepository.BrowserAction action) {
+        if (!"signed_out".equals(checkSession(false).state())) return false;
+        repository.locked("state", state -> {
+            if (state.generation() == action.generation() + 1 && state.credentialKey() == null && state.operationId() == null)
+                repository.write(new AccountRepository.State(1, state.generation(), null, null, null, null, 0, false, null, 0, null));
+            return null;
+        });
+        return true;
     }
 
     public AccountStatus cancelBrowserAction() {
@@ -438,7 +497,7 @@ public final class LocalAccountService implements AutoCloseable {
         if (!json.path(field).isTextual() || json.path(field).asText().isBlank()) throw invalidService();
         return json.path(field).asText();
     }
-    private static Map<String, String> query(String raw) {
+    static Map<String, String> query(String raw) {
         if (raw == null || raw.length() > 16384) throw new IllegalArgumentException();
         Map<String, String> result = new LinkedHashMap<>();
         for (String parameter : raw.split("&")) {
@@ -452,7 +511,7 @@ public final class LocalAccountService implements AutoCloseable {
     private void requireCurrent(AccountRepository.State expected) {
         if (closed || repository.read().generation() != expected.generation()) throw new java.util.concurrent.CancellationException();
     }
-    private static String callbackPage(String message) {
+    static String callbackPage(String message) {
         return """
                 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
                 <title>Return to local development</title><style>

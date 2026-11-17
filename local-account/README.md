@@ -27,11 +27,16 @@ outside that window the existing replay/revocation policy applies.
 or refresh cannot restore it. Online revocation targets that delegated session; failure or offline operation
 produces a separate notice that server revocation was not confirmed. Logout does not open credential dialogs.
 
-`startLogoutEverywhere()` opens the configured account session manager. Global sign-out requires confirmation
-in that authenticated browser. Its bounded, non-secret pending action is shared between local surfaces.
+`startLogoutEverywhere()` opens a focused confirmation at the configured account session manager. Global sign-out
+uses the IDP's existing browser session and CSRF-protected logout-all action; native profile tokens gain no new authority.
+Its bounded, non-secret pending action is shared between local surfaces. A temporary loopback listener receives only
+a correlated completion/cancellation hint at `/fluxzero/account/logout/callback`. This hint carries no credentials
+and never proves revocation. The existing account worker verifies the native session after completion and closes
+the listener on completion, cancellation, timeout or shutdown. Status readers only observe metadata; they do not
+open secure storage or contact the issuer. No manual waiting or checking controls are needed in Devboard.
 `checkSession(interactive)` explicitly verifies this native session through DPoP-protected UserInfo and clears
 it only after confirmed expiry or revocation. Network and storage errors preserve the session. Background return
-checks use `interactive=false`, so they cannot open Keychain dialogs. `cancelBrowserAction()` stops local waiting;
+checks use `interactive=false`, so they cannot open Keychain dialogs. `cancelBrowserAction()` remains a compatibility action;
 it cannot undo a server-side sign-out. Passive `status()` remains local and never performs this check.
 
 CLI equivalents are `fz auth login`, `fz auth login --use-another-account`, `fz auth status --json`,

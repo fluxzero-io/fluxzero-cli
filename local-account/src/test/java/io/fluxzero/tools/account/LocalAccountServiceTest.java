@@ -81,22 +81,69 @@ class LocalAccountServiceTest {
         assertTrue(store.values.isEmpty());
     }
 
-    @Test void browserSignOutKeepsLocalAccessUntilTheIssuerConfirmsItsRevocation() throws Exception {
+    @Test void browserSignOutCompletesAutomaticallyAndCancellationPreservesTheAccount() throws Exception {
         start(true); login();
-        var accountBrowser = new AtomicReference<URI>();
-        try (var other = new LocalAccountService(configuration, store, accountBrowser::set)) {
+        var opened = new java.util.concurrent.LinkedBlockingQueue<URI>();
+        try (var other = new LocalAccountService(configuration, store, opened::add)) {
             assertEquals("sign_out_everywhere", other.startLogoutEverywhere().pendingAction());
-            assertEquals(configuration.sessionsUrl(), accountBrowser.get());
+            var destination = opened.poll(5, TimeUnit.SECONDS);
+            assertNotNull(destination);
+            assertEquals(configuration.sessionsUrl().getPath(), destination.getPath());
+            var parameters = query(destination.getRawQuery());
+            assertEquals("sign-out-everywhere", parameters.get("action"));
             assertEquals("sign_out_everywhere", service.status().pendingAction());
-            assertEquals("signed_in", other.checkSession(false).state());
-            assertEquals("signed_in", other.cancelBrowserAction().state());
-            assertNull(service.status().pendingAction());
+            completeSignOut(parameters, "cancelled");
+            awaitNoBrowserAction(other);
+            assertEquals("signed_in", other.status().state());
+            assertEquals("Sign-out cancelled.", other.status().message());
             other.startLogoutEverywhere();
+            assertNull(other.status().message());
+            parameters = query(opened.poll(5, TimeUnit.SECONDS).getRawQuery());
+            // A completion hint alone must never sign out a different/still-active account.
+            completeSignOut(parameters, "completed");
+            assertEquals("signed_in", other.status().state());
             sessionRevoked.set(true);
-            assertEquals("signed_out", other.checkSession(false).state());
+            awaitNoBrowserAction(other);
             assertEquals("signed_out", service.status().state());
+            assertNull(service.status().message());
             assertTrue(store.values.isEmpty());
         }
+    }
+
+    private static void completeSignOut(Map<String,String> parameters, String outcome) throws Exception {
+        var target = URI.create(parameters.get("completion_uri") + "?state=" + parameters.get("state") + "&outcome=" + outcome);
+        assertEquals(200, HttpClient.newHttpClient().send(HttpRequest.newBuilder(target).GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode());
+    }
+
+    @Test void completedBrowserHintCannotSignOutAnUnrevokedNativeAccount() throws Exception {
+        start(true);login();
+        var opened = new java.util.concurrent.LinkedBlockingQueue<URI>();
+        try (var other = new LocalAccountService(configuration, store, opened::add)) {
+            other.startLogoutEverywhere();
+            completeSignOut(query(opened.poll(5, TimeUnit.SECONDS).getRawQuery()), "completed");
+            awaitNoBrowserAction(other);
+            assertEquals("signed_in",other.status().state());
+            assertEquals(1,store.values.size());
+            assertTrue(other.status().message().contains("could not be confirmed"));
+        }
+    }
+
+    @Test void browserClosureAfterServerRevocationDoesNotLeaveTheUserWaiting() throws Exception {
+        start(true);login();
+        var opened = new CountDownLatch(1);
+        try (var other = new LocalAccountService(configuration, store, uri -> opened.countDown())) {
+            other.startLogoutEverywhere();
+            assertTrue(opened.await(5,TimeUnit.SECONDS));
+            sessionRevoked.set(true); // The browser closes without delivering the optional completion hint.
+            awaitNoBrowserAction(other);
+            assertEquals("signed_out",other.status().state());
+            assertNull(other.status().message());
+        }
+    }
+    private static void awaitNoBrowserAction(LocalAccountService account) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+        while (account.status().pendingAction() != null && System.nanoTime() < deadline) Thread.sleep(10);
+        assertNull(account.status().pendingAction());
     }
 
     @Test void failedBrowserSignOutCheckPreservesCredentialsAndPendingAction() throws Exception {
