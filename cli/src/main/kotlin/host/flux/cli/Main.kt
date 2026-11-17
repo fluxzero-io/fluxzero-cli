@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.github.ajalt.mordant.rendering.Widget
 import com.github.ajalt.mordant.table.verticalLayout
 import host.flux.cli.commands.Init
+import host.flux.cli.commands.Auth
 import host.flux.cli.commands.Dev
 import host.flux.cli.commands.Mcp
 import host.flux.cli.commands.Upgrade
@@ -65,6 +66,7 @@ fun main(args: Array<String>) {
         FluxCli()
             .subcommands(
                 Init(),
+                Auth(),
                 Dev(),
                 Templates(),
                 Upgrade(),
@@ -83,6 +85,7 @@ internal fun shouldCheckForUpdates(args: Array<String>): Boolean = args.none { i
     "--version",
     "version",
     "upgrade",
+    "auth",
 )
 
 private class CommandFirstHelpFormatter(context: Context) : MordantHelpFormatter(context) {

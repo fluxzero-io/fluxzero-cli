@@ -1,0 +1,4 @@
+[
+  ["io.fluxzero.tools.account.MacKeychainStore$Security"],
+  ["io.fluxzero.tools.account.MacKeychainStore$CoreFoundation"]
+]

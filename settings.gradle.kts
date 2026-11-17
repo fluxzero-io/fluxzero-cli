@@ -12,6 +12,7 @@ rootProject.name = "fluxzero-cli"
 
 include("templates")
 include("cli")
+include("local-account")
 include("api")
 include("project-files")
 include("dev-launcher")
