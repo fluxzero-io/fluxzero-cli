@@ -60,7 +60,7 @@ configuration or the project wrapper only for explicit full-suite, CI, or fallba
 ## Deployment
 
 The generated `.github/workflows/deploy-to-fluxzero-cloud.yml` matches the selected Maven or Gradle build. After this
-repository is connected to a Fluxzero organisation, run the workflow with a cluster and application name. GitHub OIDC
+repository is connected to a Fluxzero organisation on the Integrations page, run the workflow with a cluster and application name. GitHub OIDC
 provides short-lived credentials, so no API-key secret or organisation id is required.
 
 The workflow tests the project first, publishes a layered image with the Fluxzero build plugin, and deploys the same
