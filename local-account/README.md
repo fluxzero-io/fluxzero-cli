@@ -94,3 +94,14 @@ shared artifact before dependent clients, with macOS Intel and Apple Silicon qua
 `FLUXZERO_TEST_KEYCHAIN=true ./gradlew :local-account:test --tests '*MacKeychainStoreTest'` enables the opt-in
 real Keychain test. It creates and removes only its own synthetic item. Regular tests use an isolated in-memory
 store and a signed local HTTP fixture; no live issuer or email is used.
+
+## Local browser return pages
+
+`AccountBrowserContext` describes the initiating surface. `startLogin(boolean, context)` and
+`startLogoutEverywhere(context)` render local completion pages with embedded Devboard icons and no hosted assets.
+A Devboard context may contain only an HTTP loopback URL at the exact `/_fluxzero/dev/` path, without credentials
+or query parameters. The Dev Server also binds that destination to its verified request origin. Context remains
+in memory and never enters authorization parameters, account metadata or project files. The Open Devboard action
+uses the browser displaying this page; it does not claim to focus another browser or agent window.
+Terminal and agent contexts offer matching return guidance. Host-specific agent deep links require an explicit,
+supported integration and are never inferred from client names or accepted as arbitrary redirect URLs.
