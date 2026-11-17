@@ -47,6 +47,7 @@ class LocalAccountServiceTest {
     private final AtomicReference<String> tokenError = new AtomicReference<>();
     private final java.util.concurrent.atomic.AtomicBoolean dropRefreshReply = new java.util.concurrent.atomic.AtomicBoolean();
     private final java.util.List<String> presentedRefreshTokens = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.concurrent.atomic.AtomicBoolean sessionRevoked = new java.util.concurrent.atomic.AtomicBoolean();
     private AccountConfiguration configuration;
     private KeyPair signingKey;
 
@@ -78,6 +79,51 @@ class LocalAccountServiceTest {
         assertEquals(1, store.values.size());
         assertEquals("signed_out", service.logout().state());
         assertTrue(store.values.isEmpty());
+    }
+
+    @Test void browserSignOutKeepsLocalAccessUntilTheIssuerConfirmsItsRevocation() throws Exception {
+        start(true); login();
+        var accountBrowser = new AtomicReference<URI>();
+        try (var other = new LocalAccountService(configuration, store, accountBrowser::set)) {
+            assertEquals("sign_out_everywhere", other.startLogoutEverywhere().pendingAction());
+            assertEquals(configuration.sessionsUrl(), accountBrowser.get());
+            assertEquals("sign_out_everywhere", service.status().pendingAction());
+            assertEquals("signed_in", other.checkSession(false).state());
+            assertEquals("signed_in", other.cancelBrowserAction().state());
+            assertNull(service.status().pendingAction());
+            other.startLogoutEverywhere();
+            sessionRevoked.set(true);
+            assertEquals("signed_out", other.checkSession(false).state());
+            assertEquals("signed_out", service.status().state());
+            assertTrue(store.values.isEmpty());
+        }
+    }
+
+    @Test void failedBrowserSignOutCheckPreservesCredentialsAndPendingAction() throws Exception {
+        start(true); login();
+        try (var other = new LocalAccountService(configuration, store, uri -> {})) {
+            other.startLogoutEverywhere();
+            idp.stop(0);
+            assertEquals("offline", assertThrows(AccountException.class, () -> other.checkSession(false)).code());
+            assertEquals("signed_in", other.status().state());
+            assertEquals("sign_out_everywhere", other.status().pendingAction());
+            assertEquals(1, store.values.size());
+        }
+    }
+
+    @Test void switchingAccountRequestsFreshLoginAndCancellationPreservesExistingAccount() throws Exception {
+        start(true); login();
+        var opened = new CountDownLatch(1);
+        try (var other = new LocalAccountService(configuration, store, uri -> {authorization.set(query(uri.getRawQuery()));opened.countDown();})) {
+            authorization.set(null);
+            other.startLogin(true);
+            assertTrue(opened.await(5, TimeUnit.SECONDS));
+            assertNotNull(authorization.get());
+            assertEquals("login", authorization.get().get("prompt"));
+            other.cancelLogin();
+            assertEquals("signed_in", other.status().state());
+            assertEquals("Marty", other.status().displayName());
+        }
     }
 
     @Test void expiredSessionRenewsWithoutOpeningBrowserAndPreservesIdentity() throws Exception {
@@ -276,13 +322,21 @@ class LocalAccountServiceTest {
         configuration = config(issuer);
         idp.createContext("/.well-known/openid-configuration", exchange -> reply(exchange, 200, Map.of(
                 "issuer", issuer.toString(), "authorization_endpoint", issuer + "/authorize", "token_endpoint", issuer + "/token",
-                "jwks_uri", issuer + "/jwks", "revocation_endpoint", issuer + "/revoke")));
+                "jwks_uri", issuer + "/jwks", "revocation_endpoint", issuer + "/revoke", "userinfo_endpoint", issuer + "/userinfo")));
         idp.createContext("/jwks", exchange -> {
             var rsa = (RSAPublicKey) signingKey.getPublic();
             reply(exchange, 200, Map.of("keys", java.util.List.of(Map.of("kty", "RSA", "kid", "test", "alg", "RS256",
                     "n", unsigned(rsa.getModulus()), "e", unsigned(rsa.getPublicExponent())))));
         });
         idp.createContext("/revoke", exchange -> reply(exchange, 200, Map.of()));
+        idp.createContext("/userinfo", exchange -> {
+            assertEquals("DPoP access-secret", exchange.getRequestHeaders().getFirst("Authorization"));
+            String proof = exchange.getRequestHeaders().getFirst("DPoP");
+            var claims = AccountHttp.JSON.readTree(java.util.Base64.getUrlDecoder().decode(proof.split("\\.")[1]));
+            assertEquals(AccountCrypto.hash("access-secret"), claims.path("ath").asText());
+            assertEquals("GET", claims.path("htm").asText());
+            reply(exchange, sessionRevoked.get() ? 401 : 200, sessionRevoked.get() ? Map.of("error", "invalid_token") : Map.of("sub", subject.get()));
+        });
         idp.createContext("/token", exchange -> {
             requests.incrementAndGet();
             Map<String, String> form = query(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));

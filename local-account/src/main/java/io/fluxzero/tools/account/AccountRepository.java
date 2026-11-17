@@ -21,6 +21,31 @@ final class AccountRepository {
         State signedOut(String message) { return new State(1, generation + 1, null, null, null, null, 0, false, null, 0, message); }
     }
 
+    record BrowserAction(int version, String id, String kind, long generation, String credentialKey, long expiresAt) {}
+
+    BrowserAction browserAction(State state) {
+        Path file = directory.resolve("browser-action.json");
+        try {
+            if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 4096) return null;
+            var action = AccountHttp.JSON.readValue(Files.readAllBytes(file), BrowserAction.class);
+            return action.version() == 1 && "sign_out_everywhere".equals(action.kind())
+                    && action.generation() == state.generation() && java.util.Objects.equals(action.credentialKey(), state.credentialKey())
+                    && state.credentialKey() != null && action.expiresAt() > Instant.now().getEpochSecond() ? action : null;
+        } catch (Exception ignored) { return null; }
+    }
+
+    void writeBrowserAction(BrowserAction action) {
+        Path file = directory.resolve("browser-action.json");
+        if (action == null) {try {Files.deleteIfExists(file);} catch (java.io.IOException e) {throw unavailable();} return;}
+        Path temporary = directory.resolve("action-" + UUID.randomUUID() + ".tmp");
+        try {
+            Files.write(temporary, AccountHttp.JSON.writeValueAsBytes(action), StandardOpenOption.CREATE_NEW);
+            permissions(temporary, "rw-------");
+            Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) { throw unavailable(); }
+        finally {try {Files.deleteIfExists(temporary);} catch (java.io.IOException ignored) {}}
+    }
+
     private final AccountConfiguration configuration;
     private final Path directory;
     AccountRepository(AccountConfiguration configuration) {
@@ -47,7 +72,9 @@ final class AccountRepository {
                 : state.expiresAt > now || state.renewable ? "signed_in" : "sign_in_required";
         return new AccountStatus(status, state.name, state.email, configuration.accountUrl().toString(),
                 configuration.environment(), state.expiresAt, state.renewable,
-                "signing_in".equals(status) ? state.operationId : null, state.message);
+                "signing_in".equals(status) ? state.operationId : null, state.message,
+                configuration.dashboardUrl().toString(), configuration.sessionsUrl().toString(),
+                browserAction(state) == null ? null : "sign_out_everywhere");
     }
 
     <T> T locked(String name, Function<State, T> action) {

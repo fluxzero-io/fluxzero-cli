@@ -49,6 +49,10 @@ final class AccountCrypto {
     }
 
     static String proof(ProofKey key, URI target, String method, String nonce) {
+        return proof(key, target, method, nonce, null);
+    }
+
+    static String proof(ProofKey key, URI target, String method, String nonce, String accessToken) {
         try {
             Map<String, Object> claims = new LinkedHashMap<>();
             claims.put("jti", UUID.randomUUID().toString());
@@ -56,6 +60,7 @@ final class AccountCrypto {
             claims.put("htu", new URI(target.getScheme(), target.getAuthority(), target.getPath(), null, null).toString());
             claims.put("iat", Instant.now().getEpochSecond());
             if (nonce != null) claims.put("nonce", nonce);
+            if (accessToken != null) claims.put("ath", hash(accessToken));
             String unsigned = json(Map.of("typ", "dpop+jwt", "alg", "ES256", "jwk", key.jwk())) + "." + json(claims);
             Signature signer = Signature.getInstance("SHA256withECDSAinP1363Format");
             signer.initSign(KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(DECODE.decode(key.privateKey()))));

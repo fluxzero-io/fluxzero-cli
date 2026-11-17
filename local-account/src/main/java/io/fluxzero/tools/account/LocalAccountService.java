@@ -36,7 +36,7 @@ public final class LocalAccountService implements AutoCloseable {
                          String subject, long expiresAt, URI tokenEndpoint, URI revocationEndpoint) {
         @Override public String toString() { return "Account credentials [redacted]"; }
     }
-    record Endpoints(URI authorization, URI token, URI keys, URI revocation) {}
+    record Endpoints(URI authorization, URI token, URI keys, URI revocation, URI userInfo) {}
 
     public LocalAccountService(AccountConfiguration configuration, SecureCredentialStore store, BrowserLauncher browser) {
         this.configuration = configuration; this.store = store; this.browser = browser;
@@ -56,7 +56,10 @@ public final class LocalAccountService implements AutoCloseable {
     }
 
     /** Starts a bounded asynchronous login. No code, token, verifier or private key is returned. */
-    public synchronized AccountStatus startLogin() {
+    public AccountStatus startLogin() { return startLogin(false); }
+
+    /** Request a fresh identity ceremony instead of reusing browser SSO. */
+    public synchronized AccountStatus startLogin(boolean useAnotherAccount) {
         if (closed) throw new AccountException("account_closed", "This account connection has closed. Try again from an active Devboard or CLI.");
         createdOperation = null;
         AccountRepository.State state = repository.locked("state", previous -> {
@@ -72,7 +75,7 @@ public final class LocalAccountService implements AutoCloseable {
             // Only the process that owns this operation may run its callback; a second process merely observes it.
             if (ownedOperation == null && createdHere(state)) {
                 ownedOperation = state.operationId();
-                login = CompletableFuture.supplyAsync(() -> performLogin(state), worker);
+                login = CompletableFuture.supplyAsync(() -> performLogin(state, useAnotherAccount), worker);
             }
         }
         return repository.status(state);
@@ -112,7 +115,7 @@ public final class LocalAccountService implements AutoCloseable {
         return status();
     }
 
-    private AccountStatus performLogin(AccountRepository.State initial) {
+    private AccountStatus performLogin(AccountRepository.State initial, boolean useAnotherAccount) {
         ExecutorService callbackWorker = Executors.newSingleThreadExecutor(r -> {
             var thread = new Thread(r, "fluxzero-account-callback"); thread.setDaemon(true); return thread;
         });
@@ -161,6 +164,7 @@ public final class LocalAccountService implements AutoCloseable {
             request.put("state", state); request.put("nonce", nonce);
             request.put("code_challenge", AccountCrypto.hash(verifier)); request.put("code_challenge_method", "S256");
             request.put("dpop_jkt", key.thumbprint());
+            if (useAnotherAccount) request.put("prompt", "login");
             if (!configuration.resource().isBlank()) request.put("resource", configuration.resource());
             requireCurrent(initial);
             browser.open(URI.create(endpoints.authorization() + "?" + AccountHttp.form(request)));
@@ -174,7 +178,7 @@ public final class LocalAccountService implements AutoCloseable {
             var jwks = successful(http.get(endpoints.keys()));
             var identity = AccountCrypto.verifyIdentity(required(token, "id_token"), jwks, configuration, nonce, null);
             SecretSession session = session(token, key, identity.path("sub").asText(), endpoints, null);
-            install(initial, session, identity, false);
+            install(initial, session, identity, false, true);
         } catch (Exception e) { fail(initial, customerFailure(e)); }
         finally {
             HttpServer server = callbackServer.getAndSet(null);
@@ -198,13 +202,13 @@ public final class LocalAccountService implements AutoCloseable {
         throw new AccountException("login_timeout", "Sign-in timed out. Try signing in again.");
     }
 
-    private void install(AccountRepository.State expected, SecretSession session, JsonNode identity, boolean renewing) throws Exception {
+    private void install(AccountRepository.State expected, SecretSession session, JsonNode identity, boolean renewing, boolean interactive) throws Exception {
         if (closed || repository.read().generation() != expected.generation()) return;
         // Keychain updates are atomic. Keep the login's item during refresh so its OS access approvals survive.
         // A fresh login always gets a separate item, isolating late refresh writes from an account switch.
         String key = renewing ? expected.credentialKey() : configuration.storageId() + "-" + UUID.randomUUID();
         byte[] bytes = AccountHttp.JSON.writeValueAsBytes(session);
-        try { store.write(key, bytes, true); } finally { Arrays.fill(bytes, (byte) 0); }
+        try { store.write(key, bytes, interactive); } finally { Arrays.fill(bytes, (byte) 0); }
         boolean installed = false;
         try {
             installed = repository.locked("state", current -> {
@@ -222,14 +226,16 @@ public final class LocalAccountService implements AutoCloseable {
     }
 
     /** Explicit user action; local status never invokes renewal. */
-    public AccountStatus refresh() {
+    public AccountStatus refresh() { return refresh(true); }
+
+    private AccountStatus refresh(boolean interactive) {
         try {
             return repository.locked("refresh", ignored -> {
                 var state = repository.read();
                 if (state.credentialKey() == null) return status();
                 if (state.operationId() != null && state.loginDeadline() > Instant.now().getEpochSecond())
                     throw new AccountException("busy", "Finish or cancel your current sign-in first.");
-                SecretSession session = load(state, true);
+                SecretSession session = load(state, interactive);
                 if (session.expiresAt() > Instant.now().plusSeconds(30).getEpochSecond()) {
                     repository.locked("state", current -> {
                         if (current.generation() == state.generation() && java.util.Objects.equals(current.credentialKey(), state.credentialKey()))
@@ -250,7 +256,7 @@ public final class LocalAccountService implements AutoCloseable {
                     JsonNode identity = token.hasNonNull("id_token")
                             ? AccountCrypto.verifyIdentity(required(token, "id_token"), successful(http.get(endpoints.keys())), configuration, null, session.subject())
                             : AccountHttp.JSON.createObjectNode();
-                    install(state, session(token, session.proofKey(), session.subject(), endpoints, session.refreshToken()), identity, true);
+                    install(state, session(token, session.proofKey(), session.subject(), endpoints, session.refreshToken()), identity, true, interactive);
                 } catch (AccountException e) {
                     if ("sign_in_required".equals(e.code())) repository.locked("state", current -> {
                         if (current.generation() == state.generation() && java.util.Objects.equals(current.credentialKey(), state.credentialKey())) {
@@ -263,6 +269,66 @@ public final class LocalAccountService implements AutoCloseable {
                 return status();
             });
         } catch (AccountException e) { throw e; }
+    }
+
+    /** Opens existing IDP session management; global confirmation stays in the authenticated browser. */
+    public AccountStatus startLogoutEverywhere() {
+        var expected = repository.locked("state", state -> {
+            if (state.credentialKey() == null || state.operationId() != null && state.loginDeadline() > Instant.now().getEpochSecond())
+                throw new AccountException("sign_in_required", "Sign in before managing your signed-in devices.");
+            repository.writeBrowserAction(new AccountRepository.BrowserAction(1, UUID.randomUUID().toString(),
+                    "sign_out_everywhere", state.generation(), state.credentialKey(),
+                    Instant.now().plus(configuration.loginTimeout()).getEpochSecond()));
+            return state;
+        });
+        try { browser.open(configuration.sessionsUrl()); }
+        catch (RuntimeException failure) {
+            repository.locked("state", current -> {
+                if (current.generation() == expected.generation()) repository.writeBrowserAction(null);
+                return null;
+            });
+            throw failure;
+        }
+        return status();
+    }
+
+    public AccountStatus cancelBrowserAction() {
+        repository.locked("state", state -> { repository.writeBrowserAction(null); return null; });
+        return status();
+    }
+
+    /** Explicit account action. Passive status never validates credentials or contacts the issuer. */
+    public AccountStatus checkSession(boolean interactive) {
+        AccountRepository.State expected = repository.read();
+        if (expected.credentialKey() == null) return status();
+        try {
+            refresh(interactive);
+            return repository.locked("refresh", ignored -> {
+                var current = repository.read();
+                if (current.credentialKey() == null || current.generation() != expected.generation()) return status();
+                var session = load(current, interactive);
+                try (AccountHttp http = new AccountHttp()) {
+                    URI endpoint = endpoints(http).userInfo();
+                    if (endpoint == null) throw invalidService();
+                    var result = http.get(endpoint, session.accessToken(), AccountCrypto.proof(session.proofKey(), endpoint, "GET", null, session.accessToken()));
+                    if (result.status() == 401 && "invalid_token".equals(result.body().path("error").asText()))
+                        throw new AccountException("sign_in_required", "Your sign-in has ended. Sign in again when you need Cloud access.");
+                    JsonNode identity = successful(result);
+                    if (!identity.path("sub").isTextual() || !AccountCrypto.constantEquals(session.subject(), identity.path("sub").asText()))
+                        throw new AccountException("invalid_identity", "Your sign-in could not be verified. Please try signing in again.");
+                }
+                return status();
+            });
+        } catch (AccountException failure) {
+            if (!"sign_in_required".equals(failure.code())) throw failure;
+            repository.locked("state", current -> {
+                if (current.generation() == expected.generation() && java.util.Objects.equals(current.credentialKey(), expected.credentialKey())) {
+                    repository.write(current.signedOut(null)); discard(current.credentialKey());
+                }
+                return null;
+            });
+            return status();
+        }
     }
 
     public AccountStatus logout() {
@@ -327,7 +393,8 @@ public final class LocalAccountService implements AutoCloseable {
         JsonNode discovery = successful(http.get(URI.create(base + "/.well-known/openid-configuration")));
         if (!configuration.issuer().toString().equals(discovery.path("issuer").asText())) throw invalidService();
         return new Endpoints(endpoint(discovery, "authorization_endpoint"), endpoint(discovery, "token_endpoint"),
-                endpoint(discovery, "jwks_uri"), discovery.hasNonNull("revocation_endpoint") ? endpoint(discovery, "revocation_endpoint") : null);
+                endpoint(discovery, "jwks_uri"), discovery.hasNonNull("revocation_endpoint") ? endpoint(discovery, "revocation_endpoint") : null,
+                discovery.hasNonNull("userinfo_endpoint") ? endpoint(discovery, "userinfo_endpoint") : null);
     }
     private URI endpoint(JsonNode discovery, String name) {
         try {

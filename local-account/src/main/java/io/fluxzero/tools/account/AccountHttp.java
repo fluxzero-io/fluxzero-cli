@@ -28,6 +28,11 @@ final class AccountHttp implements AutoCloseable {
 
     Reply get(URI uri) { return send(HttpRequest.newBuilder(uri).GET().build()); }
 
+    Reply get(URI uri, String accessToken, String proof) {
+        return send(HttpRequest.newBuilder(uri).header("Authorization", "DPoP " + accessToken)
+                .header("DPoP", proof).GET().build());
+    }
+
     Reply post(URI uri, Map<String, String> fields, String proof) {
         var builder = HttpRequest.newBuilder(uri).header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(form(fields)));

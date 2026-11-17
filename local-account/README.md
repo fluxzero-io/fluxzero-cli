@@ -14,6 +14,7 @@ Construction and close do not initialize credential storage. Local development m
 The callback uses an available IPv4 loopback port and the exact `/fluxzero/account/callback` path. State, nonce,
 PKCE S256, signed ID-token verification and an ES256 DPoP key bind the exchange. Cancellation from another local
 surface invalidates the operation and releases the callback. No credential is returned through the public API.
+`startLogin(true)` requests a fresh sign-in with `prompt=login`; ordinary sign-in may reuse the browser's session.
 
 `refresh()` is an explicit account/Cloud action, never a startup or background-status operation. A process lock
 serializes renewal. Keychain atomically updates the existing login item, retaining its OS access approvals. A new
@@ -25,6 +26,17 @@ outside that window the existing replay/revocation policy applies.
 `logout()` clears the local reference and advances its generation before contacting the issuer. In-flight login
 or refresh cannot restore it. Online revocation targets that delegated session; failure or offline operation
 produces a separate notice that server revocation was not confirmed. Logout does not open credential dialogs.
+
+`startLogoutEverywhere()` opens the configured account session manager. Global sign-out requires confirmation
+in that authenticated browser. Its bounded, non-secret pending action is shared between local surfaces.
+`checkSession(interactive)` explicitly verifies this native session through DPoP-protected UserInfo and clears
+it only after confirmed expiry or revocation. Network and storage errors preserve the session. Background return
+checks use `interactive=false`, so they cannot open Keychain dialogs. `cancelBrowserAction()` stops local waiting;
+it cannot undo a server-side sign-out. Passive `status()` remains local and never performs this check.
+
+CLI equivalents are `fz auth login`, `fz auth login --use-another-account`, `fz auth status --json`,
+`fz auth status --check`, `fz auth status --refresh` and `fz auth logout`. Use `--check` to validate a remembered
+session explicitly; `--refresh` renews it when needed. No command prints tokens or keys.
 
 ## Storage and configuration
 
@@ -42,6 +54,8 @@ System properties use `fluxzero.account.<name>`; environment equivalents are:
 | `FLUXZERO_ACCOUNT_ISSUER` | `https://login.fluxzero.io` |
 | `FLUXZERO_ACCOUNT_CLIENT_ID` | `fluxzero-cli`, provisioned once by the platform |
 | `FLUXZERO_ACCOUNT_ACCOUNT_URL` | Issuer plus `/account` |
+| `FLUXZERO_ACCOUNT_SESSIONS_URL` | Issuer plus `/account/sessions` |
+| `FLUXZERO_ACCOUNT_DASHBOARD_URL` | `https://dashboard.fluxzero.io`; override explicitly for local Dashboard |
 | `FLUXZERO_ACCOUNT_RESOURCE` | Optional exact resource URI |
 | `FLUXZERO_ACCOUNT_DIRECTORY` | `~/.fluxzero/account`; private metadata and process locks |
 | `FLUXZERO_ACCOUNT_OFFLINE_ACCESS` | `false`; request the native client's consented refresh profile explicitly |
@@ -49,6 +63,8 @@ System properties use `fluxzero.account.<name>`; environment equivalents are:
 Use the same configuration when starting CLI, MCP and Devboards. Credential identity includes environment,
 issuer, client and resource. Only HTTPS or explicit loopback HTTP is accepted; discovery endpoints must belong
 to the configured issuer origin. Shared subject sectors are platform-provisioned, never selected by the CLI.
+System properties take precedence over environment variables, followed by the defaults above. The environment
+name separates storage; it does not automatically change the issuer or Dashboard URL.
 
 Metadata is versioned and replaced atomically with private filesystem permissions. Diagnostics contain only
 fixed application failure codes and timestamps. They never contain provider bodies or protocol credentials.

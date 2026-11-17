@@ -10,7 +10,7 @@ import java.util.Set;
 /** Non-secret, user-level configuration. Never load account authorities from project files. */
 public record AccountConfiguration(String environment, URI issuer, String clientId, String resource,
                                    URI accountUrl, Path directory, boolean requestOfflineAccess,
-                                   Duration loginTimeout) {
+                                   Duration loginTimeout, URI dashboardUrl, URI sessionsUrl) {
     public AccountConfiguration {
         if (environment == null || !environment.matches("[a-zA-Z0-9_-]{1,64}"))
             throw new IllegalArgumentException("Select a valid account environment.");
@@ -22,9 +22,18 @@ public record AccountConfiguration(String environment, URI issuer, String client
         if (resource == null) resource = "";
         if (!resource.isEmpty()) requireTrustedTransport(URI.create(resource));
         requireTrustedTransport(accountUrl);
+        requireTrustedTransport(dashboardUrl);
+        requireTrustedTransport(sessionsUrl);
         directory = directory.toAbsolutePath().normalize();
         if (loginTimeout.isNegative() || loginTimeout.isZero() || loginTimeout.compareTo(Duration.ofMinutes(10)) > 0)
             throw new IllegalArgumentException("The sign-in timeout must be between zero and ten minutes.");
+    }
+
+    /** Retains the initial component constructor for embedders. */
+    public AccountConfiguration(String environment, URI issuer, String clientId, String resource, URI accountUrl,
+                                Path directory, boolean requestOfflineAccess, Duration loginTimeout) {
+        this(environment, issuer, clientId, resource, accountUrl, directory, requestOfflineAccess, loginTimeout,
+                URI.create("https://dashboard.fluxzero.io"), URI.create(issuer.toString().replaceAll("/$", "") + "/account/sessions"));
     }
 
     /** Reading defaults does not access credentials, start processes or contact a server. */
@@ -34,7 +43,9 @@ public record AccountConfiguration(String environment, URI issuer, String client
         return new AccountConfiguration(environment, URI.create(issuer), setting("clientId", "fluxzero-cli"),
                 setting("resource", ""), URI.create(setting("accountUrl", issuer + "/account")),
                 Path.of(setting("directory", Path.of(System.getProperty("user.home"), ".fluxzero", "account").toString())),
-                Boolean.parseBoolean(setting("offlineAccess", "false")), Duration.ofMinutes(3));
+                Boolean.parseBoolean(setting("offlineAccess", "false")), Duration.ofMinutes(3),
+                URI.create(setting("dashboardUrl", "https://dashboard.fluxzero.io")),
+                URI.create(setting("sessionsUrl", issuer.replaceAll("/$", "") + "/account/sessions")));
     }
 
     private static String setting(String name, String fallback) {

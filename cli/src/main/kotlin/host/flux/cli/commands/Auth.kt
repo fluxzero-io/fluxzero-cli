@@ -18,12 +18,13 @@ class Auth : CliktCommand(name = "auth") {
 }
 
 private class AuthLogin : CliktCommand(name = "login") {
+    private val another by option("--use-another-account", help = "Request a fresh sign-in instead of reusing the browser session.").flag()
     private val json by option("--json", help = "Print account status as JSON. Credentials are never printed.").flag()
     override fun help(context: Context) = "Sign in using your browser; local development does not require an account"
     override fun run() {
         accountAction(json) { account ->
             if (!json) echo("Opening your browser to sign in to Fluxzero…")
-            account.startLogin()
+            account.startLogin(another)
             val status = account.awaitLogin()
             printStatus(status, json)
             if (status.state() != "signed_in" || status.message() != null) throw ProgramResult(1)
@@ -32,12 +33,13 @@ private class AuthLogin : CliktCommand(name = "login") {
 }
 
 private class AuthStatus : CliktCommand(name = "status") {
+    private val check by option("--check", help = "Explicitly verify the remembered session with Fluxzero.").flag()
     private val json by option("--json", help = "Print non-secret account status as JSON.").flag()
     private val refresh by option("--refresh", help = "Explicitly renew an expired sign-in using secure storage.").flag()
     override fun help(context: Context) = "Read local account status without contacting Cloud or opening credential dialogs"
     override fun run() {
         accountAction(json) { account ->
-            printStatus(if (refresh) account.refresh() else account.status(), json)
+            printStatus(if (check) account.checkSession(true) else if (refresh) account.refresh() else account.status(), json)
         }
     }
 }

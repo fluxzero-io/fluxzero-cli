@@ -1,5 +1,6 @@
 [
   {"name":"io.fluxzero.tools.account.AccountStatus","allDeclaredConstructors":true,"allDeclaredMethods":true},
+  {"name":"io.fluxzero.tools.account.AccountRepository$BrowserAction","allDeclaredConstructors":true,"allDeclaredMethods":true},
   {"name":"io.fluxzero.tools.account.AccountRepository$State","allDeclaredConstructors":true,"allDeclaredMethods":true},
   {"name":"io.fluxzero.tools.account.LocalAccountService$SecretSession","allDeclaredConstructors":true,"allDeclaredMethods":true},
   {"name":"io.fluxzero.tools.account.AccountCrypto$ProofKey","allDeclaredConstructors":true,"allDeclaredMethods":true},
