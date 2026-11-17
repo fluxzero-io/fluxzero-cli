@@ -362,7 +362,7 @@ class LocalAccountServiceTest {
             var response = http.send(HttpRequest.newBuilder(URI.create(callback + valid)).GET().build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, response.statusCode());
             assertTrue(response.body().contains("Return to local development"));
-            assertTrue(response.body().contains("terminal or Devboard"));
+            assertTrue(response.body().contains("continue in your terminal"));
             assertFalse(response.body().contains("test-code"));
             String script = response.body().split("<script>")[1].split("</script>")[0];
             String hash = Base64.getEncoder().encodeToString(java.security.MessageDigest.getInstance("SHA-256")

@@ -59,7 +59,10 @@ public final class LocalAccountService implements AutoCloseable {
     public AccountStatus startLogin() { return startLogin(false); }
 
     /** Request a fresh identity ceremony instead of reusing browser SSO. */
-    public synchronized AccountStatus startLogin(boolean useAnotherAccount) {
+    public AccountStatus startLogin(boolean useAnotherAccount) {return startLogin(useAnotherAccount, AccountBrowserContext.terminal());}
+
+    public synchronized AccountStatus startLogin(boolean useAnotherAccount, AccountBrowserContext context) {
+        java.util.Objects.requireNonNull(context);
         if (closed) throw new AccountException("account_closed", "This account connection has closed. Try again from an active Devboard or CLI.");
         createdOperation = null;
         AccountRepository.State state = repository.locked("state", previous -> {
@@ -75,7 +78,7 @@ public final class LocalAccountService implements AutoCloseable {
             // Only the process that owns this operation may run its callback; a second process merely observes it.
             if (ownedOperation == null && createdHere(state)) {
                 ownedOperation = state.operationId();
-                login = CompletableFuture.supplyAsync(() -> performLogin(state, useAnotherAccount), worker);
+                login = CompletableFuture.supplyAsync(() -> performLogin(state, useAnotherAccount, context), worker);
             }
         }
         return repository.status(state);
@@ -115,7 +118,7 @@ public final class LocalAccountService implements AutoCloseable {
         return status();
     }
 
-    private AccountStatus performLogin(AccountRepository.State initial, boolean useAnotherAccount) {
+    private AccountStatus performLogin(AccountRepository.State initial, boolean useAnotherAccount, AccountBrowserContext context) {
         ExecutorService callbackWorker = Executors.newSingleThreadExecutor(r -> {
             var thread = new Thread(r, "fluxzero-account-callback"); thread.setDaemon(true); return thread;
         });
@@ -140,15 +143,15 @@ public final class LocalAccountService implements AutoCloseable {
                     if (query.containsKey("iss") && !configuration.issuer().toString().equals(query.get("iss"))) throw new IllegalArgumentException();
                     if (query.containsKey("error")) {
                         code.completeExceptionally(new AccountException("cancelled", "Sign-in was not completed. You can try again whenever you need Cloud access."));
-                        text = "Sign-in was not completed. You can close this tab and return to your terminal or Devboard.";
+                        text = "Sign-in was not completed.";
                     } else if (!query.getOrDefault("code", "").isBlank() && code.complete(query.get("code"))) {
                         accepted = true;
-                        text = "You can close this tab and continue in your terminal or Devboard.";
+                        text = "";
                     }
                 } catch (RuntimeException ignored) {}
-                byte[] body = callbackPage(text).getBytes(StandardCharsets.UTF_8);
+                byte[] body = AccountBrowserPage.render(text, context).getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-                exchange.getResponseHeaders().set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-UxVXWyAt9U/Kult2HhuIFYy6Qb9b3amlNkkrXDu38Zg='; frame-ancestors 'none'");
+                exchange.getResponseHeaders().set("Content-Security-Policy", AccountBrowserPage.CSP);
                 exchange.getResponseHeaders().set("Cache-Control", "no-store");
                 exchange.getResponseHeaders().set("Referrer-Policy", "no-referrer");
                 exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
@@ -272,7 +275,10 @@ public final class LocalAccountService implements AutoCloseable {
     }
 
     /** Opens a focused confirmation backed by the IDP's existing browser-authenticated logout-all action. */
-    public synchronized AccountStatus startLogoutEverywhere() {
+    public AccountStatus startLogoutEverywhere() {return startLogoutEverywhere(AccountBrowserContext.terminal());}
+
+    public synchronized AccountStatus startLogoutEverywhere(AccountBrowserContext context) {
+        java.util.Objects.requireNonNull(context);
         if (closed) throw new AccountException("account_closed", "This account connection has closed. Try again from an active Devboard or CLI.");
         repository.locked("state", state -> {
             if (state.credentialKey() == null || state.operationId() != null && state.loginDeadline() > Instant.now().getEpochSecond())
@@ -285,16 +291,16 @@ public final class LocalAccountService implements AutoCloseable {
             repository.write(new AccountRepository.State(1, state.generation(), state.credentialKey(), state.subject(),
                     state.name(), state.email(), state.expiresAt(), state.renewable(), null, 0, null));
             repository.writeBrowserAction(action);
-            worker.execute(() -> performLogoutEverywhere(action));
+            worker.execute(() -> performLogoutEverywhere(action, context));
             return action;
         });
         return status();
     }
 
-    private void performLogoutEverywhere(AccountRepository.BrowserAction action) {
+    private void performLogoutEverywhere(AccountRepository.BrowserAction action, AccountBrowserContext context) {
         String message = "Sign-out wasn't completed. Please try again.";
         String issue = null;
-        try (var callback = new AccountLogoutCallback(action.id())) {
+        try (var callback = new AccountLogoutCallback(action.id(), context)) {
             String query = AccountHttp.form(Map.of("action", "sign-out-everywhere", "completion_uri", callback.uri().toString(), "state", action.id()));
             browser.open(URI.create(configuration.sessionsUrl() + (configuration.sessionsUrl().getQuery() == null ? "?" : "&") + query));
             long nextCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
@@ -515,17 +521,6 @@ public final class LocalAccountService implements AutoCloseable {
     private static AccountException invalidService() { return new AccountException("service_unavailable", "Sign-in could not be completed. Try again shortly; local development is still available."); }
     private void requireCurrent(AccountRepository.State expected) {
         if (closed || repository.read().generation() != expected.generation()) throw new java.util.concurrent.CancellationException();
-    }
-    static String callbackPage(String message) {
-        return """
-                <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-                <title>Return to local development</title><style>
-                :root{color-scheme:light dark;font-family:system-ui,sans-serif;background:#f3f6fa;color:#182635}
-                body{min-height:90vh;display:grid;place-items:center;margin:20px}main{max-width:420px;padding:36px;border:1px solid #cbd5e1;border-radius:16px;background:#fff}
-                .brand{font-size:16px;font-weight:650;color:#185a86}h1{font-size:24px;margin:24px 0 16px}p{line-height:1.6;margin:0}
-                @media(prefers-color-scheme:dark){:root{background:#111923;color:#e7edf5}main{background:#1b2634;border-color:#4b5d73}.brand{color:#9bd4f4}}
-                </style><main><div class="brand">Fluxzero</div><h1>Return to local development</h1><p>
-                """ + message + "</p></main><script>history.replaceState(null,'','/fluxzero/account/complete');</script></html>";
     }
     private static AccountException customerFailure(Exception error) {
         Throwable value = error;
