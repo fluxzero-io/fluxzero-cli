@@ -137,6 +137,7 @@ dependencies {
     // Keep the provided API floor without resolving its vulnerable old utilities.
     // Revisit these constraints when the supported Maven API floor advances.
     constraints {
+        compileOnly("com.google.guava:guava:33.7.2-jre")
         compileOnly("org.codehaus.plexus:plexus-utils:4.2.0")
         compileOnly("org.apache.commons:commons-lang3:3.22.0")
     }
