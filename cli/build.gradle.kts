@@ -16,7 +16,7 @@ dependencies {
     implementation(project(":publishing"))
     implementation(project(":dev-launcher"))
     implementation("com.fasterxml.jackson.core:jackson-databind:2.23.0")
-    implementation("com.github.ajalt.clikt:clikt:5.2.0")
+    implementation("com.github.ajalt.clikt:clikt:5.2.1")
     implementation("org.jline:jline:4.7.0")
 }
 
