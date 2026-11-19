@@ -1,6 +1,6 @@
-java temurin-25.0.5+8.0.LTS
+java temurin-25.0.5+100000002.0.LTS
 maven 3.10.0
 # renovate: datasource=gradle-version depName=gradle
 gradle 9.7.1
 # renovate: datasource=npm depName=wrangler
-wrangler 4.164.0
+wrangler 4.165.0
