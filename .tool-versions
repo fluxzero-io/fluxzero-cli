@@ -1,4 +1,4 @@
-java temurin-25.0.5+100000002.0.LTS
+java temurin-25.0.5.1+2.0.LTS
 maven 3.10.0
 # renovate: datasource=gradle-version depName=gradle
 gradle 9.7.1
