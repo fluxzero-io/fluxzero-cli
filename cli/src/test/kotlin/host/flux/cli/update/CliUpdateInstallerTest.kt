@@ -76,24 +76,20 @@ class CliUpdateInstallerTest {
     }
 
     private fun brewInfo(version: String = "1.2.4", pinned: Boolean = false) =
-        """{"formulae":[{"full_name":"fluxzero-io/tap/fluxzero","pinned":$pinned,"versions":{"stable":"$version"},"installed":[{"version":"1.2.3"}]}]}"""
+        """{"formulae":[{"full_name":"fluxzero-io/tap/fluxzero","pinned":$pinned,"options":[{"option":"--with-cli-update-guard"}],"versions":{"stable":"$version"},"installed":[{"version":"1.2.3"}]}]}"""
 
-    @Test fun `Homebrew checks pins and version before upgrading with metadata refresh disabled`() {
+    @Test fun `Homebrew upgrades by name with an install-time version guard`() {
         val target = directory.resolve("Cellar/fluxzero/1.2.3/bin/fz")
         val calls = mutableListOf<List<String>>()
-        val formula = directory.resolve("fluxzero.rb")
-        Files.writeString(formula, brewInfo())
         val service = installer(target, command = { command, env ->
             calls += command
             assertEquals("1", env["HOMEBREW_NO_AUTO_UPDATE"])
             assertEquals("1", env["HOMEBREW_NO_INSTALL_CLEANUP"])
             when (command[1]) {
-                "info" -> if (command.last().endsWith(".rb")) Files.readString(Path.of(command.last())) else brewInfo()
-                "formula" -> formula.toString()
+                "info" -> brewInfo()
                 "upgrade" -> {
-                    // Change the live tap between validation and install: only the frozen file may be used.
-                    Files.writeString(formula, brewInfo("2.0.0"))
-                    assertEquals(brewInfo(), Files.readString(Path.of(command.last())))
+                    assertEquals(listOf("brew", "upgrade", "--formula", "--with-cli-update-guard", "fluxzero-io/tap/fluxzero"), command)
+                    assertEquals("1.2.4", env["HOMEBREW_FLUXZERO_CLI_UPDATE_VERSION"])
                     ""
                 }
                 "--prefix" -> directory.toString()
@@ -104,6 +100,14 @@ class CliUpdateInstallerTest {
         assertContains(service.update("1.2.3"), "through Homebrew")
         assertEquals(1, calls.count { it.getOrNull(1) == "upgrade" })
         assertTrue(calls.indexOfFirst { it[1] == "update" } < calls.indexOfFirst { it[1] == "upgrade" })
+    }
+
+    @Test fun `an older Homebrew formula without the guard defers automatic installation`() {
+        val result = installer(directory.resolve("Cellar/fluxzero/1.2.3/bin/fz"), command = { command, _ ->
+            assertNotEquals("upgrade", command[1])
+            if (command[1] == "info") brewInfo().replace("--with-cli-update-guard", "--with-other-option") else ""
+        }).update("1.2.3")
+        assertContains(result, "update deferred")
     }
 
     @Test fun `Homebrew pins and a formula moving to another major skip installation`() {

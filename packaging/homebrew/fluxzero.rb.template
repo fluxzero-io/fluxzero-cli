@@ -24,7 +24,15 @@ class Fluxzero < Formula
     end
   end
 
+  option "with-cli-update-guard", "Check the version selected by the automatic CLI updater"
+
   def install
+    # Explicit brew upgrades do not set this variable, even if the option is retained in the receipt.
+    expected = ENV["HOMEBREW_FLUXZERO_CLI_UPDATE_VERSION"]
+    if expected && version.to_s != expected
+      raise "CLI update deferred: requested #{expected}, but Homebrew now offers #{version}"
+    end
+
     binary = if OS.mac?
       Hardware::CPU.arm? ? "flux-macos-arm64" : "flux-macos-amd64"
     else

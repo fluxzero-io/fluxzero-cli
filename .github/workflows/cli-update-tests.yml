@@ -25,7 +25,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [[ "$EVENT" == workflow_dispatch ]] || git diff --name-only "$BASE" HEAD | grep -Eq '^cli/|^dev-launcher/|^project-files/|^publishing/|(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^\.github/workflows/cli-update-tests\.yml$'; then
+          if [[ "$EVENT" == workflow_dispatch ]] || git diff --name-only "$BASE" HEAD | grep -Eq '^cli/|^dev-launcher/|^project-files/|^publishing/|^packaging/homebrew/|(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^\.github/workflows/cli-update-tests\.yml$'; then
             echo 'relevant=true' >> "$GITHUB_OUTPUT"
           else
             echo 'relevant=false' >> "$GITHUB_OUTPUT"
