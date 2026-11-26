@@ -141,9 +141,9 @@ Native image build is configured with:
 
 ## Dependency Maintenance Boundaries
 
-- `renovate.json` owns dependency discovery and supported-version boundaries. The injected starter versions are in `templates/template-versions.properties`; public Fluxzero lookups use Packages rather than Central alone.
+- `.mrpatch.yml` owns dependency discovery and supported-version boundaries; Renovate is explicitly disabled in `renovate.json`. The injected starter versions are in `templates/template-versions.properties`; public Fluxzero lookups use Packages rather than Central alone.
 - Release/candidate templates use their own plugin version. Keep the development fallback out of automatic self-updates to avoid a release/update loop; SDK and IDP dependencies remain independently maintained.
-- GitHub dependency alerts and automatic Gradle dependency submission are separate from Renovate update generation. Inspect a real submitted graph and the hosted updater results; an empty alert list alone is insufficient.
+- GitHub dependency alerts and automatic Gradle dependency submission are separate from Mr Patch update generation. Inspect a real submitted graph and the hosted updater results; an empty alert list alone is insufficient.
 - Keep the provided Maven API floor in `maven-plugin/build.gradle.kts` and `maven-plugin/pom.xml` aligned. Those interfaces are supplied by the consuming Maven runtime. Updating them can silently raise the generated descriptor's minimum Maven version; current test/runtime tooling can advance separately.
 - Run the existing owning publication and embedded-template scripts when changing build plugins or injected versions. Preserve signed main, sources, Javadoc and Gradle marker artifacts and verify independent consumers.
 - The required PR gates include applicable native builds and actual executable-update regressions. Unix native qualification also exercises JLine through a real pseudo-terminal; a noninteractive version command does not cover that path.

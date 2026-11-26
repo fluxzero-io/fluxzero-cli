@@ -1,1 +1,50 @@
-disabled: true
+version: 1
+defaults:
+  schedule: {cron: '0 * * * *', spread: 55m}
+  directories:
+    excludes: [templates/build/**, '**/test/resources/**']
+  ecosystems:
+    - package-ecosystem: github-actions
+      ignore:
+        # Keep the JVM 21 compatibility job while updating newer Java builders.
+        - {dependency-name: java-jdk, current-versions: ['21']}
+        # Retain the Node line already used by deployment and registry tooling.
+        - {dependency-name: node, versions: ['[27,)']}
+        # WinGetCreate still targets net9.0.
+        - {dependency-name: dotnet-sdk, versions: ['[10,)']}
+    - npm
+    - cargo
+    - gomod
+    - pip
+    - helm
+    - opentofu
+    - package-ecosystem: gradle
+      directory: /
+      ignore:
+        # Kotlin 2.4.21 is qualified through Gradle 9.7.
+        - {dependency-name: gradle, versions: ['[9.8,)']}
+        # Keep the provided Maven API floor; newer test dependencies may advance.
+        - {dependency-name: 'org.apache.maven:maven-plugin-api', current-versions: ['3.9.6']}
+        - {dependency-name: 'org.apache.maven:maven-core', current-versions: ['3.9.6']}
+    - package-ecosystem: maven
+      directory: /
+      ignore:
+        - {dependency-name: 'org.apache.maven:maven-plugin-api', current-versions: ['3.9.6']}
+        - {dependency-name: 'org.apache.maven:maven-core', current-versions: ['3.9.6']}
+        # Release/candidate builds inject the local plugin version.
+        - {dependency-name: 'io.fluxzero.tools:fluxzero-maven-plugin'}
+    - package-ecosystem: maven
+      directory: /maven-plugin/examples/spring-boot
+      ignore:
+        - {dependency-name: 'io.fluxzero.tools:fluxzero-maven-plugin'}
+        - {dependency-name: 'org.springframework.boot:spring-boot-starter-parent', versions: ['[4,)']}
+    - package-ecosystem: docker
+      ignore:
+        # The API image qualifies the Java 21 compatibility floor.
+        - {dependency-name: eclipse-temurin, update-types: ['version-update:semver-major']}
+    - package-ecosystem: custom
+      directory: /
+      ignore:
+        - {dependency-name: gradle, versions: ['[9.8,)']}
+        # Updating the development fallback would create a release loop.
+        - {dependency-name: 'io.fluxzero.tools:fluxzero-maven-plugin'}
