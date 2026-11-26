@@ -451,8 +451,9 @@ There is no scheduled job and no check while the CLI is unused.
 
 Homebrew and WinGet installations are updated through their package manager, preserving pins.
 Homebrew upgrades are deferred if its current formula differs from the selected release or
-if a Homebrew update opt-out is set. Validation and installation use one private formula
-copy inside the owning tap, so concurrent tap refreshes cannot change the chosen version.
+if a Homebrew update opt-out is set. The formula verifies the selected version before
+installation, so a concurrent tap refresh cannot silently install a different release.
+Older formulae without this guard defer automatic updates; explicit upgrades remain available.
 Old kegs are retained for running processes. WinGet uses
 the exact selected version without interactive prompts. Direct native and JAR installations
 require the release asset's SHA-256 digest and a successful version check before replacement.

@@ -117,6 +117,11 @@ tasks.check {
     dependsOn(verifyRunnableJar)
 }
 
+tasks.test {
+    inputs.file(rootProject.file("packaging/homebrew/fluxzero.rb.template"))
+    inputs.property("homebrewIntegration", providers.environmentVariable("FLUXZERO_TEST_HOMEBREW").orElse(""))
+}
+
 val greenfieldMcpE2e by tasks.registering(Test::class) {
     description = "Verifies greenfield MCP bootstrap with the release candidate CLI"
     group = "verification"

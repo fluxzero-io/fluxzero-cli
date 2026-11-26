@@ -96,31 +96,28 @@ internal class CliUpdateInstaller(
             .path("formulae").single { it.path("full_name").asText() == formula }
         if (info(formula).path("pinned").asBoolean()) return "Homebrew pin preserved"
         command(listOf("brew", "update"), env)
-        val source = Path.of(command(listOf("brew", "formula", formula), env).trim()).toRealPath()
-        // Keep the copy inside the owning tap so Homebrew preserves the formula identity and receipt.
-        val snapshot = Files.createTempDirectory(source.parent, ".fz-update-")
-        try {
-            val frozen = snapshot.resolve(source.fileName)
-            Files.copy(source, frozen)
-            val details = info(frozen.toString())
-            if (details.path("pinned").asBoolean()) return "Homebrew pin preserved"
-            if (CliVersion.parse(details.path("versions").path("stable").asText()) != CliVersion.parse(release.tag)) {
-                return "Homebrew does not currently offer the selected same-major release; update deferred"
-            }
-            val installedVersions = details.path("installed").mapNotNull { CliVersion.parse(it.path("version").asText()) }
-            if (installedVersions.any { it >= CliVersion.parse(release.tag)!! }) return "Homebrew installation is already current"
-            check(installedVersions.contains(CliVersion.parse(current))) { "Homebrew installation changed; update deferred" }
-            if (!allowed()) return "Automatic updates disabled"
-            // Both validation and installation use the same private file, never the mutable tap name.
-            command(listOf("brew", "upgrade", "--formula", frozen.toString()), env)
-            val prefix = command(listOf("brew", "--prefix", formula), env).trim()
-            check(CliVersion.parse(command(listOf(Path.of(prefix, "bin", "fz").toString(), "--version"), env).trim()) == CliVersion.parse(release.tag)) {
-                "Homebrew update could not be verified"
-            }
-            return "Fluxzero CLI updated to ${release.tag} through Homebrew"
-        } finally {
-            Files.walk(snapshot).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }
+        val details = info(formula)
+        if (details.path("pinned").asBoolean()) return "Homebrew pin preserved"
+        val target = release.tag.removePrefix("v")
+        if (CliVersion.parse(details.path("versions").path("stable").asText()) != CliVersion.parse(target)) {
+            return "Homebrew does not currently offer the selected same-major release; update deferred"
         }
+        val guard = "--with-cli-update-guard"
+        if (details.path("options").none { it.path("option").asText() == guard }) {
+            return "Homebrew formula does not support guarded automatic updates yet; update deferred"
+        }
+        val installedVersions = details.path("installed").mapNotNull { CliVersion.parse(it.path("version").asText()) }
+        if (installedVersions.any { it >= CliVersion.parse(target)!! }) return "Homebrew installation is already current"
+        check(installedVersions.contains(CliVersion.parse(current))) { "Homebrew installation changed; update deferred" }
+        if (!allowed()) return "Automatic updates disabled"
+        // The formula checks the selected version before writing files, including after a concurrent tap update.
+        command(listOf("brew", "upgrade", "--formula", guard, formula),
+            env + ("HOMEBREW_FLUXZERO_CLI_UPDATE_VERSION" to target))
+        val prefix = command(listOf("brew", "--prefix", formula), env).trim()
+        check(CliVersion.parse(command(listOf(Path.of(prefix, "bin", "fz").toString(), "--version"), env).trim()) == CliVersion.parse(target)) {
+            "Homebrew update could not be verified"
+        }
+        return "Fluxzero CLI updated to ${release.tag} through Homebrew"
     }
 
     private fun updateWinget(release: CliRelease): String {
