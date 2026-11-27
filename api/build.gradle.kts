@@ -10,7 +10,7 @@ dependencies {
     implementation(project(":templates"))
     
     // Ktor server dependencies
-    implementation("io.ktor:ktor-server-core:3.6.1")
+    implementation("io.ktor:ktor-server-core:3.6.2")
     implementation("io.ktor:ktor-server-cio:3.6.2")
     implementation("io.ktor:ktor-server-content-negotiation:3.6.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.2")
