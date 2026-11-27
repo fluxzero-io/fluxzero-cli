@@ -33,3 +33,7 @@ tasks.register<Jar>("platformProbeJar") {
     from(sourceSets.test.get().output)
     include("io/fluxzero/tools/account/AccountPlatformProbe*.class", "io/fluxzero/tools/account/AccountPlatformLoginProbe*.class")
 }
+
+tasks.named<Jar>("jar") {
+    manifest.attributes["Automatic-Module-Name"] = "io.fluxzero.tools.account"
+}
