@@ -25,3 +25,11 @@ publishing {
         }
     }
 }
+
+// This artifact is only for CI qualification; it is never published or embedded in the customer CLI.
+tasks.register<Jar>("platformProbeJar") {
+    dependsOn(tasks.testClasses)
+    archiveClassifier.set("platform-probe")
+    from(sourceSets.test.get().output)
+    include("io/fluxzero/tools/account/AccountPlatformProbe*.class", "io/fluxzero/tools/account/AccountPlatformLoginProbe*.class")
+}

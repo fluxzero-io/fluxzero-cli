@@ -126,8 +126,18 @@ final class AccountRepository {
         } catch (java.io.IOException e) { throw unavailable(); }
     }
     private static void permissions(Path path, String permissions) throws java.io.IOException {
-        if (path.getFileSystem().supportedFileAttributeViews().contains("posix"))
+        if (path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(permissions));
+        } else {
+            var acl = Files.getFileAttributeView(path, java.nio.file.attribute.AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+            if (acl == null || Files.isSymbolicLink(path)) throw unavailable();
+            var owner = Files.getOwner(path, LinkOption.NOFOLLOW_LINKS);
+            var entry = java.nio.file.attribute.AclEntry.newBuilder().setType(java.nio.file.attribute.AclEntryType.ALLOW)
+                    .setPrincipal(owner).setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission.class));
+            if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                entry.setFlags(java.nio.file.attribute.AclEntryFlag.DIRECTORY_INHERIT, java.nio.file.attribute.AclEntryFlag.FILE_INHERIT);
+            acl.setAcl(java.util.List.of(entry.build()));
+        }
     }
     private static AccountException unavailable() {
         return new AccountException("state_unavailable", "Your local account information cannot be read. Local development is still available.");

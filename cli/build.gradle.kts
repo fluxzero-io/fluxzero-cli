@@ -44,7 +44,7 @@ graalvmNative {
                 "--enable-native-access=ALL-UNNAMED",
                 "--report-unsupported-elements-at-runtime",
                 "--initialize-at-build-time=kotlin",
-                "--initialize-at-run-time=org.jline",
+                "--initialize-at-run-time=org.jline,io.fluxzero.tools.account",
                 "-H:+AddAllCharsets"
             )
         }

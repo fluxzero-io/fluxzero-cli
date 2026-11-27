@@ -19,7 +19,7 @@ jobs:
   native-build:
     name: Build Native Image - ${{ matrix.os }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.targets-json) }}
@@ -73,7 +73,7 @@ jobs:
             --enable-native-access=ALL-UNNAMED \
             --report-unsupported-elements-at-runtime \
             --initialize-at-build-time=kotlin \
-            --initialize-at-run-time=org.jline \
+            --initialize-at-run-time=org.jline,io.fluxzero.tools.account \
             -H:+AddAllCharsets \
             -jar "$CLI_JAR" \
             "$OUTPUT_DIRECTORY/flux"
@@ -81,6 +81,54 @@ jobs:
             test -f "$OUTPUT_DIRECTORY/flux.exe"
           else
             test -x "$OUTPUT_DIRECTORY/flux"
+          fi
+
+      - name: Install Linux secure-storage test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsecret-1-0 gnome-keyring dbus-x11
+
+      - name: Build separate native account qualification probes
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            image="$(cygpath -u "$JAVA_HOME")/bin/native-image.cmd"
+            separator=';'
+          else
+            image="$JAVA_HOME/bin/native-image"
+            separator=':'
+          fi
+          probe=$(find build/local-account/build/libs -name '*-platform-probe.jar' -print -quit)
+          test -n "$probe"
+          classpath="build/cli/build/libs/${{ inputs.jar-name }}${separator}${probe}"
+          for name in Storage Login; do
+            if [[ "$name" == Storage ]]; then main=AccountPlatformProbe; else main=AccountPlatformLoginProbe; fi
+            "$image" -march=compatibility --no-fallback --enable-native-access=ALL-UNNAMED \
+              --initialize-at-run-time=io.fluxzero.tools.account \
+              -cp "$classpath" "io.fluxzero.tools.account.$main" "cli/build/native/nativeCompile/account-$name"
+          done
+
+      - name: Qualify JVM and native account storage and local login
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          probe=$(find build/local-account/build/libs -name '*-platform-probe.jar' -print -quit)
+          jar="build/cli/build/libs/${{ inputs.jar-name }}"
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; else suffix=; fi
+          qualify() {
+            python3 scripts/test-account-platform.py --jar "$jar" --probe "$probe"
+            python3 scripts/test-account-platform.py --jar "$jar" --probe "$probe" \
+              --native-storage "cli/build/native/nativeCompile/account-Storage$suffix" \
+              --native-login "cli/build/native/nativeCompile/account-Login$suffix"
+          }
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            export -f qualify
+            export probe jar suffix
+            dbus-run-session -- bash scripts/with-test-secret-service.sh bash -ec qualify
+          else
+            qualify
           fi
 
       - name: Verify compatibility with older x86-64 CPUs

@@ -47,8 +47,7 @@ session explicitly; `--refresh` renews it when needed. No command prints tokens 
 
 The macOS adapter calls Security.framework directly. Tokens and the private DPoP key stay in Keychain, not in
 subprocess arguments, project files, browser storage or diagnostics. The first explicit access from a different
-executable can require macOS approval. There is no plaintext fallback. Other platforms currently return a scoped
-storage-unavailable result when credentials are needed; ordinary local development and cached status remain usable.
+executable can require macOS approval. There is no plaintext fallback. Windows uses Credential Manager generic credentials, with an atomic manifest and bounded chunks for sessions larger than one credential blob. Linux uses libsecret and the desktop Secret Service on the user session bus. Missing libsecret, no session bus/keyring, a locked collection or denied access produces a recoverable storage error; there is no file or plaintext credential fallback. Background operations never execute Secret Service prompts. Linux desktop/keyring dependencies must be installed by the user or their system administrator; Fluxzero does not launch an unprotected keyring for ordinary use.
 For the macOS login keychain, the adapter also scopes the process interaction policy around each serialized
 operation and restores its previous value. This covers application access prompts in addition to authentication
 prompts. Background operations fail with a recoverable storage issue; Devboard offers an explicit Unlock secure
@@ -89,7 +88,7 @@ Build/install the candidate shared module before building a candidate Dev Server
 For the real local IDP, use its `account-local` profile and prepare with `--with-cli-account`. Set the same local
 issuer/environment for each surface; enable offline access only with its explicit native refresh registration.
 All local mail must use the IDP's Rebound sink. The public release requires backend provisioning and the published
-shared artifact before dependent clients, with macOS Intel and Apple Silicon qualification.
+shared artifact before dependent clients, with macOS Intel/Apple Silicon, Windows x64 and Linux x64 qualification.
 
 `FLUXZERO_TEST_KEYCHAIN=true ./gradlew :local-account:test --tests '*MacKeychainStoreTest'` enables the opt-in
 real Keychain test. It creates and removes only its own synthetic item. Regular tests use an isolated in-memory
@@ -105,3 +104,11 @@ in memory and never enters authorization parameters, account metadata or project
 uses the browser displaying this page; it does not claim to focus another browser or agent window.
 Terminal and agent contexts offer matching return guidance. Host-specific agent deep links require an explicit,
 supported integration and are never inferred from client names or accepted as arbitrary redirect URLs.
+
+## Platform qualification
+
+The PR/release native matrix builds the same CLI on macOS Intel/Apple Silicon, Windows x64 and Linux x64. A separate, unpublished test artifact exercises real OS storage across process exits, large session updates, deletion, private metadata, and a signed loopback issuer through login, instance restart, expiry, DPoP refresh, verification and logout. Both JVM and native-image probes run; no production issuer, credentials or email are used. The synthetic callback driver does not prove real browser SSO or production account continuity.
+
+On Linux the CI job creates its own temporary session bus and synthetic unlocked keyring. This is test setup only, not a production fallback. Local desktop users need libsecret and a running Secret Service implementation (for example GNOME Keyring or a compatible KWallet service). Browser login uses `xdg-open`; Windows uses `ShellExecuteW`, and macOS uses `open`.
+
+References: [Windows credential blobs](https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw), [libsecret encrypted D-Bus secret encoding](https://gnome.pages.gitlab.gnome.org/libsecret/method.Service.encode_dbus_secret.html).
