@@ -23,7 +23,7 @@ dependencies {
     
     // Testing dependencies
     testImplementation("io.ktor:ktor-server-test-host:3.6.1")
-    testImplementation("io.ktor:ktor-client-content-negotiation:3.6.1")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.6.2")
 }
 
 application {
