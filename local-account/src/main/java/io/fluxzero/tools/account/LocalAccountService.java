@@ -24,8 +24,9 @@ public final class LocalAccountService implements AutoCloseable {
     private final SecureCredentialStore store;
     private final BrowserLauncher browser;
     private final AccountRepository repository;
+    private volatile Thread workerThread;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
-        Thread thread = new Thread(r, "fluxzero-account"); thread.setDaemon(true); return thread;
+        Thread thread = new Thread(r, "fluxzero-account"); thread.setDaemon(true); workerThread = thread; return thread;
     });
     private final AtomicReference<HttpServer> callbackServer = new AtomicReference<>();
     private final AtomicReference<CompletableFuture<String>> callbackCode = new AtomicReference<>();
@@ -329,7 +330,7 @@ public final class LocalAccountService implements AutoCloseable {
             }
         } catch (InterruptedException ignored) {Thread.currentThread().interrupt();}
         catch (AccountException failure) {
-            repository.recordFailure(failure.code());issue = failure.code();
+            if (!closed) repository.recordFailure(failure.code());issue = failure.code();
             message = "storage_locked".equals(issue) ? "Unlock secure storage to finish signing out." : failure.getMessage();
         }
         catch (Exception ignored) { /* Keep the recoverable account message scoped to this explicit operation. */ }
@@ -449,6 +450,7 @@ public final class LocalAccountService implements AutoCloseable {
     private void discard(String key) { if (key != null) try { store.delete(key, false); } catch (RuntimeException ignored) {} }
 
     private void fail(AccountRepository.State initial, AccountException error) {
+        if (closed) return;
         repository.recordFailure(error.code());
         try { repository.locked("state", current -> {
             if (current.generation() == initial.generation()) repository.write(new AccountRepository.State(1,
@@ -536,5 +538,9 @@ public final class LocalAccountService implements AutoCloseable {
         HttpServer server = callbackServer.getAndSet(null);
         if (server != null) server.stop(0);
         worker.shutdownNow();
+        if (Thread.currentThread() != workerThread) {
+            try { worker.awaitTermination(2, TimeUnit.SECONDS); }
+            catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        }
     }
 }

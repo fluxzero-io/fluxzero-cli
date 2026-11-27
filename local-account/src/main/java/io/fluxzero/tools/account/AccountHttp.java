@@ -43,13 +43,18 @@ final class AccountHttp implements AutoCloseable {
     private Reply send(HttpRequest request) {
         var future = client.sendAsync(request, ignored -> new LimitedBody());
         try {
-            var response = future.thenApply(value -> value).orTimeout(10, TimeUnit.SECONDS).join();
+            var response = future.get(10, TimeUnit.SECONDS);
             byte[] bytes = response.body();
             JsonNode body;
             try { body = bytes.length == 0 ? JSON.createObjectNode() : JSON.readTree(bytes); }
             catch (Exception e) { throw new AccountException("service_unavailable", "The account service could not complete this request. Try again shortly."); }
             return new Reply(response.statusCode(), body, response.headers().firstValue("DPoP-Nonce").orElse(null));
         } catch (AccountException e) { throw e; }
+        catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new AccountException("cancelled", "The account operation was cancelled. You can keep working locally.");
+        }
         catch (Exception e) {
             future.cancel(true);
             throw new AccountException("offline", "Fluxzero account services cannot be reached. You can keep working locally and try again later.");

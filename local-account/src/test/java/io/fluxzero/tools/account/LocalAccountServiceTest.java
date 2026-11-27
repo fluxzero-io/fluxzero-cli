@@ -128,6 +128,25 @@ class LocalAccountServiceTest {
         }
     }
 
+    @Test void closeWaitsForTheOwnedWorkerToStop() throws Exception {
+        start(false);
+        var opened = new CountDownLatch(1);
+        var blocked = new CountDownLatch(1);
+        var thread = new AtomicReference<Thread>();
+        try (var other = new LocalAccountService(configuration, store, uri -> {
+            thread.set(Thread.currentThread());
+            opened.countDown();
+            try { blocked.await(); }
+            catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+        })) {
+            other.startLogin();
+            assertTrue(opened.await(5, TimeUnit.SECONDS));
+            other.close();
+            assertFalse(thread.get().isAlive(), "Closing must drain the owned worker before returning");
+            assertEquals("signed_out", other.status().state());
+        } finally { blocked.countDown(); }
+    }
+
     @Test void browserClosureAfterServerRevocationDoesNotLeaveTheUserWaiting() throws Exception {
         start(true);login();
         var opened = new CountDownLatch(1);
