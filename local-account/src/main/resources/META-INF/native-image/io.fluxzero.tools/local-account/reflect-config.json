@@ -1,0 +1,68 @@
+[
+  {
+    "name": "io.fluxzero.tools.account.AccountStatus",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.AccountRepository$BrowserAction",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.AccountRepository$State",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LocalAccountService$SecretSession",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.AccountCrypto$ProofKey",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.MacKeychainStore$Security",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.MacKeychainStore$CoreFoundation",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.WindowsCredentialStore$Advapi",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.BrowserLauncher$Shell",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LinuxSecretServiceStore$Secret",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LinuxSecretServiceStore$Glib",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LinuxSecretServiceStore$Gio",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LinuxSecretServiceStore$GObject",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.LinuxSecretServiceStore$ObjectPathApi",
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.fluxzero.tools.account.WindowsCredentialStore$Credential",
+    "allPublicFields": true,
+    "allDeclaredConstructors": true
+  }
+]

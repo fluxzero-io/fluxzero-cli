@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":templates"))
     implementation(project(":publishing"))
     implementation(project(":dev-launcher"))
+    implementation(project(":local-account"))
     implementation("com.fasterxml.jackson.core:jackson-databind:2.23.0")
     implementation("com.github.ajalt.clikt:clikt:5.2.1")
     implementation("org.jline:jline:4.7.0")
@@ -43,7 +44,7 @@ graalvmNative {
                 "--enable-native-access=ALL-UNNAMED",
                 "--report-unsupported-elements-at-runtime",
                 "--initialize-at-build-time=kotlin",
-                "--initialize-at-run-time=org.jline",
+                "--initialize-at-run-time=org.jline,io.fluxzero.tools.account",
                 "-H:+AddAllCharsets"
             )
         }

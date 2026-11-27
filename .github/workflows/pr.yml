@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           changed="$(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.sha }}')"
-          if grep -Eq '(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^\.github/workflows/(native-build|release)\.yml$' <<< "$changed"; then
+          if grep -Eq '(^|/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties)$|^gradle/|^\.tool-versions$|^local-account/|^scripts/test-account-platform\.py$|^\.github/workflows/(native-build|release)\.yml$' <<< "$changed"; then
             echo 'native-package=true' >> "$GITHUB_OUTPUT"
             echo 'native-targets={"include":[{"os":"linux-amd64","runner":"ubuntu-24.04","artifact-name":"flux-linux-amd64"},{"os":"macos-amd64","runner":"macos-15-intel","artifact-name":"flux-macos-amd64"},{"os":"macos-arm64","runner":"macos-15","artifact-name":"flux-macos-arm64"},{"os":"windows-amd64","runner":"windows-2022","artifact-name":"flux-windows-amd64"}]}' >> "$GITHUB_OUTPUT"
           elif grep -Eq '^scripts/(collect-windows-runtime\.ps1|install\.ps1\.template)$' <<< "$changed"; then
@@ -68,7 +68,7 @@ jobs:
           api/node_modules/.bin/wrangler deploy --config api/wrangler.toml --dry-run --containers-rollout=none
 
       - name: Build and test
-        run: ./gradlew build :cli:shadowJar :cli:generateScripts -PappVersion="$CANDIDATE_VERSION"
+        run: ./gradlew build :cli:shadowJar :cli:generateScripts :local-account:platformProbeJar -PappVersion="$CANDIDATE_VERSION"
 
       - name: Publish candidate plugins locally
         run: >-
@@ -105,6 +105,8 @@ jobs:
           mkdir -p "$artifact_root/libs" "$artifact_root/release-scripts"
           cp "cli/build/libs/fluxzero-cli-$CANDIDATE_VERSION.jar" "$artifact_root/libs/"
           cp cli/build/release-scripts/* "$artifact_root/release-scripts/"
+          mkdir -p build/pr-native-artifact/local-account/build/libs
+          cp local-account/build/libs/*-platform-probe.jar build/pr-native-artifact/local-account/build/libs/
 
       - name: Upload candidate JAR and install scripts
         if: steps.changes.outputs.native-package == 'true'

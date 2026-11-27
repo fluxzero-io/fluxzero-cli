@@ -1,0 +1,29 @@
+[
+  [
+    "io.fluxzero.tools.account.MacKeychainStore$Security"
+  ],
+  [
+    "io.fluxzero.tools.account.MacKeychainStore$CoreFoundation"
+  ],
+  [
+    "io.fluxzero.tools.account.WindowsCredentialStore$Advapi"
+  ],
+  [
+    "io.fluxzero.tools.account.BrowserLauncher$Shell"
+  ],
+  [
+    "io.fluxzero.tools.account.LinuxSecretServiceStore$Secret"
+  ],
+  [
+    "io.fluxzero.tools.account.LinuxSecretServiceStore$Glib"
+  ],
+  [
+    "io.fluxzero.tools.account.LinuxSecretServiceStore$Gio"
+  ],
+  [
+    "io.fluxzero.tools.account.LinuxSecretServiceStore$GObject"
+  ],
+  [
+    "io.fluxzero.tools.account.LinuxSecretServiceStore$ObjectPathApi"
+  ]
+]
