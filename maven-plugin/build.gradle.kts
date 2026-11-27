@@ -147,8 +147,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.apache.maven.plugin-testing:maven-plugin-testing-harness:3.5.1")
-    testImplementation("org.apache.maven:maven-core:3.10.1")
-    testImplementation("org.apache.maven:maven-compat:3.10.1")
+    testImplementation("org.apache.maven:maven-core:3.10.2")
+    testImplementation("org.apache.maven:maven-compat:3.10.2")
 }
 
 // Copy compiled classes to Maven's expected location (target/classes)
