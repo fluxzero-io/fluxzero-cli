@@ -117,6 +117,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          # The lifecycle smoke resolves the Dev Server runtime through Maven.
+          cache: maven
 
       - name: Verify dev server Java installation
         shell: bash
