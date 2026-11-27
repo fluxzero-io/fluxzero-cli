@@ -118,5 +118,13 @@ References: [Windows credential blobs](https://learn.microsoft.com/en-us/windows
 The account JAR carries JNA JNI, reflection and native-dispatch resource metadata so standalone
 consumers and direct `native-image` builds use the same OS adapters. The metadata derives from
 the pinned Oracle GraalVM Reachability Metadata revision identified in
-`META-INF/NOTICE-jna-metadata.txt` (CC0); upstream coverage-test resources are omitted.
+`META-INF/NOTICE-jna-metadata.txt` (CC0); upstream coverage-test entries and the unused X11 AWT error-handler registration are omitted.
+Account integration opens the browser through platform launchers and does not use AWT.
 Qualification probes exercise actual secure-store access in both JVM and native executables.
+
+JNA uses explicit JNI and reflection configuration rather than the unified metadata format.
+The unified format registers bulk reflection queries for every listed type, including unused
+`Native` AWT method signatures. This would pull AWT and image-specific JVM shim DLLs into the
+Windows package and break the updater's unchanged-runtime boundary. Account integration does
+not use AWT; the exact registrations preserve that boundary. Native qualification executables
+are built in their own directory so their auxiliary files cannot enter the customer package.

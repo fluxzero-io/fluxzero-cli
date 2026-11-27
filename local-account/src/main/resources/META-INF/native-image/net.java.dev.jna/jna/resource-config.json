@@ -1,0 +1,21 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "com/sun/jna/darwin\\-aarch64/libjnidispatch\\.jnilib"
+      },
+      {
+        "pattern": "com/sun/jna/darwin\\-x86\\-64/libjnidispatch\\.jnilib"
+      },
+      {
+        "pattern": "com/sun/jna/linux\\-aarch64/libjnidispatch\\.so"
+      },
+      {
+        "pattern": "com/sun/jna/linux\\-x86\\-64/libjnidispatch\\.so"
+      },
+      {
+        "pattern": "com/sun/jna/win32\\-x86\\-64/jnidispatch\\.dll"
+      }
+    ]
+  }
+}

@@ -4,7 +4,9 @@ Derived from Oracle GraalVM Reachability Metadata, revision
 ecaeaa437656b64914152c7dd80025328efbb013:
 https://github.com/oracle/graalvm-reachability-metadata/blob/ecaeaa437656b64914152c7dd80025328efbb013/metadata/net.java.dev.jna/jna/5.8.0/reachability-metadata.json
 
-The upstream coverage-test library resources are omitted.
+The metadata is split into explicit JNI, reflection and resource configuration.
+The upstream coverage-test library resources and test callback lambdas are omitted.
+The X11 AWT error-handler registration is omitted: account integration uses no AWT.
 
 Copyright and related rights waived via CC0
 Creative Commons Legal Code

@@ -103,11 +103,12 @@ jobs:
           probe=$(find build/local-account/build/libs -name '*-platform-probe.jar' -print -quit)
           test -n "$probe"
           classpath="build/cli/build/libs/${{ inputs.jar-name }}${separator}${probe}"
+          mkdir -p local-account/build/native/platform-probes
           for name in Storage Login; do
             if [[ "$name" == Storage ]]; then main=AccountPlatformProbe; else main=AccountPlatformLoginProbe; fi
             "$image" -march=compatibility --no-fallback --enable-native-access=ALL-UNNAMED \
               --initialize-at-run-time=io.fluxzero.tools.account \
-              -cp "$classpath" "io.fluxzero.tools.account.$main" "cli/build/native/nativeCompile/account-$name"
+              -cp "$classpath" "io.fluxzero.tools.account.$main" "local-account/build/native/platform-probes/account-$name"
           done
 
       - name: Qualify JVM and native account storage and local login
@@ -120,8 +121,8 @@ jobs:
           qualify() {
             python3 scripts/test-account-platform.py --jar "$jar" --probe "$probe"
             python3 scripts/test-account-platform.py --jar "$jar" --probe "$probe" \
-              --native-storage "cli/build/native/nativeCompile/account-Storage$suffix" \
-              --native-login "cli/build/native/nativeCompile/account-Login$suffix"
+              --native-storage "local-account/build/native/platform-probes/account-Storage$suffix" \
+              --native-login "local-account/build/native/platform-probes/account-Login$suffix"
           }
           if [[ "$RUNNER_OS" == Linux ]]; then
             export -f qualify
@@ -146,6 +147,11 @@ jobs:
           & ./scripts/collect-windows-runtime.ps1 `
             -Executable cli/build/native/nativeCompile/flux.exe `
             -Destination cli/build/native/nativeCompile
+          foreach ($unexpected in @('awt.dll', 'java.dll', 'jvm.dll')) {
+            if (Test-Path (Join-Path 'cli/build/native/nativeCompile' $unexpected)) {
+              throw "The CLI must not bundle unused AWT or image-specific JVM shims: $unexpected"
+            }
+          }
 
       - name: Package Windows distribution
         if: runner.os == 'Windows'
