@@ -128,23 +128,35 @@ class LocalAccountServiceTest {
         }
     }
 
-    @Test void closeWaitsForTheOwnedWorkerToStop() throws Exception {
+    @Test void closeWaitsForOwnedCleanupBeforeReturning() throws Exception {
         start(false);
         var opened = new CountDownLatch(1);
         var blocked = new CountDownLatch(1);
-        var thread = new AtomicReference<Thread>();
+        var cleanupStarted = new CountDownLatch(1);
+        var releaseCleanup = new CountDownLatch(1);
+        var cleanupFinished = new CountDownLatch(1);
         try (var other = new LocalAccountService(configuration, store, uri -> {
-            thread.set(Thread.currentThread());
             opened.countDown();
             try { blocked.await(); }
-            catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            catch (InterruptedException ignored) {
+                cleanupStarted.countDown();
+                try { releaseCleanup.await(); }
+                catch (InterruptedException again) { Thread.currentThread().interrupt(); }
+                finally { cleanupFinished.countDown(); Thread.currentThread().interrupt(); }
+            }
         })) {
             other.startLogin();
             assertTrue(opened.await(5, TimeUnit.SECONDS));
-            other.close();
-            assertFalse(thread.get().isAlive(), "Closing must drain the owned worker before returning");
+            var closing = CompletableFuture.runAsync(other::close);
+            try {
+                assertTrue(cleanupStarted.await(5, TimeUnit.SECONDS));
+                assertThrows(java.util.concurrent.TimeoutException.class, () -> closing.get(100, TimeUnit.MILLISECONDS),
+                        "Closing must wait while owned cleanup is still running");
+            } finally { releaseCleanup.countDown(); }
+            closing.get(5, TimeUnit.SECONDS);
+            assertEquals(0, cleanupFinished.getCount());
             assertEquals("signed_out", other.status().state());
-        } finally { blocked.countDown(); }
+        } finally { blocked.countDown(); releaseCleanup.countDown(); }
     }
 
     @Test void browserClosureAfterServerRevocationDoesNotLeaveTheUserWaiting() throws Exception {
