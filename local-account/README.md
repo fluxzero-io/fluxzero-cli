@@ -112,3 +112,11 @@ The PR/release native matrix builds the same CLI on macOS Intel/Apple Silicon, W
 On Linux the CI job creates its own temporary session bus and synthetic unlocked keyring. This is test setup only, not a production fallback. Local desktop users need libsecret and a running Secret Service implementation (for example GNOME Keyring or a compatible KWallet service). Browser login uses `xdg-open`; Windows uses `ShellExecuteW`, and macOS uses `open`.
 
 References: [Windows credential blobs](https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw), [libsecret encrypted D-Bus secret encoding](https://gnome.pages.gitlab.gnome.org/libsecret/method.Service.encode_dbus_secret.html).
+
+### Native-image metadata
+
+The account JAR carries JNA JNI, reflection and native-dispatch resource metadata so standalone
+consumers and direct `native-image` builds use the same OS adapters. The metadata derives from
+the pinned Oracle GraalVM Reachability Metadata revision identified in
+`META-INF/NOTICE-jna-metadata.txt` (CC0); upstream coverage-test resources are omitted.
+Qualification probes exercise actual secure-store access in both JVM and native executables.
