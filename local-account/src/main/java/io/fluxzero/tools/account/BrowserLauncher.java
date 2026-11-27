@@ -17,6 +17,19 @@ public interface BrowserLauncher {
         static final Shell API = com.sun.jna.Native.load("shell32", Shell.class);
     }
 
+    /** Linux launchers may intentionally retain the browser's process lifetime. */
+    final class Processes {
+        private Processes() {}
+        static void awaitOpening(Process process, boolean followsBrowserLifetime) throws InterruptedException {
+            if (process.waitFor(3, TimeUnit.SECONDS)) {
+                if (process.exitValue() != 0) throw new IllegalStateException();
+            } else if (!followsBrowserLifetime) {
+                process.destroyForcibly();
+                throw new IllegalStateException();
+            }
+        }
+    }
+
     static BrowserLauncher system() {
         return uri -> {
             AccountConfiguration.requireTrustedTransport(uri);
@@ -32,8 +45,7 @@ public interface BrowserLauncher {
                 if (opener == null) throw new IllegalStateException();
                 Process process = new ProcessBuilder(opener, uri.toString()).redirectError(ProcessBuilder.Redirect.DISCARD)
                         .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
-                if (!process.waitFor(3, TimeUnit.SECONDS)) { process.destroyForcibly(); throw new IllegalStateException(); }
-                if (process.exitValue() != 0) throw new IllegalStateException();
+                Processes.awaitOpening(process, os.equals("Linux"));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new AccountException("cancelled", "Sign-in was cancelled. You can continue working locally.");

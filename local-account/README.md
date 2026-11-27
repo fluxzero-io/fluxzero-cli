@@ -128,3 +128,8 @@ The unified format registers bulk reflection queries for every listed type, incl
 Windows package and break the updater's unchanged-runtime boundary. Account integration does
 not use AWT; the exact registrations preserve that boundary. Native qualification executables
 are built in their own directory so their auxiliary files cannot enter the customer package.
+
+A successful Linux `xdg-open` invocation may remain attached to the browser. The launcher
+therefore stops waiting after a short startup check without terminating that process; the
+bounded account callback still determines login success. A prompt nonzero exit is reported
+as a launcher failure. See the [xdg-open manual](https://manpages.debian.org/trixie/xdg-utils/xdg-open.1.en.html).
